@@ -1,0 +1,45 @@
+name: Publicar o site automaticamente
+
+# Roda toda vez que uma mudança é enviada (push) para a branch "main"
+on:
+  push:
+    branches: [main]
+  # Também permite rodar manualmente pela aba "Actions" no GitHub, se precisar
+  workflow_dispatch:
+
+# Permissões necessárias para publicar no GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-e-publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar as dependências do projeto
+        run: npm install
+
+      - name: Construir o site (build)
+        run: npm run build
+
+      - name: Preparar o site para publicação
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
