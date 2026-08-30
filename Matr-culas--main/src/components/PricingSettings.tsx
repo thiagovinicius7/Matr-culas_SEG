@@ -1,24 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { RegularClass, ContraturnoPrice } from '../types';
-import { REGULAR_CLASSES } from '../data';
-import { DollarSign, Check, RotateCcw, Info, Sliders, Shield, Plus, Trash2 } from 'lucide-react';
+import { RegularClass, ContraturnoPrice, PackDocument } from '../types';
+import { REGULAR_CLASSES, PACK_DOCUMENT_DEFINITIONS } from '../data';
+import { DollarSign, Check, RotateCcw, Info, Sliders, Shield, Plus, Trash2, FileText, Upload, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface PricingSettingsProps {
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
   onSavePrices: (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[], year: number) => void;
-  appPassword?: string;
-  onUpdatePassword?: (newPassword: string) => Promise<void>;
+  currentUserEmail?: string;
+  onCreateTeamMember?: (email: string, password: string) => Promise<void>;
+  packDocuments?: PackDocument[];
+  onUploadPackDocument?: (docId: string, nome: string, fase: PackDocument['fase'], file: File) => Promise<void>;
+  onRemovePackDocument?: (docId: string) => Promise<void>;
 }
 
 export default function PricingSettings({
   classPrices,
   contraturnoPrices,
   onSavePrices,
-  appPassword,
-  onUpdatePassword
+  currentUserEmail,
+  onCreateTeamMember,
+  packDocuments = [],
+  onUploadPackDocument,
+  onRemovePackDocument
 }: PricingSettingsProps) {
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberPassword, setNewMemberPassword] = useState('');
+  const [isCreatingMember, setIsCreatingMember] = useState(false);
+  const [createMemberMsg, setCreateMemberMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleCreateMemberClick = async () => {
+    if (!newMemberEmail.trim() || !newMemberPassword) {
+      setCreateMemberMsg({ type: 'error', text: 'Preencha o e-mail e a senha.' });
+      return;
+    }
+    if (newMemberPassword.length < 6) {
+      setCreateMemberMsg({ type: 'error', text: 'A senha precisa ter pelo menos 6 caracteres.' });
+      return;
+    }
+    setIsCreatingMember(true);
+    setCreateMemberMsg(null);
+    try {
+      if (onCreateTeamMember) {
+        await onCreateTeamMember(newMemberEmail.trim(), newMemberPassword);
+      }
+      setCreateMemberMsg({ type: 'success', text: `Acesso criado para ${newMemberEmail.trim()}.` });
+      setNewMemberEmail('');
+      setNewMemberPassword('');
+    } catch {
+      // O toast de erro específico já é mostrado pelo handler no App.tsx
+    } finally {
+      setIsCreatingMember(false);
+    }
+  };
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [customYears, setCustomYears] = useState<number[]>([]);
   const [showAddYear, setShowAddYear] = useState(false);
@@ -29,12 +65,6 @@ export default function PricingSettings({
   const [localContraturno, setLocalContraturno] = useState<ContraturnoPrice[]>([]);
   const [contraturnoTableTab, setContraturnoTableTab] = useState<'regular' | 'somente_contraturno'>('regular');
   const [isSaved, setIsSaved] = useState(false);
-
-  // Password fields state
-  const [newPasswordInput, setNewPasswordInput] = useState('');
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Derive available years
   const availableYears = Array.from(
@@ -158,31 +188,6 @@ export default function PricingSettings({
     onSavePrices(localClasses, localContraturno, selectedYear);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 4000);
-  };
-
-  const handleUpdatePasswordClick = async () => {
-    if (!newPasswordInput) {
-      setPasswordError('A nova senha não pode ser vazia.');
-      return;
-    }
-    if (newPasswordInput.length < 4) {
-      setPasswordError('A nova senha deve ter pelo menos 4 dígitos.');
-      return;
-    }
-    try {
-      setIsUpdatingPassword(true);
-      setPasswordError(null);
-      setPasswordSuccess(null);
-      if (onUpdatePassword) {
-        await onUpdatePassword(newPasswordInput);
-      }
-      setPasswordSuccess('Senha de acesso do aplicativo atualizada com sucesso!');
-      setNewPasswordInput('');
-    } catch (err) {
-      setPasswordError('Ocorreu um erro ao atualizar a senha no banco de dados.');
-    } finally {
-      setIsUpdatingPassword(false);
-    }
   };
 
   const handleRestoreDefaults = () => {
@@ -551,56 +556,145 @@ export default function PricingSettings({
         <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
           <Shield size={16} className="text-brand-orange" />
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Segurança do Aplicativo (Senha de Acesso)
+            Segurança do Aplicativo (Acesso da Equipe)
           </h3>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Senha de Acesso Ativa</label>
-            <div className="bg-slate-50 text-xs px-3 py-2 border border-slate-200 rounded-md font-mono select-none text-slate-600 flex justify-between items-center">
-              <span>••••••</span>
-              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded uppercase font-sans font-bold">Protegido</span>
-            </div>
-          </div>
-          
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Definir Nova Senha</label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="Digite apenas números"
-                value={newPasswordInput}
-                onChange={(e) => {
-                  setNewPasswordInput(e.target.value.replace(/\D/g, ''));
-                  setPasswordSuccess(null);
-                  setPasswordError(null);
-                }}
-                className="text-xs px-3 py-2 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none flex-1 font-mono font-bold"
-              />
-              <button
-                onClick={handleUpdatePasswordClick}
-                disabled={isUpdatingPassword || !newPasswordInput}
-                className="px-4 py-2 bg-brand-green-dark hover:bg-brand-green-light disabled:bg-slate-300 text-white text-xs font-bold rounded-md cursor-pointer transition-colors whitespace-nowrap"
-              >
-                {isUpdatingPassword ? 'Gravando...' : 'Alterar Senha'}
-              </button>
-            </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sua conta</label>
+          <div className="bg-slate-50 text-xs px-3 py-2 border border-slate-200 rounded-md font-mono text-slate-600 flex justify-between items-center">
+            <span>{currentUserEmail || '—'}</span>
+            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded uppercase font-sans font-bold">Conectado</span>
           </div>
         </div>
-        
-        {passwordError && (
-          <p className="text-[10px] text-rose-600 font-semibold">{passwordError}</p>
-        )}
-        {passwordSuccess && (
-          <p className="text-[10px] text-emerald-600 font-semibold">{passwordSuccess}</p>
-        )}
-        <p className="text-[10px] text-slate-400 italic">
-          Nota: Esta senha protege todo o ecossistema do gestor escolar. Ao alterá-la, ela será salva na nuvem e será exigida imediatamente no próximo acesso de qualquer dispositivo.
-        </p>
+
+        <div className="p-3 bg-slate-50 border border-slate-150 rounded-lg space-y-2.5">
+          <p className="text-[11px] font-bold text-slate-600">Criar acesso para alguém da equipe</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <input
+              type="email"
+              placeholder="E-mail da pessoa"
+              value={newMemberEmail}
+              onChange={(e) => { setNewMemberEmail(e.target.value); setCreateMemberMsg(null); }}
+              className="text-xs px-3 py-2 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none bg-white"
+            />
+            <input
+              type="text"
+              placeholder="Senha (mín. 6 caracteres)"
+              value={newMemberPassword}
+              onChange={(e) => { setNewMemberPassword(e.target.value); setCreateMemberMsg(null); }}
+              className="text-xs px-3 py-2 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none bg-white font-mono"
+            />
+          </div>
+          <button
+            onClick={handleCreateMemberClick}
+            disabled={isCreatingMember}
+            className="px-4 py-2 bg-brand-green-dark hover:bg-brand-green-light disabled:bg-slate-300 text-white text-xs font-bold rounded-md cursor-pointer transition-colors"
+          >
+            {isCreatingMember ? 'Criando...' : 'Criar acesso'}
+          </button>
+          {createMemberMsg && (
+            <p className={`text-[10px] font-semibold ${createMemberMsg.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {createMemberMsg.text}
+            </p>
+          )}
+          <p className="text-[10px] text-slate-400 leading-relaxed pt-1 border-t border-slate-150">
+            Combine essa senha com a pessoa (por WhatsApp, por exemplo) — ela pode trocá-la depois usando "Esqueci minha senha" na tela de login.
+          </p>
+          <p className="text-[10px] text-slate-400 leading-relaxed">
+            Para <strong>remover</strong> o acesso de alguém que saiu da equipe, é preciso entrar no Firebase Console (Authentication → Users) — essa parte ainda não dá pra fazer por aqui.
+          </p>
+        </div>
       </div>
+
+      {/* Documentos do Pack de Matrícula */}
+      {onUploadPackDocument && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <FileText size={16} className="text-brand-green-dark" /> Documentos do Pack de Matrícula
+          </h3>
+          <p className="text-[11px] text-slate-500">
+            Envie ou substitua os arquivos usados pela equipe (contratos, fichas, calendário, etc). Enviar um arquivo novo substitui automaticamente o anterior.
+          </p>
+
+          {(['semeadura', 'enraizamento', 'florescer'] as const).map(fase => {
+            const faseLabels: Record<typeof fase, string> = {
+              semeadura: '🌱 Semeadura',
+              enraizamento: '🌿 Enraizamento',
+              florescer: '🌸 Florescer',
+            };
+            const docsGrupo = PACK_DOCUMENT_DEFINITIONS.filter(d => d.fase === fase);
+            return (
+              <div key={fase} className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{faseLabels[fase]}</p>
+                <div className="border border-slate-150 rounded-lg divide-y divide-slate-100">
+                  {docsGrupo.map(def => {
+                    const existing = packDocuments.find(d => d.id === def.id);
+                    const isUploading = uploadingDocId === def.id;
+                    return (
+                      <div key={def.id} className="flex items-center justify-between px-3 py-2.5 gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{def.nome}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {existing
+                              ? `Atualizado em ${new Date(existing.atualizadoEm + 'T00:00:00').toLocaleDateString('pt-BR')}`
+                              : 'Nenhum arquivo enviado ainda'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {existing && (
+                            <a
+                              href={existing.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-bold text-brand-green-dark hover:underline px-1.5"
+                            >
+                              ver
+                            </a>
+                          )}
+                          <label className={`text-[10px] font-bold px-2.5 py-1.5 rounded-md cursor-pointer flex items-center gap-1 ${
+                            existing ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-brand-green-dark text-white hover:bg-emerald-900'
+                          }`}>
+                            {isUploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                            {existing ? 'Substituir' : 'Enviar'}
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.doc,.docx"
+                              disabled={isUploading}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file || !onUploadPackDocument) return;
+                                setUploadingDocId(def.id);
+                                await onUploadPackDocument(def.id, def.nome, def.fase, file);
+                                setUploadingDocId(null);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          {existing && onRemovePackDocument && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remover o arquivo de "${def.nome}"?`)) {
+                                  onRemovePackDocument(def.id);
+                                }
+                              }}
+                              className="text-slate-300 hover:text-rose-600 p-1 cursor-pointer"
+                              title="Remover arquivo"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Safety Notice block */}
       <div className="p-4 bg-slate-50 border border-slate-150 rounded-lg flex items-start gap-3">
