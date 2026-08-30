@@ -290,3 +290,29 @@ export async function migrateGuardianContatoParaTelefone(): Promise<{ migrados: 
   return { migrados, total: guardians.length };
 }
 
+/**
+ * Envia (ou substitui) o arquivo de um documento do Pack de Matrícula no
+ * Firebase Storage e devolve a URL pública de download. Cada documento tem
+ * um `docId` fixo (ex: 'ficha_dados_gerais') — subir um arquivo novo com o
+ * mesmo docId simplesmente sobrescreve o anterior no Storage.
+ */
+export async function uploadPackDocument(docId: string, file: File): Promise<string> {
+  const extension = file.name.split('.').pop() || 'pdf';
+  const fileRef = storageRef(storage, `pack-documents/${docId}.${extension}`);
+  await uploadBytes(fileRef, file);
+  return getDownloadURL(fileRef);
+}
+
+/**
+ * Remove o arquivo de um documento do Pack de Matrícula do Storage.
+ * O caminho precisa incluir a extensão exata que foi usada no upload.
+ */
+export async function deletePackDocumentFile(storagePath: string): Promise<void> {
+  try {
+    await deleteObject(storageRef(storage, storagePath));
+  } catch (error) {
+    // Arquivo pode já não existir — não é um erro crítico para o usuário.
+    console.warn('Não foi possível remover o arquivo do Storage:', error);
+  }
+}
+

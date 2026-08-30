@@ -465,3 +465,20 @@ export const INITIAL_FINANCIAL_MOVEMENTS: FinancialMovement[] = [
     valorNovo: 2400
   }
 ];
+
+// Definições fixas dos documentos do Pack de Matrícula (id estável usado tanto
+// para exibir/baixar no Dashboard quanto para fazer upload em Configurações).
+export const PACK_DOCUMENT_DEFINITIONS: { id: string; nome: string; fase: 'semeadura' | 'enraizamento' | 'florescer' }[] = [
+  { id: 'ficha_dados_gerais', nome: 'Ficha de Dados Gerais', fase: 'semeadura' },
+  { id: 'texto_orientador', nome: 'Texto Orientador de Fechamento', fase: 'semeadura' },
+  { id: 'contrato_padrao', nome: 'Contrato Padrão', fase: 'enraizamento' },
+  { id: 'contrato_contraturno_interno', nome: 'Contrato Contraturno (interno)', fase: 'enraizamento' },
+  { id: 'contrato_contraturno_externo', nome: 'Contrato Crianças Externas Contraturno', fase: 'enraizamento' },
+  { id: 'aditivo_alimentacao', nome: 'Aditivo de Alimentação', fase: 'enraizamento' },
+  { id: 'termo_uso_imagem', nome: 'Termo de Uso de Imagem', fase: 'enraizamento' },
+  { id: 'ficha_saude', nome: 'Ficha de Saúde', fase: 'enraizamento' },
+  { id: 'calendario_escolar', nome: 'Calendário Escolar', fase: 'florescer' },
+  { id: 'regras_combinados', nome: 'Regras e Combinados', fase: 'florescer' },
+  { id: 'anamnese_infantil', nome: 'Ficha de Anamnese — Infantil', fase: 'florescer' },
+  { id: 'anamnese_fundamental', nome: 'Ficha de Anamnese — Fundamental', fase: 'florescer' },
+];

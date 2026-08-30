@@ -162,3 +162,18 @@ export interface ContraturnoDailyException {
   nomeAvulso?: string; // usado em 'avulso_diaria' quando a criança não tem cadastro (ex: diária externa)
   observacao?: string;
 }
+
+/**
+ * Um documento real do Pack de Matrícula (contrato, ficha, etc.), com o
+ * arquivo já enviado e disponível para download pela equipe. O `id` é uma
+ * chave fixa e estável (ex: 'ficha_dados_gerais') usada para localizar o
+ * documento certo em cada fase, independente do nome do arquivo enviado.
+ */
+export interface PackDocument {
+  id: string;
+  nome: string;
+  fase: 'semeadura' | 'enraizamento' | 'florescer';
+  url: string;
+  storagePath: string; // caminho no Firebase Storage, usado para poder substituir/excluir
+  atualizadoEm: string; // YYYY-MM-DD
+}
