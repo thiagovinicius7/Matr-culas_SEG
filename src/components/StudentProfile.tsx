@@ -326,6 +326,35 @@ export default function StudentProfile({
     return true; // 'todos'
   });
 
+  // Busca/navegação por turma (tela de "Alunos cadastrados")
+  const [browseMode, setBrowseMode] = useState<'nome' | 'turma'>('nome');
+  const [browseTurmaId, setBrowseTurmaId] = useState<string | null>(null);
+
+  const turmaCatalog = classPrices.length > 0 ? classPrices : REGULAR_CLASSES;
+  const turmaCounts = turmaCatalog.map(cls => {
+    const count = filteredStudents.filter(st => {
+      const age = calculateAgeAtCutoff(st.nascimento, activeYear);
+      return normalizeClassId(getRegularClassForAge(age).id) === normalizeClassId(cls.id);
+    }).length;
+    return { ...cls, count };
+  });
+
+  const studentsInBrowseTurma = browseTurmaId
+    ? filteredStudents.filter(st => {
+        const age = calculateAgeAtCutoff(st.nascimento, activeYear);
+        return normalizeClassId(getRegularClassForAge(age).id) === normalizeClassId(browseTurmaId);
+      })
+    : [];
+
+  const studentsToList = browseMode === 'turma' && browseTurmaId ? studentsInBrowseTurma : filteredStudents;
+
+  const backToBrowse = () => {
+    setSelectedStudentId('');
+    onSelectStudent?.('');
+    setIsAddingStudent(false);
+    setIsEditingStudent(false);
+  };
+
   const startAddStudent = () => {
     setFormNome('');
     setFormNascimento('');
@@ -460,10 +489,12 @@ export default function StudentProfile({
     setIsAddingSingleGuardian(false);
   };
 
+  const showBrowsePanel = !activeStudent && !isAddingStudent && !isEditingStudent;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="student-ficha-root">
-      {/* Sidebar: Student list & search */}
-      <div className="lg:col-span-4 bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-4">
+    <div id="student-ficha-root">
+      {showBrowsePanel && (
+      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">Alunos cadastrados</h3>
           <button
@@ -522,88 +553,130 @@ export default function StudentProfile({
               Todos
             </button>
           </div>
+
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-[10px] font-bold w-fit">
+            <button
+              type="button"
+              onClick={() => { setBrowseMode('nome'); setBrowseTurmaId(null); }}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                browseMode === 'nome' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Por nome
+            </button>
+            <button
+              type="button"
+              onClick={() => setBrowseMode('turma')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                browseMode === 'turma' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Por turma
+            </button>
+          </div>
         </div>
 
-        <div className="max-h-[520px] overflow-y-auto divide-y divide-slate-100 pr-1 space-y-1">
-          {filteredStudents.map((st) => {
-            const isSelected = st.id === selectedStudentId;
-            const bAge = calculateAgeAtCutoff(st.nascimento, activeYear);
-            const bClass = getRegularClassForAge(bAge);
-            return (
-              <div
-                key={st.id}
-                className={`w-full rounded-lg transition-all border ${
-                  isSelected ? 'bg-emerald-50/80 border-emerald-500 shadow-2xs' : 'border-transparent hover:bg-slate-50'
-                }`}
+        {browseMode === 'turma' && !browseTurmaId ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {turmaCounts.map(cls => (
+              <button
+                key={cls.id}
+                onClick={() => setBrowseTurmaId(cls.id)}
+                className="p-3 rounded-lg border border-slate-200 hover:border-brand-green-light hover:bg-emerald-50/40 text-left transition-colors cursor-pointer"
               >
-                <div className="p-2.5 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedStudentId(st.id);
-                      onSelectStudent?.(st.id);
-                      setIsAddingStudent(false);
-                      setIsEditingStudent(false);
-                      setIsAddingSingleGuardian(false);
-                      setMobileDetailOpen(true);
-                    }}
-                    className="flex-1 text-left cursor-pointer min-w-0"
-                  >
-                    <h4 className="font-bold text-xs text-slate-800 truncate">{st.nome}</h4>
-                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                      {bAge} anos • <span className="text-slate-700 font-semibold">{bClass.nome}</span>
-                    </p>
-                  </button>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
+                <p className="text-xs font-bold text-slate-800">{cls.nome}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">{cls.count} aluno{cls.count !== 1 ? 's' : ''}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+        <>
+          {browseMode === 'turma' && browseTurmaId && (
+            <button
+              onClick={() => setBrowseTurmaId(null)}
+              className="text-[11px] font-bold text-brand-orange hover:underline cursor-pointer"
+            >
+              ← todas as turmas
+            </button>
+          )}
+          <div className="max-h-[560px] overflow-y-auto divide-y divide-slate-100 pr-1 space-y-1">
+            {studentsToList.map((st) => {
+              const isSelected = st.id === selectedStudentId;
+              const bAge = calculateAgeAtCutoff(st.nascimento, activeYear);
+              const bClass = getRegularClassForAge(bAge);
+              return (
+                <div
+                  key={st.id}
+                  className={`w-full rounded-lg transition-all border ${
+                    isSelected ? 'bg-emerald-50/80 border-emerald-500 shadow-2xs' : 'border-transparent hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="p-2.5 flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         setSelectedStudentId(st.id);
                         onSelectStudent?.(st.id);
-                        setShowNegotiationModal(true);
+                        setIsAddingStudent(false);
+                        setIsEditingStudent(false);
+                        setIsAddingSingleGuardian(false);
                       }}
-                      className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-bold rounded-md flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                      title={`Abrir Calculadora de Acordo para ${st.nome}`}
+                      className="flex-1 text-left cursor-pointer min-w-0"
                     >
-                      <Calculator size={12} className="text-amber-800" />
-                      <span>Acordo</span>
+                      <h4 className="font-bold text-xs text-slate-800 truncate">{st.nome}</h4>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                        {bAge} anos • <span className="text-slate-700 font-semibold">{bClass.nome}</span>
+                      </p>
                     </button>
 
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
-                      st.status === 'ativo' 
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                        : st.status === 'trancado' 
-                        ? 'bg-amber-100 text-amber-900 border border-amber-300' 
-                        : st.status === 'cancelado' 
-                        ? 'bg-rose-100 text-rose-900 border border-rose-300' 
-                        : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {st.status}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedStudentId(st.id);
+                          onSelectStudent?.(st.id);
+                          setShowNegotiationModal(true);
+                        }}
+                        className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-bold rounded-md flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                        title={`Abrir Calculadora de Acordo para ${st.nome}`}
+                      >
+                        <Calculator size={12} className="text-amber-800" />
+                        <span>Acordo</span>
+                      </button>
+
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                        st.status === 'ativo' 
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                          : st.status === 'trancado' 
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                          : st.status === 'cancelado' 
+                          ? 'bg-rose-100 text-rose-900 border border-rose-300' 
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {st.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-          {filteredStudents.length === 0 && (
-            <p className="text-xs text-slate-400 text-center py-8">Nenhum aluno encontrado com "{searchQuery}".</p>
-          )}
-        </div>
+              );
+            })}
+            {studentsToList.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-8">
+                {browseMode === 'turma' ? 'Nenhum aluno nesta turma.' : `Nenhum aluno encontrado com "${searchQuery}".`}
+              </p>
+            )}
+          </div>
+        </>
+        )}
       </div>
+      )}
 
-      {/* Main Panel: Selected Ficha or Add Student form.
-          No mobile, funciona como um overlay de tela cheia (evita ter que
-          rolar até o fim da lista para ver a ficha); no desktop (lg+) fica
-          sempre visível lado a lado com a lista. */}
-      <div className={
-        (mobileDetailOpen ? 'fixed inset-0 z-50 bg-slate-50 overflow-y-auto p-4 ' : 'hidden ') +
-        'lg:static lg:z-auto lg:bg-transparent lg:p-0 lg:overflow-visible lg:block lg:col-span-8'
-      }>
+      {/* Painel da ficha (aluno selecionado, novo cadastro ou edição) — ocupa a tela toda */}
+      <div className={showBrowsePanel ? 'hidden' : ''}>
         <button
-          onClick={() => setMobileDetailOpen(false)}
-          className="lg:hidden flex items-center gap-1 text-xs font-bold text-slate-600 mb-3 cursor-pointer"
+          onClick={backToBrowse}
+          className="flex items-center gap-1 text-xs font-bold text-slate-600 mb-3 cursor-pointer hover:text-slate-900"
         >
           ‹ Voltar para a lista
         </button>
@@ -1052,33 +1125,26 @@ export default function StudentProfile({
                   </button>
 
                   {activeStudent.status === 'ativo' ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Deseja trancar a matrícula de ${activeStudent.nome}? Ele deixará de constar nas listas de chamada ativas.`)) {
+                    <div className="relative">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === 'trancado' && confirm(`Deseja trancar a matrícula de ${activeStudent.nome}? Ele deixará de constar nas listas de chamada ativas.`)) {
                             onUpdateStudent({ ...activeStudent, status: 'trancado' });
-                          }
-                        }}
-                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer border border-amber-200"
-                        title="Trancar a matrícula mantendo histórico gravado"
-                      >
-                        <Lock size={13} />
-                        Trancar Matrícula
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (confirm(`Deseja cancelar a matrícula de ${activeStudent.nome}?`)) {
+                          } else if (value === 'cancelado' && confirm(`Deseja cancelar a matrícula de ${activeStudent.nome}?`)) {
                             onUpdateStudent({ ...activeStudent, status: 'cancelado' });
                           }
+                          e.target.value = '';
                         }}
-                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-900 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-200"
-                        title="Cancelar a matrícula e arquivar aluno"
+                        className="appearance-none pl-3 pr-7 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-900 text-[11px] font-bold rounded-md border border-rose-200 cursor-pointer"
+                        title="Alterar status da matrícula"
                       >
-                        <Ban size={13} />
-                        Cancelar Matrícula
-                      </button>
-                    </>
+                        <option value="" disabled>Alterar status...</option>
+                        <option value="trancado">🔒 Trancar Matrícula</option>
+                        <option value="cancelado">🚫 Cancelar Matrícula</option>
+                      </select>
+                    </div>
                   ) : (
                     <button
                       onClick={() => {
@@ -1090,15 +1156,6 @@ export default function StudentProfile({
                       Reativar Matrícula (Retornar)
                     </button>
                   )}
-
-                  <button
-                    onClick={handleExportImage}
-                    disabled={isExporting}
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    <FileImage size={13} />
-                    {isExporting ? 'Gerando Imagem...' : 'Gerar Imagem para Enviar'}
-                  </button>
                   <button
                     onClick={handlePrintFicha}
                     className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"

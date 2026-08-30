@@ -778,27 +778,6 @@ export default function Dashboard({
         })}
       </div>
 
-      {/* Contraturno Highlights */}
-      <div className="bg-brand-green-dark text-white rounded-lg p-5 shadow-xs relative overflow-hidden border border-emerald-900/30 font-display" id="contraturno-banner">
-        <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-brand-orange/10 via-transparent to-transparent pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <span className="px-2.5 py-0.5 bg-brand-orange text-white rounded text-[9px] font-bold uppercase tracking-wider">Contraturno Escolar</span>
-            <h3 className="text-base font-bold text-white font-display">Melaço (até 4 anos) & Marmelada (5+ anos)</h3>
-            <p className="text-xs text-slate-300 font-sans">
-              Oferecemos atividades lúdicas, vivências integradas na natureza, ateliê de artes e alimentação saudável. Atualmente com <strong className="text-brand-orange font-bold">{activeContraturnos.length} estudantes</strong> no contraturno ativo, somando {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contraturnoRevenue)} mensais.
-            </p>
-          </div>
-          <button 
-            onClick={() => onNavigate('escala')}
-            className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-md shadow-md transition-colors flex items-center gap-2 self-start md:self-auto cursor-pointer uppercase tracking-wider"
-          >
-            Ver Escala Semanal
-            <Calendar size={14} />
-          </button>
-        </div>
-      </div>
-
       {/* Modal for Class Student List */}
       <AnimatePresence>
         {selectedClassForModal && (

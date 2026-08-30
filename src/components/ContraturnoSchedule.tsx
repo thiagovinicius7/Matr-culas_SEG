@@ -319,17 +319,30 @@ export default function ContraturnoSchedule({
 
   if (isPrintMode) {
     return (
-      <div className="p-6 bg-white text-black min-h-screen" id="print-view">
-        <div className="text-center pb-4 border-b border-slate-300 mb-4">
-          <h1 className="text-lg font-bold uppercase tracking-wide">Sítio-escola — Escala de Contraturno</h1>
-          <p className="text-[10px] font-mono mt-0.5">Impresso em {new Date().toLocaleDateString('pt-BR')} • Período: 2026</p>
+      <div className="bg-white text-black min-h-screen font-sans" id="print-view">
+        {/* Cabeçalho com identidade visual do Sítio-Escola Geranium */}
+        <div className="flex items-center justify-between px-8 pt-6 pb-3">
+          <img
+            src="https://sitioescolageranium.com.br/imagens/logo-sitio-escola-geranium.png"
+            alt="Sítio-Escola Geranium"
+            className="h-14 w-auto object-contain"
+            referrerPolicy="no-referrer"
+          />
+          <div className="text-right">
+            <h1 className="text-base font-bold uppercase tracking-wide text-brand-green-dark font-display">Escala de Contraturno</h1>
+            <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+              {viewMode === 'semanal' ? 'Semana' : 'Matriz geral'} • Impresso em {new Date().toLocaleDateString('pt-BR')}
+            </p>
+          </div>
         </div>
+        <div className="h-1.5 bg-brand-orange mx-8 rounded-full mb-5" />
+
+        <div className="px-8 pb-8">
 
         {viewMode === 'semanal' ? (
           /* WEEKLY PRINT MATRIX */
           <div className="space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider">Escala Semanal de Presença</h2>
-            <div className="grid grid-cols-5 gap-2 border border-slate-300 divide-x divide-slate-300">
+            <div className="grid grid-cols-5 gap-3">
               {daysOfWeek.map(day => {
                 const allAttendees = getAttendeesForDay(day);
                 // Impressão só mostra quem realmente estará presente: exclui quem
@@ -339,49 +352,51 @@ export default function ContraturnoSchedule({
                 const marmelada = attendees.filter(a => a.segment.natureza === 'Marmelada');
 
                 return (
-                  <div key={day} className="p-2 space-y-2">
-                    <div className="border-b border-slate-300 pb-1">
-                      <h3 className="font-bold text-xs text-center">{dayNamesFull[day]}</h3>
-                      <p className="text-[9px] text-center font-mono font-bold">Total: {attendees.length}</p>
+                  <div key={day} className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-brand-green-dark text-white text-center py-1.5">
+                      <h3 className="font-bold text-xs font-display">{dayNamesFull[day]}</h3>
+                      <p className="text-[9px] font-mono opacity-80">{attendees.length} {attendees.length === 1 ? 'criança' : 'crianças'}</p>
                     </div>
 
-                    {/* Melaço group */}
-                    <div className="space-y-1">
-                      <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Melaço</h4>
-                      {melaco.map(a => (
-                        <div key={a.segment.id} className="text-[9px] font-medium">
-                          • {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}
-                          {a.exceptionStatus === 'movido_para_ca' && ' (veio de outro dia)'}
-                          {a.exceptionStatus === 'avulso' && ' (diária)'}
-                        </div>
-                      ))}
-                      {melaco.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
-                    </div>
+                    <div className="p-2 space-y-3">
+                      {/* Melaço group */}
+                      <div className="space-y-0.5">
+                        <h4 className="text-[9px] font-bold uppercase text-brand-orange border-b border-brand-orange/30 pb-0.5 mb-1">Melaço</h4>
+                        {melaco.map(a => (
+                          <div key={a.segment.id} className="text-[9.5px] leading-snug">
+                            • {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}
+                            {a.exceptionStatus === 'movido_para_ca' && <span className="text-brand-orange font-semibold"> (veio de outro dia)</span>}
+                            {a.exceptionStatus === 'avulso' && <span className="text-emerald-700 font-semibold"> (diária)</span>}
+                          </div>
+                        ))}
+                        {melaco.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
+                      </div>
 
-                    {/* Marmelada group */}
-                    <div className="space-y-1">
-                      <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Marmelada</h4>
-                      {marmelada.map(a => (
-                        <div key={a.segment.id} className="text-[9px] font-medium">
-                          • {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}
-                          {a.exceptionStatus === 'movido_para_ca' && ' (veio de outro dia)'}
-                          {a.exceptionStatus === 'avulso' && ' (diária)'}
-                        </div>
-                      ))}
-                      {marmelada.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
+                      {/* Marmelada group */}
+                      <div className="space-y-0.5">
+                        <h4 className="text-[9px] font-bold uppercase text-brand-green-light border-b border-brand-green-light/30 pb-0.5 mb-1">Marmelada</h4>
+                        {marmelada.map(a => (
+                          <div key={a.segment.id} className="text-[9.5px] leading-snug">
+                            • {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}
+                            {a.exceptionStatus === 'movido_para_ca' && <span className="text-brand-orange font-semibold"> (veio de outro dia)</span>}
+                            {a.exceptionStatus === 'avulso' && <span className="text-emerald-700 font-semibold"> (diária)</span>}
+                          </div>
+                        ))}
+                        {marmelada.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <p className="text-[9px] italic text-slate-600 mt-2">* Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.</p>
+            <p className="text-[9px] italic text-slate-500 mt-3">* Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.</p>
           </div>
         ) : (
           /* MONTHLY MATRIX PRINT */
           <div className="space-y-3">
-            <h2 className="text-sm font-bold uppercase tracking-wider">Matriz Geral do Contraturno</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-brand-green-dark font-display">Matriz Geral do Contraturno</h2>
             <div className="overflow-x-auto w-full">
-              <table className="w-full text-left border border-slate-300 border-collapse">
+              <table className="w-full text-left border border-slate-200 border-collapse rounded-lg overflow-hidden">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-300 text-[10px] font-bold font-mono">
                     <th className="p-2 border-r border-slate-300">Estudante</th>
@@ -416,13 +431,16 @@ export default function ContraturnoSchedule({
                 </tbody>
               </table>
             </div>
-            <p className="text-[9px] italic text-slate-600 mt-2">* Crianças com saída antecipada às 15h (Parcial).</p>
+            <p className="text-[9px] italic text-slate-500 mt-2">* Crianças com saída antecipada às 15h (Parcial).</p>
           </div>
         )}
 
-        <div className="mt-8 text-center text-[9px] border-t border-slate-300 pt-2">
-          <p>Documento de circulação interna — Sítio-escola</p>
         </div>
+
+        <div className="mx-8 h-1 bg-brand-green-dark rounded-full mb-2" />
+        <p className="text-center text-[9px] text-slate-400 pb-6">
+          Sítio-Escola Geranium • Núcleo Rural de Taguatinga, Chácara 29 • (61) 9876-3154 — documento de circulação interna
+        </p>
       </div>
     );
   }
@@ -648,15 +666,14 @@ export default function ContraturnoSchedule({
                                   </button>
                                 )}
                                 {onUpdateContraturnoNatureza && exceptionStatus !== 'movido_para_ca' && exceptionStatus !== 'avulso' && (
-                                  <select
-                                    value={segment.natureza}
-                                    onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
-                                    className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
-                                    title="Trocar turma de contraturno"
+                                  <button
+                                    type="button"
+                                    onClick={() => onUpdateContraturnoNatureza(student.id, segment.id, segment.natureza === 'Melaço' ? 'Marmelada' : 'Melaço')}
+                                    className="text-slate-400 hover:text-brand-orange cursor-pointer shrink-0"
+                                    title={`Mover para ${segment.natureza === 'Melaço' ? 'Marmelada' : 'Melaço'}`}
                                   >
-                                    <option value="Melaço">Melaço</option>
-                                    <option value="Marmelada">Marmelada</option>
-                                  </select>
+                                    <MoveRight size={11} />
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -674,7 +691,7 @@ export default function ContraturnoSchedule({
                               <span className="text-[8px] font-bold text-emerald-700 uppercase">diária · externo</span>
                             )}
 
-                            {!exceptionStatus && (!isConfirmed ? (
+                            {!exceptionStatus && !isConfirmed && (
                               <div className="flex items-center justify-between text-[9px] font-bold text-amber-900 pt-1 border-t border-amber-300/80">
                                 <span className="flex items-center gap-1">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
@@ -684,17 +701,7 @@ export default function ContraturnoSchedule({
                                   Pendente
                                 </span>
                               </div>
-                            ) : (
-                              <div className="flex items-center justify-between text-[9px] font-medium text-emerald-800 pt-0.5 border-t border-emerald-200/50">
-                                <span className="flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                  {targetYear}
-                                </span>
-                                <span className="text-[8px] text-emerald-800 font-bold">
-                                  Confirmada
-                                </span>
-                              </div>
-                            ))}
+                            )}
                           </div>
                           );
                         })}
@@ -768,15 +775,14 @@ export default function ContraturnoSchedule({
                                   </button>
                                 )}
                                 {onUpdateContraturnoNatureza && exceptionStatus !== 'movido_para_ca' && exceptionStatus !== 'avulso' && (
-                                  <select
-                                    value={segment.natureza}
-                                    onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
-                                    className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
-                                    title="Trocar turma de contraturno"
+                                  <button
+                                    type="button"
+                                    onClick={() => onUpdateContraturnoNatureza(student.id, segment.id, segment.natureza === 'Melaço' ? 'Marmelada' : 'Melaço')}
+                                    className="text-slate-400 hover:text-brand-orange cursor-pointer shrink-0"
+                                    title={`Mover para ${segment.natureza === 'Melaço' ? 'Marmelada' : 'Melaço'}`}
                                   >
-                                    <option value="Melaço">Melaço</option>
-                                    <option value="Marmelada">Marmelada</option>
-                                  </select>
+                                    <MoveRight size={11} />
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -794,7 +800,7 @@ export default function ContraturnoSchedule({
                               <span className="text-[8px] font-bold text-emerald-700 uppercase">diária · externo</span>
                             )}
 
-                            {!exceptionStatus && (!isConfirmed ? (
+                            {!exceptionStatus && !isConfirmed && (
                               <div className="flex items-center justify-between text-[9px] font-bold text-amber-900 pt-1 border-t border-amber-300/80">
                                 <span className="flex items-center gap-1">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
@@ -804,17 +810,7 @@ export default function ContraturnoSchedule({
                                   Pendente
                                 </span>
                               </div>
-                            ) : (
-                              <div className="flex items-center justify-between text-[9px] font-medium text-emerald-800 pt-0.5 border-t border-emerald-200/50">
-                                <span className="flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                  {targetYear}
-                                </span>
-                                <span className="text-[8px] text-emerald-800 font-bold">
-                                  Confirmada
-                                </span>
-                              </div>
-                            ))}
+                            )}
                           </div>
                           );
                         })}
@@ -1015,7 +1011,6 @@ export default function ContraturnoSchedule({
                   ))}
                   <th className="p-3 text-center">Frequência</th>
                   <th className="p-3 text-center">Saída</th>
-                  <th className="p-3 text-right">Valor Mensal</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150 text-xs text-slate-700">
@@ -1111,9 +1106,6 @@ export default function ContraturnoSchedule({
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                           {horarioSaida(c.periodo)}
                         </span>
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-900">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.valorMensal)}
                       </td>
                     </tr>
                   );
