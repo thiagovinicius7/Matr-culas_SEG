@@ -1,62 +1,69 @@
-import React, { useState, useEffect } from 'react';
-import { Sprout, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sprout, Lock, Mail, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { signIn, requestPasswordReset } from '../firebase';
 
 interface LoginScreenProps {
-  expectedPassword: string;
   onLoginSuccess: () => void;
 }
 
-export default function LoginScreen({ expectedPassword, onLoginSuccess }: LoginScreenProps) {
+export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWiggling, setIsWiggling] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const friendlyError = (code: string): string => {
+    switch (code) {
+      case 'auth/invalid-email':
+        return 'E-mail inválido.';
+      case 'auth/user-not-found':
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+        return 'E-mail ou senha incorretos.';
+      case 'auth/too-many-requests':
+        return 'Muitas tentativas. Aguarde um pouco e tente novamente.';
+      default:
+        return 'Não foi possível entrar. Tente novamente.';
+    }
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
-    if (password === expectedPassword) {
-      setError('');
+    if (!email.trim() || !password) {
+      setError('Preencha o e-mail e a senha.');
+      return;
+    }
+    setError('');
+    setResetSent(false);
+    setIsSubmitting(true);
+    try {
+      await signIn(email.trim(), password);
       onLoginSuccess();
-    } else {
-      setError('Senha incorreta. Tente novamente.');
+    } catch (err: any) {
+      setError(friendlyError(err?.code || ''));
       setIsWiggling(true);
       setTimeout(() => setIsWiggling(false), 500);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Auto-submit when exactly 6 characters are typed/pressed
-  useEffect(() => {
-    if (password.length === expectedPassword.length) {
-      if (password === expectedPassword) {
-        setError('');
-        onLoginSuccess();
-      } else if (password.length >= 6) {
-        setError('Senha incorreta. Tente novamente.');
-        setIsWiggling(true);
-        setTimeout(() => setIsWiggling(false), 500);
-      }
-    } else {
-      setError('');
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Digite seu e-mail acima para receber o link de redefinição.');
+      return;
     }
-  }, [password, expectedPassword, onLoginSuccess]);
-
-  const handleKeyPress = (num: string) => {
     setError('');
-    if (password.length < 12) {
-      setPassword(prev => prev + num);
+    try {
+      await requestPasswordReset(email.trim());
+      setResetSent(true);
+    } catch (err: any) {
+      setError(friendlyError(err?.code || ''));
     }
-  };
-
-  const handleBackspace = () => {
-    setError('');
-    setPassword(prev => prev.slice(0, -1));
-  };
-
-  const handleClear = () => {
-    setError('');
-    setPassword('');
   };
 
   return (
@@ -71,113 +78,101 @@ export default function LoginScreen({ expectedPassword, onLoginSuccess }: LoginS
         <div className="bg-brand-green-dark p-6 text-center text-white relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/10 rounded-full blur-2xl pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-brand-green-light/20 rounded-full blur-xl pointer-events-none"></div>
-          
+
           <div className="mx-auto mb-3 flex items-center justify-center p-2 bg-white/95 rounded-xl shadow-md max-w-[180px]">
-            <img 
-              src="https://sitioescolageranium.com.br/imagens/logo-sitio-escola-geranium.png" 
-              alt="Sítio-Escola Geranium" 
-              className="h-12 w-auto object-contain" 
+            <img
+              src="https://sitioescolageranium.com.br/imagens/logo-sitio-escola-geranium.png"
+              alt="Sítio-Escola Geranium"
+              className="h-12 w-auto object-contain"
               referrerPolicy="no-referrer"
             />
           </div>
           <h1 className="font-display font-bold text-lg tracking-tight">Sítio-Escola Geranium</h1>
-          <p className="text-[10px] text-brand-sand mt-1 uppercase tracking-wider font-bold">Gestor de Rematrículas</p>
+          <p className="text-[10px] text-brand-sand mt-1 uppercase tracking-wider font-bold">Gestor de Matrículas</p>
         </div>
 
-        {/* Form and Controls Section */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 flex-1 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="text-center space-y-1">
-              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center justify-center gap-1.5">
-                <Lock size={14} className="text-brand-orange" />
-                Acesso Restrito
-              </h2>
-              <p className="text-[11px] text-slate-500">
-                Insira a senha de acesso para gerenciar as fichas e rematrículas.
-              </p>
+        {/* Form Section */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="text-center space-y-1">
+            <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center justify-center gap-1.5">
+              <Lock size={14} className="text-brand-orange" />
+              Acesso Restrito
+            </h2>
+            <p className="text-[11px] text-slate-500">
+              Entre com o e-mail e a senha da sua conta da equipe.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <Mail size={11} /> E-mail
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(''); setResetSent(false); }}
+                placeholder="seuemail@geranium.com.br"
+                autoFocus
+                autoComplete="username"
+                className="w-full text-sm px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-brand-green-light focus:outline-none focus:ring-1 focus:ring-brand-green-light/20"
+              />
             </div>
 
-            {/* Password input box */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Senha</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Digite a senha"
-                  className="w-full text-center text-lg font-mono font-bold tracking-[0.25em] px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-brand-green-light focus:outline-none focus:ring-1 focus:ring-brand-green-light/20 transition-all text-slate-800"
-                  maxLength={12}
-                  autoFocus
+                  onChange={(e) => { setPassword(e.target.value); setError(''); setResetSent(false); }}
+                  placeholder="Sua senha"
+                  autoComplete="current-password"
+                  className="w-full text-sm px-3 py-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-xl focus:border-brand-green-light focus:outline-none focus:ring-1 focus:ring-brand-green-light/20"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-
-              {error && (
-                <div className="flex items-center gap-1 text-rose-600 justify-center text-[11px] font-semibold">
-                  <AlertCircle size={12} />
-                  <span>{error}</span>
-                </div>
-              )}
             </div>
 
-            {/* Virtual Keyboard (Numeric keypad) */}
-            <div className="grid grid-cols-3 gap-2 pt-2 max-w-[280px] mx-auto" id="virtual-keypad">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => handleKeyPress(num)}
-                  className="h-12 text-sm font-bold bg-slate-50 hover:bg-brand-sand border border-slate-100 rounded-xl active:scale-95 transition-all text-slate-700 shadow-2xs cursor-pointer flex items-center justify-center"
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={handleClear}
-                className="h-12 text-[10px] uppercase font-bold bg-slate-100/60 hover:bg-slate-200/80 border border-slate-100 rounded-xl active:scale-95 transition-all text-slate-500 cursor-pointer flex items-center justify-center"
-              >
-                Limpar
-              </button>
-              <button
-                type="button"
-                onClick={() => handleKeyPress('0')}
-                className="h-12 text-sm font-bold bg-slate-50 hover:bg-brand-sand border border-slate-100 rounded-xl active:scale-95 transition-all text-slate-700 shadow-2xs cursor-pointer flex items-center justify-center"
-              >
-                0
-              </button>
-              <button
-                type="button"
-                onClick={handleBackspace}
-                className="h-12 text-[10px] uppercase font-bold bg-slate-100/60 hover:bg-slate-200/80 border border-slate-100 rounded-xl active:scale-95 transition-all text-slate-500 cursor-pointer flex items-center justify-center"
-              >
-                Apagar
-              </button>
-            </div>
-          </div>
+            {error && (
+              <div className="flex items-center gap-1 text-rose-600 justify-center text-[11px] font-semibold">
+                <AlertCircle size={12} />
+                <span>{error}</span>
+              </div>
+            )}
+            {resetSent && (
+              <div className="text-center text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg py-2 px-3">
+                Enviamos um link de redefinição de senha para o seu e-mail.
+              </div>
+            )}
 
-          <div className="space-y-4 pt-2">
             <button
-              type="submit"
-              className="w-full h-11 bg-brand-green-dark hover:bg-brand-green-light text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all uppercase tracking-wider font-display"
+              type="button"
+              onClick={handleForgotPassword}
+              className="w-full text-center text-[11px] font-bold text-brand-orange hover:underline cursor-pointer"
             >
-              Acessar Sistema
+              Esqueci minha senha
             </button>
-
-            {/* Password hint */}
-            <div className="text-center p-2.5 bg-brand-sand/40 border border-brand-sand rounded-xl text-[10px] text-brand-clay leading-normal">
-              <span className="font-bold uppercase tracking-wide block mb-0.5">Dica de Acesso</span>
-              Senha padrão do sistema: <strong className="font-mono text-slate-800 bg-white px-1 py-0.5 rounded border border-slate-200 shadow-2xs">456321</strong>
-            </div>
           </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full h-11 bg-brand-green-dark hover:bg-brand-green-light text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all uppercase tracking-wider font-display disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+            Acessar Sistema
+          </button>
+
+          <p className="text-center text-[10px] text-slate-400 leading-relaxed">
+            Não tem uma conta? Peça à direção da escola para criar seu acesso.
+          </p>
         </form>
       </motion.div>
       <div className="mt-4 text-[9px] text-slate-400 font-mono text-center">

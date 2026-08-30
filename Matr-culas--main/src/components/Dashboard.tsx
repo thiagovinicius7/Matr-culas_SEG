@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Student, Enrollment, ContraturnoSegment, RegularClass } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId } from '../data';
+import { Student, Enrollment, ContraturnoSegment, RegularClass, PackDocument } from '../types';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS } from '../data';
 import { 
   Users, 
   CheckCircle, 
@@ -28,6 +28,7 @@ interface DashboardProps {
   classPrices?: RegularClass[];
   activeYear?: number;
   availableYears?: number[];
+  packDocuments?: PackDocument[];
   onNavigate: (tab: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
   onSelectActiveYear?: (year: number) => void;
@@ -43,6 +44,7 @@ export default function Dashboard({
   classPrices = [],
   activeYear = 2026,
   availableYears = [2026, 2027],
+  packDocuments = [],
   onNavigate, 
   onNavigateWithStudent,
   onSelectActiveYear,
@@ -722,57 +724,58 @@ export default function Dashboard({
           </button>
         </div>
 
-        {([
-          {
-            fase: '🌱 Semeadura',
-            color: 'text-brand-green-light',
-            docs: ['Ficha de Dados Gerais', 'Texto Orientador de Fechamento'],
-          },
-          {
-            fase: '🌿 Enraizamento',
-            color: 'text-brand-orange',
-            docs: [
-              'Contrato Padrão',
-              'Contrato Contraturno (interno)',
-              'Contrato Crianças Externas Contraturno',
-              'Aditivo de Alimentação',
-              'Termo de Uso de Imagem',
-              'Ficha de Saúde',
-            ],
-          },
-          {
-            fase: '🌸 Florescer',
-            color: 'text-brand-clay',
-            docs: [
-              'Calendário Escolar',
-              'Regras e Combinados',
-              'Ficha de Anamnese — Infantil',
-              'Ficha de Anamnese — Fundamental',
-            ],
-          },
-        ] as const).map(grupo => (
-          <div key={grupo.fase}>
-            <p className={`text-[10px] font-bold uppercase tracking-wide mb-1.5 ${grupo.color}`}>
-              {grupo.fase}
-            </p>
-            <div className="border border-slate-150 rounded-lg divide-y divide-slate-100 bg-slate-50/40">
-              {grupo.docs.map(nome => (
-                <div key={nome} className="flex items-center justify-between px-3 py-2">
-                  <span className="text-xs text-slate-700 flex items-center gap-2">
-                    <FileText size={13} className="text-slate-400 shrink-0" />
-                    {nome}
-                  </span>
-                  <button
-                    title="Baixar (documento a ser cadastrado em Configurações)"
-                    className="text-slate-400 hover:text-brand-green-dark cursor-pointer p-1"
-                  >
-                    <ArrowRightCircle size={15} className="rotate-90" />
-                  </button>
-                </div>
-              ))}
+        {(['semeadura', 'enraizamento', 'florescer'] as const).map(fase => {
+          const faseLabels: Record<typeof fase, { titulo: string; color: string }> = {
+            semeadura: { titulo: '🌱 Semeadura', color: 'text-brand-green-light' },
+            enraizamento: { titulo: '🌿 Enraizamento', color: 'text-brand-orange' },
+            florescer: { titulo: '🌸 Florescer', color: 'text-brand-clay' },
+          };
+          const docsGrupo = PACK_DOCUMENT_DEFINITIONS.filter(d => d.fase === fase);
+          return (
+            <div key={fase}>
+              <p className={`text-[10px] font-bold uppercase tracking-wide mb-1.5 ${faseLabels[fase].color}`}>
+                {faseLabels[fase].titulo}
+              </p>
+              <div className="border border-slate-150 rounded-lg divide-y divide-slate-100 bg-slate-50/40">
+                {docsGrupo.map(def => {
+                  const doc = packDocuments.find(d => d.id === def.id);
+                  return (
+                    <div key={def.id} className="flex items-center justify-between px-3 py-2">
+                      <span className="text-xs text-slate-700 flex items-center gap-2">
+                        <FileText size={13} className="text-slate-400 shrink-0" />
+                        {def.nome}
+                        {!doc && (
+                          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">
+                            não enviado
+                          </span>
+                        )}
+                      </span>
+                      {doc ? (
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Baixar (atualizado em ${new Date(doc.atualizadoEm + 'T00:00:00').toLocaleDateString('pt-BR')})`}
+                          className="text-brand-green-dark hover:text-emerald-900 cursor-pointer p-1"
+                        >
+                          <ArrowRightCircle size={15} className="rotate-90" />
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => onNavigate('pricing')}
+                          title="Enviar documento em Configurações"
+                          className="text-slate-300 hover:text-brand-orange cursor-pointer p-1"
+                        >
+                          <ArrowRightCircle size={15} className="rotate-90 opacity-40" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Contraturno Highlights */}

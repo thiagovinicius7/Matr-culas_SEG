@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, deleteApp } from 'firebase/app';
 import { 
   initializeFirestore, 
   collection, 
@@ -8,6 +8,22 @@ import {
   deleteDoc, 
   writeBatch 
 } from 'firebase/firestore';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  type User
+} from 'firebase/auth';
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+} from 'firebase/storage';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement } from './types';
 import { 
   INITIAL_STUDENTS, 
@@ -26,6 +42,52 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase with the custom database ID and enable long polling
 const app = initializeApp(firebaseConfig);
+export const storage = getStorage(app);
+export const auth = getAuth(app);
+
+/**
+ * Login individual por e-mail e senha (Firebase Authentication). As contas da
+ * equipe são criadas manualmente no Firebase Console (Authentication → Users
+ * → Add user) — não existe cadastro público dentro do app, o que é
+ * intencional: só quem a escola autorizou tem acesso.
+ */
+export async function signIn(email: string, password: string): Promise<User> {
+  const credential = await signInWithEmailAndPassword(auth, email, password);
+  return credential.user;
+}
+
+export async function signOutUser(): Promise<void> {
+  await firebaseSignOut(auth);
+}
+
+export function watchAuthState(callback: (user: User | null) => void): () => void {
+  return onAuthStateChanged(auth, callback);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email);
+}
+
+/**
+ * Cria uma conta nova para alguém da equipe (e-mail + senha), direto pelo
+ * app, sem precisar abrir o Firebase Console para isso. Usa uma instância
+ * secundária e temporária do Firebase só para esse cadastro — assim, quem
+ * está criando o acesso NÃO é deslogado da própria sessão no processo
+ * (limitação normal do SDK do Firebase para o navegador: criar uma conta
+ * loga automaticamente com ela, então criamos e destruímos essa instância
+ * separada em vez de usar a principal).
+ */
+export async function createTeamMemberAccount(email: string, password: string): Promise<void> {
+  const secondaryApp = initializeApp(firebaseConfig, `criar-acesso-${Date.now()}`);
+  const secondaryAuth = getAuth(secondaryApp);
+  try {
+    await createUserWithEmailAndPassword(secondaryAuth, email, password);
+  } finally {
+    await firebaseSignOut(secondaryAuth).catch(() => {});
+    await deleteApp(secondaryApp);
+  }
+}
+
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 }, firebaseConfig.firestoreDatabaseId);
@@ -226,5 +288,31 @@ export async function migrateGuardianContatoParaTelefone(): Promise<{ migrados: 
   }
 
   return { migrados, total: guardians.length };
+}
+
+/**
+ * Envia (ou substitui) o arquivo de um documento do Pack de Matrícula no
+ * Firebase Storage e devolve a URL pública de download. Cada documento tem
+ * um `docId` fixo (ex: 'ficha_dados_gerais') — subir um arquivo novo com o
+ * mesmo docId simplesmente sobrescreve o anterior no Storage.
+ */
+export async function uploadPackDocument(docId: string, file: File): Promise<string> {
+  const extension = file.name.split('.').pop() || 'pdf';
+  const fileRef = storageRef(storage, `pack-documents/${docId}.${extension}`);
+  await uploadBytes(fileRef, file);
+  return getDownloadURL(fileRef);
+}
+
+/**
+ * Remove o arquivo de um documento do Pack de Matrícula do Storage.
+ * O caminho precisa incluir a extensão exata que foi usada no upload.
+ */
+export async function deletePackDocumentFile(storagePath: string): Promise<void> {
+  try {
+    await deleteObject(storageRef(storage, storagePath));
+  } catch (error) {
+    // Arquivo pode já não existir — não é um erro crítico para o usuário.
+    console.warn('Não foi possível remover o arquivo do Storage:', error);
+  }
 }
 

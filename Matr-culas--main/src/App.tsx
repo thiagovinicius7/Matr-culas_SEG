@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException } from './types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument } from './types';
 import { 
   calculateAgeAtCutoff,
   getRegularClassForAge,
@@ -17,8 +17,14 @@ import {
   getCollectionData,
   saveDocument,
   deleteDocument,
-  clearAllDatabaseCollections
+  clearAllDatabaseCollections,
+  uploadPackDocument,
+  deletePackDocumentFile,
+  watchAuthState,
+  signOutUser,
+  createTeamMemberAccount
 } from './firebase';
+import type { User as AuthUser } from 'firebase/auth';
 import {
   IMPORTED_STUDENTS,
   getImportedGuardians,
@@ -34,7 +40,7 @@ import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
 import ParentCartaPortal from './components/ParentCartaPortal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -60,11 +66,20 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // App Password and Session states
-  const [appPassword, setAppPassword] = useState<string>('456321');
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return sessionStorage.getItem('isLoggedIn') === 'true';
-  });
+  // Autenticação real (Firebase Auth) — cada pessoa da equipe tem sua própria
+  // conta (e-mail + senha), criada manualmente no Firebase Console. Não existe
+  // mais uma "senha única do sistema".
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const isLoggedIn = !!currentUser;
+
+  useEffect(() => {
+    const unsubscribe = watchAuthState((user) => {
+      setCurrentUser(user);
+      setIsCheckingAuth(false);
+    });
+    return unsubscribe;
+  }, []);
 
   // Core App States loaded from Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -74,6 +89,7 @@ export default function App() {
   const [movements, setMovements] = useState<FinancialMovement[]>([]);
   const [negotiationHistory, setNegotiationHistory] = useState<NegotiationHistoryEntry[]>([]);
   const [dailyExceptions, setDailyExceptions] = useState<ContraturnoDailyException[]>([]);
+  const [packDocuments, setPackDocuments] = useState<PackDocument[]>([]);
   
   // Custom Pricing States
   const [classPrices, setClassPrices] = useState<RegularClass[]>([]);
@@ -104,7 +120,8 @@ export default function App() {
           loadedContraturnoPrices,
           loadedSettings,
           loadedNegotiationHistory,
-          loadedDailyExceptions
+          loadedDailyExceptions,
+          loadedPackDocuments
         ] = await Promise.all([
           getCollectionData<Student>('students'),
           getCollectionData<Guardian>('guardians'),
@@ -115,7 +132,8 @@ export default function App() {
           getCollectionData<ContraturnoPrice>('contraturnoPrices'),
           getCollectionData<{ id: string; value: string }>('settings'),
           getCollectionData<NegotiationHistoryEntry>('negotiationHistory'),
-          getCollectionData<ContraturnoDailyException>('contraturnoDailyExceptions')
+          getCollectionData<ContraturnoDailyException>('contraturnoDailyExceptions'),
+          getCollectionData<PackDocument>('packDocuments')
         ]);
         
         // Ensure student status defaults to 'ativo' if missing, preserving 'trancado', 'cancelado', etc.
@@ -157,12 +175,7 @@ export default function App() {
         setMovements(loadedMovements);
         setNegotiationHistory(loadedNegotiationHistory || []);
         setDailyExceptions(loadedDailyExceptions || []);
-
-        // Process loaded settings
-        const passwordSetting = (loadedSettings || []).find(s => s.id === 'appPassword');
-        if (passwordSetting && passwordSetting.value) {
-          setAppPassword(passwordSetting.value);
-        }
+        setPackDocuments(loadedPackDocuments || []);
 
         // Sanitize loaded Class Prices to ensure all have an 'ano' field
         const sanitizedClassPrices = (loadedClassPrices || []).map(cp => {
@@ -943,6 +956,41 @@ export default function App() {
     deleteDocument('contraturnoDailyExceptions', id);
   };
 
+  // Handlers: Documentos do Pack de Matrícula (upload/substituição via Firebase Storage)
+  const handleUploadPackDocument = async (
+    docId: string,
+    nome: string,
+    fase: PackDocument['fase'],
+    file: File
+  ) => {
+    try {
+      const url = await uploadPackDocument(docId, file);
+      const extension = file.name.split('.').pop() || 'pdf';
+      const newDoc: PackDocument = {
+        id: docId,
+        nome,
+        fase,
+        url,
+        storagePath: `pack-documents/${docId}.${extension}`,
+        atualizadoEm: new Date().toISOString().split('T')[0],
+      };
+      setPackDocuments(prev => [...prev.filter(d => d.id !== docId), newDoc]);
+      await saveDocument('packDocuments', newDoc);
+      showToast('Documento enviado', `${nome} foi enviado com sucesso.`, 'success');
+    } catch (error) {
+      console.error(error);
+      showToast('Erro ao enviar', `Não foi possível enviar ${nome}. Tente novamente.`, 'error');
+    }
+  };
+
+  const handleRemovePackDocument = async (docId: string) => {
+    const existing = packDocuments.find(d => d.id === docId);
+    if (!existing) return;
+    await deletePackDocumentFile(existing.storagePath);
+    setPackDocuments(prev => prev.filter(d => d.id !== docId));
+    deleteDocument('packDocuments', docId);
+  };
+
   // Handler: Change regular class manually (exceptional case)
   const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
     const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
@@ -1214,17 +1262,25 @@ export default function App() {
     }
   };
 
-  // Handler: Update application security password
-  const handleUpdatePassword = async (newPassword: string) => {
-    setAppPassword(newPassword);
-    await saveDocument('settings', { id: 'appPassword', value: newPassword });
-    showToast('Senha Atualizada', 'A nova senha de acesso ao sistema foi salva no Firebase.', 'success');
+  // Handler: Logout / Lock session
+  const handleLogout = async () => {
+    await signOutUser();
   };
 
-  // Handler: Logout / Lock session
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    sessionStorage.removeItem('isLoggedIn');
+  // Handler: criar acesso de um novo membro da equipe, direto pelo app
+  const handleCreateTeamMember = async (email: string, password: string) => {
+    try {
+      await createTeamMemberAccount(email, password);
+      showToast('Acesso criado', `A conta de ${email} foi criada. A pessoa já pode entrar com essa senha.`, 'success');
+    } catch (error: any) {
+      const code = error?.code || '';
+      let msg = 'Não foi possível criar o acesso. Tente novamente.';
+      if (code === 'auth/email-already-in-use') msg = 'Já existe uma conta com esse e-mail.';
+      if (code === 'auth/weak-password') msg = 'A senha precisa ter pelo menos 6 caracteres.';
+      if (code === 'auth/invalid-email') msg = 'E-mail inválido.';
+      showToast('Erro ao criar acesso', msg, 'error');
+      throw error;
+    }
   };
 
   const availableYears = Array.from(
@@ -1389,14 +1445,18 @@ export default function App() {
     }
   }
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen w-screen bg-brand-cream flex items-center justify-center">
+        <Loader2 className="animate-spin text-brand-green-dark" size={28} />
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
       <LoginScreen 
-        expectedPassword={appPassword} 
-        onLoginSuccess={() => {
-          setIsLoggedIn(true);
-          sessionStorage.setItem('isLoggedIn', 'true');
-        }} 
+        onLoginSuccess={() => { /* onAuthStateChanged já atualiza currentUser automaticamente */ }} 
       />
     );
   }
@@ -1630,6 +1690,7 @@ export default function App() {
                   onSelectActiveYear={setActiveYear}
                   onAdvanceSchoolYear={handleAdvanceSchoolYear}
                   classPrices={classPrices}
+                  packDocuments={packDocuments}
                   onNavigate={setActiveTab} 
                   onNavigateWithStudent={handleNavigateWithStudent}
                   onImportGeraniumData={handleImportGeraniumData}
@@ -1713,8 +1774,11 @@ export default function App() {
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   onSavePrices={handleSavePrices}
-                  appPassword={appPassword}
-                  onUpdatePassword={handleUpdatePassword}
+                  currentUserEmail={currentUser?.email || undefined}
+                  onCreateTeamMember={handleCreateTeamMember}
+                  packDocuments={packDocuments}
+                  onUploadPackDocument={handleUploadPackDocument}
+                  onRemovePackDocument={handleRemovePackDocument}
                 />
               )}
             </motion.div>
