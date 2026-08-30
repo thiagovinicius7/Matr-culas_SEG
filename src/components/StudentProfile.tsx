@@ -816,8 +816,8 @@ export default function StudentProfile({
                             type="text"
                             required
                             placeholder="(11) 99999-9999"
-                            value={tg.contato}
-                            onChange={(e) => updateTempGuardian(idx, 'contato', e.target.value)}
+                            value={tg.telefone}
+                            onChange={(e) => updateTempGuardian(idx, 'telefone', e.target.value)}
                             className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                           />
                         </div>

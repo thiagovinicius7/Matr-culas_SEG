@@ -222,11 +222,11 @@ export default function CartaIntencaoForm({
   // WhatsApp Message Generator
   const generateWhatsAppMessage = () => {
     return (
-      `🌿 *Sítio-Escola Geranium*\n` +
+      `*Sítio-Escola Geranium*\n` +
       `*Carta de Intenção de Rematrícula — Ano Letivo 2027*\n\n` +
       `Olá, família de *${student.nome}*!\n\n` +
       `Já estamos organizando o ano letivo de 2027 com muito carinho. Convidamos vocês a acessarem o link abaixo para conferir a proposta do próximo ano e confirmar a intenção de rematrícula:\n\n` +
-      `🔗 ${parentUrl}\n\n` +
+      `${parentUrl}\n\n` +
       `No link vocês poderão conferir a turma prevista, selecionar opções de Contraturno e registrar a decisão da família.\n\n` +
       `Ficamos à disposição para qualquer dúvida!\n` +
       `Atenciosamente,\n` +
@@ -239,8 +239,9 @@ export default function CartaIntencaoForm({
     navigator.clipboard.writeText(msg);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-    if (guardian?.contato) {
-      const cleanPhone = guardian.contato.replace(/\D/g, '');
+    const telefone = guardian?.telefone || guardian?.contato;
+    if (telefone) {
+      const cleanPhone = telefone.replace(/\D/g, '');
       if (cleanPhone) {
         window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
       }
@@ -309,7 +310,7 @@ export default function CartaIntencaoForm({
           <div className="space-y-1 sm:text-right border-t sm:border-t-0 sm:border-l border-slate-200 pt-2 sm:pt-0 sm:pl-4">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Responsável Financeiro</p>
             <p className="text-sm font-semibold text-slate-800">{guardian?.nome || 'Não cadastrado'}</p>
-            <p className="text-xs text-slate-600">Contato: {guardian?.contato || 'Sem telefone'}</p>
+            <p className="text-xs text-slate-600">Contato: {guardian?.telefone || guardian?.contato || 'Sem telefone'}</p>
           </div>
         </div>
 

@@ -22,7 +22,8 @@ import {
   deletePackDocumentFile,
   watchAuthState,
   signOutUser,
-  createTeamMemberAccount
+  createTeamMemberAccount,
+  signInAsPublicVisitor
 } from './firebase';
 import type { User as AuthUser } from 'firebase/auth';
 import {
@@ -73,6 +74,11 @@ export default function App() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const isLoggedIn = !!currentUser;
 
+  // Detecta cedo se a página foi aberta via link público da Carta de Intenção
+  // (?alunoId=... ou ?carta=...), para saber se precisa de login anônimo.
+  const urlParams = new URLSearchParams(window.location.search);
+  const publicStudentId = urlParams.get('alunoId') || urlParams.get('carta');
+
   useEffect(() => {
     const unsubscribe = watchAuthState((user) => {
       setCurrentUser(user);
@@ -80,6 +86,18 @@ export default function App() {
     });
     return unsubscribe;
   }, []);
+
+  // Quem abre o link público (pais, sem conta própria) precisa de uma sessão
+  // autenticada — mesmo que anônima — para que as regras do Firestore
+  // (que exigem login) liberem a leitura dos dados da Carta de Intenção.
+  useEffect(() => {
+    if (isCheckingAuth) return;
+    if (!currentUser && publicStudentId) {
+      signInAsPublicVisitor().catch(() => {
+        showToast('Erro ao abrir a carta', 'Não foi possível carregar os dados. Tente atualizar a página.', 'error');
+      });
+    }
+  }, [isCheckingAuth, currentUser, publicStudentId]);
 
   // Core App States loaded from Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -101,8 +119,14 @@ export default function App() {
   // Selected student ID shared across components
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
-  // Sync state with Firebase on mount
+  // Sync state with Firebase on mount — só depois que a autenticação estiver
+  // pronta (usuário da equipe logado, ou visitante público com login anônimo).
+  // Buscar antes disso faria as leituras serem recusadas pelas regras do
+  // Firestore, que agora exigem `request.auth != null`.
   useEffect(() => {
+    if (isCheckingAuth) return;
+    if (!currentUser) return;
+
     async function initFirebase() {
       try {
         setLoading(true);
@@ -246,7 +270,7 @@ export default function App() {
     }
     
     initFirebase();
-  }, []);
+  }, [isCheckingAuth, currentUser]);
 
   // Update selectedStudentId when students are loaded/changed if not set
   useEffect(() => {
@@ -1401,10 +1425,6 @@ export default function App() {
     }
     event.target.value = '';
   };
-
-  // Check if opening via public parent link (e.g. ?alunoId=XYZ or ?carta=XYZ)
-  const urlParams = new URLSearchParams(window.location.search);
-  const publicStudentId = urlParams.get('alunoId') || urlParams.get('carta');
 
   if (publicStudentId) {
     if (loading) {

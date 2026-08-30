@@ -301,9 +301,9 @@ export default function RematriculaList({
                           </div>
                           <div className="flex items-center gap-1 text-slate-500 font-mono text-[10px]">
                             <Phone size={11} className="text-slate-400" />
-                            <span>{guardian.contato}</span>
+                            <span>{guardian.telefone || guardian.contato}</span>
                             <button
-                              onClick={() => handleCopyContact(guardian.contato)}
+                              onClick={() => handleCopyContact(guardian.telefone || guardian.contato || '')}
                               className="p-0.5 hover:bg-slate-150 rounded text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                               title="Copiar contato"
                             >

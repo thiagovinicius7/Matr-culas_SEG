@@ -12,6 +12,7 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -66,6 +67,17 @@ export function watchAuthState(callback: (user: User | null) => void): () => voi
 
 export async function requestPasswordReset(email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email);
+}
+
+/**
+ * Login anônimo, usado só para quem abre o link público da Carta de Intenção
+ * (?alunoId=... ou ?carta=...). Os pais não têm conta própria — mas como as
+ * regras do Firestore agora exigem `request.auth != null` para qualquer
+ * leitura, sem isso o link ficaria bloqueado antes mesmo de mostrar a carta.
+ * O login anônimo satisfaz a regra de segurança sem exigir e-mail/senha.
+ */
+export async function signInAsPublicVisitor(): Promise<void> {
+  await signInAnonymously(auth);
 }
 
 /**
