@@ -738,6 +738,38 @@ export default function StudentProfile({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 block">CPF do aluno (opcional)</label>
+                    <input
+                      type="text"
+                      value={formCpf}
+                      onChange={(e) => setFormCpf(e.target.value)}
+                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 block">Como conheceu a escola (opcional)</label>
+                    <input
+                      type="text"
+                      value={formComoConheceuEscola}
+                      onChange={(e) => setFormComoConheceuEscola(e.target.value)}
+                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 block">Outras pessoas autorizadas a buscar (opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Nomes separados por vírgula"
+                    value={formAutorizadosBuscar}
+                    onChange={(e) => setFormAutorizadosBuscar(e.target.value)}
+                    className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none"
+                  />
+                </div>
+
                 <div className="p-3 bg-slate-50 rounded-md border border-slate-200 space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 block">Modalidade de Matrícula Inicial</label>
                   <div className="flex flex-wrap gap-4 items-center">
@@ -791,49 +823,117 @@ export default function StudentProfile({
                     </button>
                   </div>
 
-                  <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
                     {tempGuardians.map((tg, idx) => (
-                      <div key={idx} className="p-3 bg-slate-50 rounded-md border border-slate-150 grid grid-cols-1 md:grid-cols-12 gap-3 items-end relative">
-                        <div className="md:col-span-4 space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500">Nome</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Nome do responsável"
-                            value={tg.nome}
-                            onChange={(e) => updateTempGuardian(idx, 'nome', e.target.value)}
-                            className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
-                          />
-                        </div>
-
-                        <div className="md:col-span-2 space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500">Parentesco</label>
-                          <select
-                            value={tg.parentesco}
-                            onChange={(e) => updateTempGuardian(idx, 'parentesco', e.target.value)}
-                            className="w-full text-xs px-2 py-1.5 rounded-md border border-slate-200 bg-white"
+                      <div key={idx} className="p-3 bg-slate-50 rounded-md border border-slate-150 space-y-2 relative">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase pt-1">Responsável {idx + 1}</span>
+                          <button
+                            type="button"
+                            disabled={tempGuardians.length === 1}
+                            onClick={() => removeTempGuardianRow(idx)}
+                            className="p-1 text-rose-500 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 cursor-pointer"
                           >
-                            <option value="Mãe">Mãe</option>
-                            <option value="Pai">Pai</option>
-                            <option value="Avó">Avó/Avô</option>
-                            <option value="Tio">Tio/Tia</option>
-                            <option value="Outro">Outro</option>
-                          </select>
+                            <Trash2 size={13} />
+                          </button>
                         </div>
 
-                        <div className="md:col-span-3 space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500">Contato (Tel/WA)</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">Nome</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Nome do responsável"
+                              value={tg.nome}
+                              onChange={(e) => updateTempGuardian(idx, 'nome', e.target.value)}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">Telefone / WhatsApp</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="(11) 99999-9999"
+                              value={tg.telefone}
+                              onChange={(e) => updateTempGuardian(idx, 'telefone', e.target.value)}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">Parentesco</label>
+                            <select
+                              value={tg.parentesco}
+                              onChange={(e) => updateTempGuardian(idx, 'parentesco', e.target.value)}
+                              className="w-full text-xs px-2 py-1.5 rounded-md border border-slate-200 bg-white"
+                            >
+                              {['Mãe', 'Pai', 'Avó', 'Avô', 'Tio', 'Tia', 'Outro'].map(op => <option key={op} value={op}>{op}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">E-mail</label>
+                            <input
+                              type="email"
+                              value={tg.email || ''}
+                              onChange={(e) => updateTempGuardian(idx, 'email', e.target.value)}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">CPF</label>
+                            <input
+                              type="text"
+                              value={tg.cpf || ''}
+                              onChange={(e) => updateTempGuardian(idx, 'cpf', e.target.value)}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">RG</label>
+                            <input
+                              type="text"
+                              value={tg.rg || ''}
+                              onChange={(e) => updateTempGuardian(idx, 'rg', e.target.value)}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">Estado civil</label>
+                            <select
+                              value={tg.estadoCivil || ''}
+                              onChange={(e) => updateTempGuardian(idx, 'estadoCivil', e.target.value)}
+                              className="w-full text-xs px-2 py-1.5 rounded-md border border-slate-200 bg-white"
+                            >
+                              <option value="">—</option>
+                              <option value="Solteiro(a)">Solteiro(a)</option>
+                              <option value="Casado(a)">Casado(a)</option>
+                              <option value="Divorciado(a)">Divorciado(a)</option>
+                              <option value="Viúvo(a)">Viúvo(a)</option>
+                              <option value="União estável">União estável</option>
+                              <option value="Outro">Outro</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500">Endereço completo</label>
                           <input
                             type="text"
-                            required
-                            placeholder="(11) 99999-9999"
-                            value={tg.telefone}
-                            onChange={(e) => updateTempGuardian(idx, 'telefone', e.target.value)}
+                            placeholder="Rua, número, bairro, cidade, CEP"
+                            value={tg.endereco || ''}
+                            onChange={(e) => updateTempGuardian(idx, 'endereco', e.target.value)}
                             className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                           />
                         </div>
 
-                        <div className="md:col-span-2 flex items-center h-[34px] gap-2">
+                        <div className="flex items-center gap-2 pt-0.5">
                           <input
                             type="checkbox"
                             id={`fin-${idx}`}
@@ -841,18 +941,7 @@ export default function StudentProfile({
                             onChange={(e) => updateTempGuardian(idx, 'financeiro', e.target.checked)}
                             className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded"
                           />
-                          <label htmlFor={`fin-${idx}`} className="text-xs text-slate-600 font-bold select-none cursor-pointer">Financeiro</label>
-                        </div>
-
-                        <div className="md:col-span-1 flex justify-end">
-                          <button
-                            type="button"
-                            disabled={tempGuardians.length === 1}
-                            onClick={() => removeTempGuardianRow(idx)}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 cursor-pointer"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <label htmlFor={`fin-${idx}`} className="text-xs text-slate-600 font-bold select-none cursor-pointer">Responsável financeiro</label>
                         </div>
                       </div>
                     ))}

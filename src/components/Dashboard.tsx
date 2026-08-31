@@ -53,6 +53,7 @@ export default function Dashboard({
   onClearDatabase 
 }: DashboardProps) {
   const [quickSearch, setQuickSearch] = useState('');
+  const [linkCopiado, setLinkCopiado] = useState(false);
   const [selectedClassForModal, setSelectedClassForModal] = useState<{
     id: string;
     nome: string;
@@ -771,36 +772,53 @@ export default function Dashboard({
               <div className="border border-slate-150 rounded-lg divide-y divide-slate-100 bg-slate-50/40">
                 {docsGrupo.map(def => {
                   const doc = packDocuments.find(d => d.id === def.id);
+                  const isFichaDadosGerais = def.id === 'ficha_dados_gerais';
+                  const linkFormularioPublico = 'https://thiagovinicius7.github.io/Matr-culas_SEG/?novaFicha=1';
                   return (
-                    <div key={def.id} className="flex items-center justify-between px-3 py-2">
-                      <span className="text-xs text-slate-700 flex items-center gap-2">
+                    <div key={def.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                      <span className="text-xs text-slate-700 flex items-center gap-2 min-w-0">
                         <FileText size={13} className="text-slate-400 shrink-0" />
-                        {def.nome}
-                        {!doc && (
-                          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">
+                        <span className="truncate">{def.nome}</span>
+                        {!doc && !isFichaDadosGerais && (
+                          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase shrink-0">
                             não enviado
                           </span>
                         )}
                       </span>
-                      {doc ? (
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={`Baixar (atualizado em ${new Date(doc.atualizadoEm + 'T00:00:00').toLocaleDateString('pt-BR')})`}
-                          className="text-brand-green-dark hover:text-emerald-900 cursor-pointer p-1"
-                        >
-                          <ArrowRightCircle size={15} className="rotate-90" />
-                        </a>
-                      ) : (
-                        <button
-                          onClick={() => onNavigate('pricing')}
-                          title="Enviar documento em Configurações"
-                          className="text-slate-300 hover:text-brand-orange cursor-pointer p-1"
-                        >
-                          <ArrowRightCircle size={15} className="rotate-90 opacity-40" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isFichaDadosGerais && (
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(linkFormularioPublico);
+                              setLinkCopiado(true);
+                              setTimeout(() => setLinkCopiado(false), 2000);
+                            }}
+                            title="Copiar link do formulário para a família preencher"
+                            className="text-[10px] font-bold text-brand-orange hover:text-brand-clay bg-amber-50 border border-amber-200 px-2 py-1 rounded-md cursor-pointer flex items-center gap-1"
+                          >
+                            {linkCopiado ? '✓ Copiado!' : '🔗 Link do formulário'}
+                          </button>
+                        )}
+                        {doc ? (
+                          <a
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Baixar (atualizado em ${new Date(doc.atualizadoEm + 'T00:00:00').toLocaleDateString('pt-BR')})`}
+                            className="text-brand-green-dark hover:text-emerald-900 cursor-pointer p-1"
+                          >
+                            <ArrowRightCircle size={15} className="rotate-90" />
+                          </a>
+                        ) : (
+                          <button
+                            onClick={() => onNavigate('pricing')}
+                            title="Enviar documento em Configurações"
+                            className="text-slate-300 hover:text-brand-orange cursor-pointer p-1"
+                          >
+                            <ArrowRightCircle size={15} className="rotate-90 opacity-40" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
