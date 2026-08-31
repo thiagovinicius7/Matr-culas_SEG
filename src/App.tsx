@@ -582,14 +582,14 @@ export default function App() {
   // da Ficha de Dados Gerais (FichaDadosGeraisForm). Mesma lógica do cadastro
   // manual, mas respeitando o ano letivo escolhido pela família e sinalizando
   // que a origem foi o auto-cadastro (para o aviso no Dashboard).
-  const handleAddStudentFromPublicForm = (
+  const handleAddStudentFromPublicForm = async (
     newStudentData: Omit<Student, 'id'>,
     guardiansList: Omit<Guardian, 'id' | 'alunoId'>[],
     enrollmentAno: number
   ) => {
     const newStudent: Student = { ...newStudentData, id: `student_${Date.now()}` };
     setStudents(prev => [...prev, newStudent].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
-    saveDocument('students', newStudent);
+    await saveDocument('students', newStudent);
 
     const newGuardians: Guardian[] = guardiansList.map((g, idx) => ({
       ...g,
@@ -597,7 +597,7 @@ export default function App() {
       alunoId: newStudent.id
     }));
     setGuardians(prev => [...prev, ...newGuardians]);
-    newGuardians.forEach(g => saveDocument('guardians', g));
+    await Promise.all(newGuardians.map(g => saveDocument('guardians', g)));
 
     const age = calculateAgeAtCutoff(newStudent.nascimento, enrollmentAno);
     const regularClass = getRegularClassForAgeDynamic(age, classPrices, enrollmentAno);
@@ -615,7 +615,7 @@ export default function App() {
       anotacoes: `Cadastro feito pela própria família via Ficha de Dados Gerais (link público), para o ano letivo ${enrollmentAno}.`
     };
     setEnrollments(prev => [...prev, newEnrollment]);
-    saveDocument('enrollments', newEnrollment);
+    await saveDocument('enrollments', newEnrollment);
 
     const initialMovement: FinancialMovement = {
       id: `mov_${Date.now()}`,
@@ -627,7 +627,7 @@ export default function App() {
       valorNovo: regularClass.valorMensal
     };
     setMovements(prev => [...prev, initialMovement]);
-    saveDocument('movements', initialMovement);
+    await saveDocument('movements', initialMovement);
   };
 
   // Handler: Edit basic student details

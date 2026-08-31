@@ -117,7 +117,14 @@ export async function createTeamMemberAccount(email: string, password: string): 
 }
 
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
+  experimentalForceLongPolling: true,
+  // Campos opcionais no app costumam ser gravados como `undefined` quando
+  // ficam em branco (ex: CPF, RG, data de nascimento do responsável). Sem
+  // esta opção, o Firestore RECUSA salvar qualquer documento que tenha um
+  // campo `undefined` — travando o formulário sem aviso claro para quem
+  // preenche. Com `ignoreUndefinedProperties: true`, esses campos são
+  // simplesmente omitidos do documento salvo, em vez de travar tudo.
+  ignoreUndefinedProperties: true
 }, firebaseConfig.firestoreDatabaseId);
 
 export enum OperationType {

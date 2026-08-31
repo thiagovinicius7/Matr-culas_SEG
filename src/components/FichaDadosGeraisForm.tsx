@@ -11,7 +11,7 @@ interface FichaDadosGeraisFormProps {
     student: Omit<Student, 'id'>,
     guardiansList: Omit<Guardian, 'id' | 'alunoId'>[],
     enrollmentAno: number
-  ) => void;
+  ) => Promise<void>;
 }
 
 interface TempGuardian {
@@ -45,6 +45,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
   const [somenteContraturno, setSomenteContraturno] = useState(false);
   const [responsaveis, setResponsaveis] = useState<TempGuardian[]>([novoResponsavel(true)]);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [erro, setErro] = useState('');
 
   const idade = nascimento ? calculateAgeAtCutoff(nascimento, anoPretendido) : null;
@@ -57,7 +58,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
   const addResponsavel = () => setResponsaveis(prev => [...prev, novoResponsavel(false)]);
   const removeResponsavel = (idx: number) => setResponsaveis(prev => prev.filter((_, i) => i !== idx));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro('');
 
@@ -96,8 +97,16 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
       financeiro: r.financeiro,
     }));
 
-    onSubmit(newStudent, guardiansList, anoPretendido);
-    setSubmitted(true);
+    setIsSubmitting(true);
+    try {
+      await onSubmit(newStudent, guardiansList, anoPretendido);
+      setSubmitted(true);
+    } catch (err) {
+      console.error(err);
+      setErro('Não foi possível enviar a ficha agora. Verifique sua internet e tente novamente em instantes. Se o problema continuar, entre em contato com a secretaria.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -282,21 +291,30 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
                   </select>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="text" placeholder="CPF" value={r.cpf}
-                    onChange={(e) => updateResponsavel(idx, 'cpf', e.target.value)}
-                    className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
-                  />
-                  <input
-                    type="text" placeholder="RG" value={r.rg}
-                    onChange={(e) => updateResponsavel(idx, 'rg', e.target.value)}
-                    className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
-                  />
-                  <input
-                    type="date" title="Data de nascimento" value={r.dataNascimento}
-                    onChange={(e) => updateResponsavel(idx, 'dataNascimento', e.target.value)}
-                    className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
-                  />
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold text-slate-400 block">CPF (opcional)</label>
+                    <input
+                      type="text" placeholder="000.000.000-00" value={r.cpf}
+                      onChange={(e) => updateResponsavel(idx, 'cpf', e.target.value)}
+                      className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold text-slate-400 block">RG (opcional)</label>
+                    <input
+                      type="text" placeholder="00.000.000-0" value={r.rg}
+                      onChange={(e) => updateResponsavel(idx, 'rg', e.target.value)}
+                      className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold text-slate-400 block">Data de nascimento (opcional)</label>
+                    <input
+                      type="date" value={r.dataNascimento}
+                      onChange={(e) => updateResponsavel(idx, 'dataNascimento', e.target.value)}
+                      className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                    />
+                  </div>
                 </div>
                 <input
                   type="text" placeholder="Endereço completo (rua, número, bairro, cidade, CEP)" value={r.endereco}
@@ -347,9 +365,10 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
 
           <button
             type="submit"
-            className="w-full py-3.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-sm font-bold font-display uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer"
+            disabled={isSubmitting}
+            className="w-full py-3.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-sm font-bold font-display uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Enviar Ficha de Dados Gerais
+            {isSubmitting ? 'Enviando...' : 'Enviar Ficha de Dados Gerais'}
           </button>
         </form>
       </div>
