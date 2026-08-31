@@ -164,6 +164,14 @@ export default function Dashboard({
   const emProcessoCount = validEnrollments.filter(e => getFaseProcesso(e) !== 'colheita').length;
   const colheitaCount = validEnrollments.filter(e => getFaseProcesso(e) === 'colheita').length;
 
+  // Alunos novos que se auto-cadastraram pela Ficha de Dados Gerais pública e
+  // ainda estão em Preparo da Terra (aguardando primeiro contato da equipe).
+  const novosAutoCadastrados = students.filter(s => {
+    if (s.origemCadastro !== 'auto') return false;
+    const enrollment = validEnrollments.find(e => e.alunoId === s.id);
+    return enrollment && getFaseProcesso(enrollment) === 'preparo_terra';
+  });
+
   // Monthly Revenue Estimate (Regular + Contraturnos)
   const activeContraturnos = contraturnos.filter(c => c.dataFim === null);
   const contraturnoRevenue = activeContraturnos.reduce((sum, c) => sum + c.valorMensal, 0);
@@ -398,6 +406,30 @@ export default function Dashboard({
           </div>
         )}
       </div>
+
+      {/* Aviso: novos alunos que se auto-cadastraram pela Ficha de Dados Gerais */}
+      {novosAutoCadastrados.length > 0 && (
+        <div className="bg-amber-50 border-2 border-brand-orange rounded-xl p-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🌱</span>
+            <div>
+              <p className="text-sm font-bold text-brand-clay">
+                {novosAutoCadastrados.length} nov{novosAutoCadastrados.length === 1 ? 'a família preencheu' : 'as famílias preencheram'} a Ficha de Dados Gerais
+              </p>
+              <p className="text-[11px] text-slate-600">
+                {novosAutoCadastrados.slice(0, 3).map(s => s.nome).join(', ')}
+                {novosAutoCadastrados.length > 3 ? ` e mais ${novosAutoCadastrados.length - 3}` : ''} — aguardando primeiro contato (Preparo da Terra)
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate('students')}
+            className="shrink-0 px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-md cursor-pointer"
+          >
+            Ver alunos
+          </button>
+        </div>
+      )}
 
       {/* Matrículas por Fase — ciclo Preparo da Terra → Semeadura → Enraizamento → Florescer → Colheita */}
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs p-5 space-y-4">

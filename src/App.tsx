@@ -40,6 +40,7 @@ import ContraturnoSchedule from './components/ContraturnoSchedule';
 import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
 import ParentCartaPortal from './components/ParentCartaPortal';
+import FichaDadosGeraisForm from './components/FichaDadosGeraisForm';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -78,6 +79,7 @@ export default function App() {
   // (?alunoId=... ou ?carta=...), para saber se precisa de login anônimo.
   const urlParams = new URLSearchParams(window.location.search);
   const publicStudentId = urlParams.get('alunoId') || urlParams.get('carta');
+  const isPublicFichaForm = urlParams.get('novaFicha') === '1' || urlParams.has('novoAluno');
 
   useEffect(() => {
     const unsubscribe = watchAuthState((user) => {
@@ -92,12 +94,12 @@ export default function App() {
   // (que exigem login) liberem a leitura dos dados da Carta de Intenção.
   useEffect(() => {
     if (isCheckingAuth) return;
-    if (!currentUser && publicStudentId) {
+    if (!currentUser && (publicStudentId || isPublicFichaForm)) {
       signInAsPublicVisitor().catch(() => {
-        showToast('Erro ao abrir a carta', 'Não foi possível carregar os dados. Tente atualizar a página.', 'error');
+        showToast('Erro ao abrir a página', 'Não foi possível carregar os dados. Tente atualizar a página.', 'error');
       });
     }
-  }, [isCheckingAuth, currentUser, publicStudentId]);
+  }, [isCheckingAuth, currentUser, publicStudentId, isPublicFichaForm]);
 
   // Core App States loaded from Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -310,13 +312,6 @@ export default function App() {
     
     initFirebase();
   }, [isCheckingAuth, currentUser]);
-
-  // Update selectedStudentId when students are loaded/changed if not set
-  useEffect(() => {
-    if (students.length > 0 && !selectedStudentId) {
-      setSelectedStudentId(students[0].id);
-    }
-  }, [students, selectedStudentId]);
 
   // Handle direct navigation to a tab for a specific student
   const handleNavigateWithStudent = (tabId: string, studentId: string) => {
@@ -581,6 +576,58 @@ export default function App() {
     setMovements(prev => [...prev, initialMovement]);
     saveDocument('movements', initialMovement);
     showToast('Novo Aluno Cadastrado', `O aluno ${newStudent.nome} foi salvo no Firebase.`, 'success');
+  };
+
+  // Handler: aluno novo cadastrado pela própria família, via link público
+  // da Ficha de Dados Gerais (FichaDadosGeraisForm). Mesma lógica do cadastro
+  // manual, mas respeitando o ano letivo escolhido pela família e sinalizando
+  // que a origem foi o auto-cadastro (para o aviso no Dashboard).
+  const handleAddStudentFromPublicForm = (
+    newStudentData: Omit<Student, 'id'>,
+    guardiansList: Omit<Guardian, 'id' | 'alunoId'>[],
+    enrollmentAno: number
+  ) => {
+    const newStudent: Student = { ...newStudentData, id: `student_${Date.now()}` };
+    setStudents(prev => [...prev, newStudent].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+    saveDocument('students', newStudent);
+
+    const newGuardians: Guardian[] = guardiansList.map((g, idx) => ({
+      ...g,
+      id: `g_${Date.now()}_${idx}`,
+      alunoId: newStudent.id
+    }));
+    setGuardians(prev => [...prev, ...newGuardians]);
+    newGuardians.forEach(g => saveDocument('guardians', g));
+
+    const age = calculateAgeAtCutoff(newStudent.nascimento, enrollmentAno);
+    const regularClass = getRegularClassForAgeDynamic(age, classPrices, enrollmentAno);
+
+    const newEnrollment: Enrollment = {
+      id: `enroll_${Date.now()}`,
+      alunoId: newStudent.id,
+      ano: enrollmentAno,
+      turmaRegularId: regularClass.id,
+      valorRegularOriginal: regularClass.valorMensal,
+      descontoMensal: 0,
+      valorFinalRegular: regularClass.valorMensal,
+      statusNegociacao: 'Pendente',
+      faseProcesso: 'preparo_terra',
+      anotacoes: `Cadastro feito pela própria família via Ficha de Dados Gerais (link público), para o ano letivo ${enrollmentAno}.`
+    };
+    setEnrollments(prev => [...prev, newEnrollment]);
+    saveDocument('enrollments', newEnrollment);
+
+    const initialMovement: FinancialMovement = {
+      id: `mov_${Date.now()}`,
+      alunoId: newStudent.id,
+      data: new Date().toISOString().split('T')[0],
+      tipo: 'Matrícula',
+      descricao: `Pré-cadastro recebido da família via Ficha de Dados Gerais, para ${enrollmentAno} na turma sugerida ${regularClass.nome}.`,
+      valorAnterior: 0,
+      valorNovo: regularClass.valorMensal
+    };
+    setMovements(prev => [...prev, initialMovement]);
+    saveDocument('movements', initialMovement);
   };
 
   // Handler: Edit basic student details
@@ -1464,6 +1511,26 @@ export default function App() {
     }
     event.target.value = '';
   };
+
+  if (isPublicFichaForm) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+          <div className="text-center space-y-3">
+            <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-sm font-bold text-slate-700 font-display">Carregando formulário...</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <FichaDadosGeraisForm
+        classPrices={classPrices}
+        activeYear={activeYear}
+        onSubmit={handleAddStudentFromPublicForm}
+      />
+    );
+  }
 
   if (publicStudentId) {
     if (loading) {

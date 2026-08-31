@@ -62,7 +62,7 @@ export default function StudentProfile({
   onSaveEnrollment,
   onConfirmNegotiation
 }: StudentProfileProps) {
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ativo' | 'trancado' | 'cancelado' | 'todos'>('ativo');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
@@ -674,12 +674,23 @@ export default function StudentProfile({
 
       {/* Painel da ficha (aluno selecionado, novo cadastro ou edição) — ocupa a tela toda */}
       <div className={showBrowsePanel ? 'hidden' : ''}>
-        <button
-          onClick={backToBrowse}
-          className="flex items-center gap-1 text-xs font-bold text-slate-600 mb-3 cursor-pointer hover:text-slate-900"
-        >
-          ‹ Voltar para a lista
-        </button>
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={backToBrowse}
+            className="flex items-center gap-1 text-xs font-bold text-slate-600 cursor-pointer hover:text-slate-900"
+          >
+            ‹ Voltar para a lista
+          </button>
+          {!isAddingStudent && (
+            <button
+              onClick={startAddStudent}
+              className="px-2.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+            >
+              <Plus size={14} />
+              Novo Aluno
+            </button>
+          )}
+        </div>
         <AnimatePresence mode="wait">
           {isAddingStudent ? (
             /* ADD NEW STUDENT FORM */
@@ -1020,7 +1031,7 @@ export default function StudentProfile({
                     onClick={() => {
                       if (confirm(`Tem certeza que deseja excluir o cadastro de ${activeStudent.nome}?`)) {
                         onDeleteStudent(activeStudent.id);
-                        setSelectedStudentId(students[0]?.id || '');
+                        backToBrowse();
                       }
                     }}
                     className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md transition-all cursor-pointer"

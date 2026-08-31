@@ -11,6 +11,7 @@ export interface Student {
   comoConheceuEscola?: string;
   autorizadosBuscar?: string; // nomes de pessoas extras autorizadas a buscar a criança
   irmaosIds?: string[]; // IDs de outros Students que são irmãos matriculados na escola
+  origemCadastro?: 'auto' | 'staff'; // 'auto' = criado pela própria família via Ficha de Dados Gerais pública
 }
 
 export type EstadoCivil = 'Solteiro(a)' | 'Casado(a)' | 'Divorciado(a)' | 'Viúvo(a)' | 'União estável' | 'Outro';
