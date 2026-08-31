@@ -62,7 +62,23 @@ export async function signOutUser(): Promise<void> {
 }
 
 export function watchAuthState(callback: (user: User | null) => void): () => void {
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // Espera o token de autenticação estar de fato pronto antes de avisar
+      // o resto do app. O objeto `user` pode "aparecer" um instante antes do
+      // token ficar disponível para as requisições ao Firestore — se o app
+      // começar a buscar dados nesse intervalo, as regras de segurança ainda
+      // veem `request.auth` como nulo e recusam a leitura (erro de
+      // "permissões insuficientes" mesmo já estando logado).
+      try {
+        await user.getIdToken();
+      } catch {
+        // Se falhar em obter o token, segue mesmo assim — o app vai lidar
+        // com o erro normalmente ao tentar buscar os dados.
+      }
+    }
+    callback(user);
+  });
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {

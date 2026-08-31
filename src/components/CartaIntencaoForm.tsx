@@ -40,6 +40,11 @@ export default function CartaIntencaoForm({
   const age2026 = calculateAgeAtCutoff(student.nascimento, 2026);
   const age2027 = calculateAgeAtCutoff(student.nascimento, 2027);
 
+  // Sem nenhuma matrícula anterior registrada, é um aluno novo — a carta
+  // então é de "Intenção de Matrícula", não de "Rematrícula".
+  const isNewStudent = !enrollment;
+  const cartaTitulo = isNewStudent ? 'Carta de Intenção de Matrícula' : 'Carta de Intenção de Rematrícula';
+
   // Suggested class for 2027 based on cutoff
   const class2026 = getRegularClassForAgeDynamic(age2026, classPrices, 2026);
   const suggestedClass2027 = getRegularClassForAgeDynamic(age2027, classPrices, 2027);
@@ -223,7 +228,7 @@ export default function CartaIntencaoForm({
   const generateWhatsAppMessage = () => {
     return (
       `*Sítio-Escola Geranium*\n` +
-      `*Carta de Intenção de Rematrícula — Ano Letivo 2027*\n\n` +
+      `*${cartaTitulo} — Ano Letivo 2027*\n\n` +
       `Olá, família de *${student.nome}*!\n\n` +
       `Já estamos organizando o ano letivo de 2027 com muito carinho. Convidamos vocês a acessarem o link abaixo para conferir a proposta do próximo ano e confirmar a intenção de rematrícula:\n\n` +
       `${parentUrl}\n\n` +
@@ -273,7 +278,7 @@ export default function CartaIntencaoForm({
           </div>
           <div className="min-w-0">
             <h2 className="text-sm sm:text-base font-bold font-display tracking-tight leading-snug truncate">
-              Carta de Intenção de Rematrícula 2027
+              {cartaTitulo} 2027
             </h2>
             <p className="text-[11px] text-emerald-200 truncate">
               {student.nome} • Nascimento: {new Date(student.nascimento + 'T00:00:00').toLocaleDateString('pt-BR')}
@@ -540,7 +545,10 @@ export default function CartaIntencaoForm({
                   )}
                 </div>
 
-                {/* Option for Lanche in Ensino Regular */}
+                {/* Option for Lanche in Ensino Regular — só para o Ensino Fundamental
+                    (Jataí, Uruçu, Iraí, Abelha Branca, Benjoí). No Infantil o lanche
+                    já é obrigatório e está incluso na mensalidade. */}
+                {selectedClass2027Details?.natureza === 'Fundamental' && (
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
@@ -566,6 +574,7 @@ export default function CartaIntencaoForm({
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {/* Contraturno 2027 Selection */}
@@ -634,48 +643,6 @@ export default function CartaIntencaoForm({
                   </div>
                 )}
               </div>
-
-              {/* Servico Opcional: Almoço na Escola (Apenas se NÃO optar por Contraturno) */}
-              {!contraturnoDesejado && (
-                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={adicionarAlmoco}
-                        onChange={(e) => setAdicionarAlmoco(e.target.checked)}
-                        className="w-4 h-4 text-brand-orange rounded border-slate-300 focus:ring-brand-orange cursor-pointer"
-                      />
-                      <span className="font-bold text-slate-800 text-xs">Incluir Almoço na Escola (Sem Contraturno)</span>
-                    </label>
-                    {adicionarAlmoco && (
-                      <span className="text-[11px] font-bold text-emerald-700">
-                        + R$ {valorAlmoco2027.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
-                      </span>
-                    )}
-                  </div>
-
-                  {adicionarAlmoco && (
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
-                      <label className="text-[11px] font-bold text-slate-600">
-                        Valor Mensal do Almoço na Escola (R$):
-                      </label>
-                      <div className="relative w-36">
-                        <span className="absolute left-2.5 top-1.5 text-slate-400 font-semibold text-xs">R$</span>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={valorAlmoco2027}
-                          onChange={(e) => setValorAlmoco2027(Number(e.target.value))}
-                          className="w-full pl-8 pr-2 py-1 bg-amber-50/50 border border-brand-orange/40 rounded text-xs font-bold text-brand-orange text-right focus:ring-2 focus:ring-brand-orange outline-none"
-                          placeholder="500,00"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Total 2027 Summary Box */}
               <div className="bg-brand-green-dark text-white p-4 rounded-xl space-y-1 shadow-sm">

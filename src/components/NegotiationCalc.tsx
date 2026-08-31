@@ -434,45 +434,6 @@ export default function NegotiationCalc({
                   </div>
                 )}
 
-                {/* Option to add lunch fee (Almoço na Escola para quem não opta pelo contraturno) */}
-                {!enableContraturno && (
-                  <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200/90 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="add-almoco"
-                        checked={addAlmoco}
-                        onChange={(e) => {
-                          setAddAlmoco(e.target.checked);
-                          if (e.target.checked && !almocoValue) {
-                            setAlmocoValue(500);
-                          }
-                        }}
-                        className="w-4 h-4 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
-                      />
-                      <label htmlFor="add-almoco" className="text-xs font-bold text-slate-800 select-none cursor-pointer flex items-center gap-1.5">
-                        <span>🍲</span> Almoço na Escola (sem Contraturno: R$ 500,00/mês)
-                      </label>
-                    </div>
-                    {addAlmoco && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Valor do Almoço:</span>
-                        <div className="relative w-28">
-                          <span className="absolute left-2.5 top-1.5 text-[10px] text-slate-400 font-mono">R$</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={almocoValue || ''}
-                            onChange={(e) => setAlmocoValue(Number(e.target.value))}
-                            className="w-full text-xs pl-7 pr-2 py-1 rounded-md border border-amber-300 focus:border-amber-500 focus:outline-none bg-white font-mono font-bold text-slate-800"
-                            placeholder="500"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Dia de Vencimento e Desconto de Pontualidade */}
                 <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200/80 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

@@ -42,6 +42,11 @@ export default function ParentCartaPortal({
   const class2026 = getRegularClassForAgeDynamic(age2026, classPrices, 2026);
   const suggestedClass2027 = getRegularClassForAgeDynamic(age2027, classPrices, 2027);
 
+  // Sem nenhuma matrícula anterior registrada, é um aluno novo — a carta
+  // então é de "Intenção de Matrícula", não de "Rematrícula".
+  const isNewStudent = !enrollment;
+  const cartaTitulo = isNewStudent ? 'Carta de Intenção de Matrícula' : 'Carta de Intenção de Rematrícula';
+
   // Proposal base set by school
   const valorRegularProposto = enrollment?.valorProposto2027 !== undefined 
     ? enrollment.valorProposto2027 
@@ -179,15 +184,15 @@ export default function ParentCartaPortal({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans py-8 px-4 flex flex-col items-center justify-center">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+    <div className="min-h-screen bg-slate-100 font-sans py-8 px-4 flex flex-col items-center justify-center print:block print:min-h-0 print:h-auto print:bg-white print:p-0">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden print:max-w-full print:shadow-none print:border-none print:rounded-none">
         
         {/* Header */}
-        <div className="bg-brand-green-dark text-white p-6 sm:p-8 text-center relative">
+        <div className="bg-brand-green-dark text-white p-6 sm:p-8 text-center relative print:p-4">
           {onBackToAdmin && (
             <button
               onClick={onBackToAdmin}
-              className="absolute top-4 left-4 text-xs font-bold text-emerald-200 hover:text-white bg-white/10 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              className="absolute top-4 left-4 text-xs font-bold text-emerald-200 hover:text-white bg-white/10 px-3 py-1.5 rounded-lg transition-colors cursor-pointer print:hidden"
             >
               ← Painel da Escola
             </button>
@@ -205,7 +210,7 @@ export default function ParentCartaPortal({
             Sítio Geranium
           </h1>
           <p className="text-emerald-200 text-xs sm:text-sm font-medium mt-1">
-            Carta de Intenção de Rematrícula — Ano Letivo 2027
+            {cartaTitulo} — Ano Letivo 2027
           </p>
         </div>
 
@@ -233,7 +238,7 @@ export default function ParentCartaPortal({
               <p>• <strong>Investimento Estimado:</strong> R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês</p>
             </div>
 
-            <div className="pt-4">
+            <div className="pt-4 print:hidden">
               <button
                 type="button"
                 onClick={() => setSubmitted(false)}
@@ -274,7 +279,7 @@ export default function ParentCartaPortal({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-1 gap-4 text-xs">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <span className="block text-slate-500 font-medium">Turma Prevista (2027):</span>
                   <span className="text-sm font-bold text-brand-green-dark">{selectedClassDetails.nome}</span>
@@ -335,7 +340,10 @@ export default function ParentCartaPortal({
                 )}
               </div>
 
-              {/* Lanche Escolar no Ensino Regular */}
+              {/* Lanche Escolar no Ensino Regular — só para o Ensino Fundamental
+                  (Jataí, Uruçu, Iraí, Abelha Branca, Benjoí). No Infantil o lanche
+                  já é obrigatório e está incluso na mensalidade. */}
+              {selectedClassDetails?.natureza === 'Fundamental' && (
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                 <label className="flex items-center justify-between cursor-pointer select-none">
                   <div className="flex items-center gap-2">
@@ -352,6 +360,7 @@ export default function ParentCartaPortal({
                   </span>
                 </label>
               </div>
+              )}
 
               {/* Contraturno Options */}
               <div className="pt-2 border-t border-slate-200 space-y-3">
@@ -415,26 +424,6 @@ export default function ParentCartaPortal({
                   </div>
                 )}
               </div>
-
-              {/* Opcional: Almoço na Escola (Exclusivo para quem NÃO cursa Contraturno) */}
-              {!contraturnoDesejado && (
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <label className="flex items-center justify-between cursor-pointer select-none">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={adicionarAlmoco}
-                        onChange={(e) => setAdicionarAlmoco(e.target.checked)}
-                        className="w-4 h-4 text-brand-orange rounded border-slate-300 focus:ring-brand-orange cursor-pointer"
-                      />
-                      <span className="font-bold text-slate-800 text-xs">Incluir Almoço na Escola (Sem Contraturno)</span>
-                    </div>
-                    <span className="text-xs font-bold text-brand-orange">
-                      + R$ {valorAlmoco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
-                    </span>
-                  </label>
-                </div>
-              )}
 
               {/* Total Calculation Display */}
               <div className="bg-brand-green-dark text-white p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
@@ -560,7 +549,7 @@ export default function ParentCartaPortal({
             </div>
 
             {/* Submit Button */}
-            <div className="pt-2">
+            <div className="pt-2 print:hidden">
               <button
                 type="submit"
                 className="w-full py-3.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-sm font-bold font-display uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"

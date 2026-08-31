@@ -133,20 +133,12 @@ export default function App() {
         // Seed if first time
         await seedDatabaseIfEmpty();
         
-        // Fetch all data from Firestore collections
-        const [
-          loadedStudents, 
-          loadedGuardians, 
-          loadedEnrollments, 
-          loadedContraturnos, 
-          loadedMovements,
-          loadedClassPrices,
-          loadedContraturnoPrices,
-          loadedSettings,
-          loadedNegotiationHistory,
-          loadedDailyExceptions,
-          loadedPackDocuments
-        ] = await Promise.all([
+        // Fetch all data from Firestore collections. Cada coleção é buscada de
+        // forma independente (Promise.allSettled) — se uma falhar (por
+        // exemplo, uma coleção nova sem regra de segurança liberada ainda),
+        // as demais continuam carregando normalmente em vez de travar o
+        // sistema inteiro.
+        const results = await Promise.allSettled([
           getCollectionData<Student>('students'),
           getCollectionData<Guardian>('guardians'),
           getCollectionData<Enrollment>('enrollments'),
@@ -159,6 +151,53 @@ export default function App() {
           getCollectionData<ContraturnoDailyException>('contraturnoDailyExceptions'),
           getCollectionData<PackDocument>('packDocuments')
         ]);
+
+        const collectionNames = [
+          'students', 'guardians', 'enrollments', 'contraturnos', 'movements',
+          'classPrices', 'contraturnoPrices', 'settings', 'negotiationHistory',
+          'contraturnoDailyExceptions', 'packDocuments'
+        ];
+        results.forEach((r, i) => {
+          if (r.status === 'rejected') {
+            console.error(`Falha ao carregar a coleção "${collectionNames[i]}":`, r.reason);
+          }
+        });
+
+        const [
+          loadedStudentsResult,
+          loadedGuardiansResult,
+          loadedEnrollmentsResult,
+          loadedContraturnosResult,
+          loadedMovementsResult,
+          loadedClassPricesResult,
+          loadedContraturnoPricesResult,
+          loadedSettingsResult,
+          loadedNegotiationHistoryResult,
+          loadedDailyExceptionsResult,
+          loadedPackDocumentsResult
+        ] = results;
+
+        const loadedStudents = loadedStudentsResult.status === 'fulfilled' ? loadedStudentsResult.value : [];
+        const loadedGuardians = loadedGuardiansResult.status === 'fulfilled' ? loadedGuardiansResult.value : [];
+        const loadedEnrollments = loadedEnrollmentsResult.status === 'fulfilled' ? loadedEnrollmentsResult.value : [];
+        const loadedContraturnos = loadedContraturnosResult.status === 'fulfilled' ? loadedContraturnosResult.value : [];
+        const loadedMovements = loadedMovementsResult.status === 'fulfilled' ? loadedMovementsResult.value : [];
+        const loadedClassPrices = loadedClassPricesResult.status === 'fulfilled' ? loadedClassPricesResult.value : [];
+        const loadedContraturnoPrices = loadedContraturnoPricesResult.status === 'fulfilled' ? loadedContraturnoPricesResult.value : [];
+        const loadedSettings = loadedSettingsResult.status === 'fulfilled' ? loadedSettingsResult.value : [];
+        const loadedNegotiationHistory = loadedNegotiationHistoryResult.status === 'fulfilled' ? loadedNegotiationHistoryResult.value : [];
+        const loadedDailyExceptions = loadedDailyExceptionsResult.status === 'fulfilled' ? loadedDailyExceptionsResult.value : [];
+        const loadedPackDocuments = loadedPackDocumentsResult.status === 'fulfilled' ? loadedPackDocumentsResult.value : [];
+
+        const algumaFalhou = results.some(r => r.status === 'rejected');
+        if (algumaFalhou) {
+          showToast(
+            'Parte dos dados não carregou',
+            'Algumas informações (provavelmente novas) não puderam ser lidas — confira as regras de segurança do Firestore. O restante do sistema carregou normalmente.',
+            'error',
+            8000
+          );
+        }
         
         // Ensure student status defaults to 'ativo' if missing, preserving 'trancado', 'cancelado', etc.
         const sanitizedStudents = (loadedStudents || []).map(st => ({
