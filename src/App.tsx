@@ -115,6 +115,26 @@ export default function App() {
   const [coordenacaoDesbloqueada, setCoordenacaoDesbloqueada] = useState(false);
   const [coordenacaoSenhaInput, setCoordenacaoSenhaInput] = useState('');
   const [coordenacaoErro, setCoordenacaoErro] = useState('');
+  // Cópia local da escala, só para a tela da Coordenação. Começa igual aos
+  // dados reais, mas as edições feitas aqui (arrastar, marcar falta, trocar
+  // Melaço/Marmelada) ficam só nessa cópia — nunca são gravadas no Firestore.
+  // Já os dados vindos do sistema principal (aluno novo, cadastro alterado)
+  // continuam chegando normalmente, porque a cópia é atualizada sempre que
+  // os dados reais mudam, contanto que ela ainda não tenha feito nenhuma
+  // edição local nessa sessão (para não perder o que ela já ajustou).
+  const [coordenacaoContraturnos, setCoordenacaoContraturnos] = useState<ContraturnoSegment[]>([]);
+  const [coordenacaoDailyExceptions, setCoordenacaoDailyExceptions] = useState<ContraturnoDailyException[]>([]);
+  const [coordenacaoTemEdicaoLocal, setCoordenacaoTemEdicaoLocal] = useState(false);
+
+  // Enquanto ela ainda não editou nada nessa sessão, a cópia local segue os
+  // dados reais automaticamente (assim um aluno novo cadastrado no sistema
+  // principal aparece na tela dela). Assim que ela faz a primeira edição,
+  // paramos de sobrescrever — senão perderíamos o que ela já ajustou.
+  useEffect(() => {
+    if (!isCoordenacaoView || coordenacaoTemEdicaoLocal) return;
+    setCoordenacaoContraturnos(contraturnos);
+    setCoordenacaoDailyExceptions(dailyExceptions);
+  }, [isCoordenacaoView, coordenacaoTemEdicaoLocal, contraturnos, dailyExceptions]);
   
   // Custom Pricing States
   const [classPrices, setClassPrices] = useState<RegularClass[]>([]);
@@ -1589,7 +1609,13 @@ export default function App() {
             <span className="text-sm font-bold font-display">Coordenação — Escala do Contraturno</span>
           </div>
           <button
-            onClick={() => { setCoordenacaoDesbloqueada(false); setCoordenacaoSenhaInput(''); }}
+            onClick={() => {
+              setCoordenacaoDesbloqueada(false);
+              setCoordenacaoSenhaInput('');
+              setCoordenacaoTemEdicaoLocal(false);
+              setCoordenacaoContraturnos(contraturnos);
+              setCoordenacaoDailyExceptions(dailyExceptions);
+            }}
             className="text-[11px] font-bold text-emerald-200 hover:text-white cursor-pointer"
           >
             Bloquear
@@ -1598,16 +1624,49 @@ export default function App() {
         <main className="p-4 md:p-6">
           <ContraturnoSchedule
             students={students}
-            contraturnos={contraturnos}
+            contraturnos={coordenacaoContraturnos}
             enrollments={enrollments}
             classPrices={classPrices}
             activeYear={activeYear}
-            dailyExceptions={dailyExceptions}
-            onAddDailyException={handleAddDailyException}
-            onRemoveDailyException={handleRemoveDailyException}
-            onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
-            onUpdateContraturnoDays={handleUpdateContraturnoDays}
+            dailyExceptions={coordenacaoDailyExceptions}
+            onAddDailyException={(exception) => {
+              setCoordenacaoTemEdicaoLocal(true);
+              const nova: ContraturnoDailyException = {
+                ...exception,
+                id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              };
+              setCoordenacaoDailyExceptions(prev => [...prev, nova]);
+            }}
+            onRemoveDailyException={(id) => {
+              setCoordenacaoTemEdicaoLocal(true);
+              setCoordenacaoDailyExceptions(prev => prev.filter(e => e.id !== id));
+            }}
+            onUpdateContraturnoNatureza={(alunoId, segmentId, newNatureza) => {
+              setCoordenacaoTemEdicaoLocal(true);
+              setCoordenacaoContraturnos(prev => prev.map(c => c.id === segmentId ? { ...c, natureza: newNatureza } : c));
+            }}
+            onUpdateContraturnoDays={(alunoId, segmentId, newDays) => {
+              setCoordenacaoTemEdicaoLocal(true);
+              setCoordenacaoContraturnos(prev => prev.map(c => c.id === segmentId ? { ...c, diasSemana: newDays } : c));
+            }}
           />
+          {coordenacaoTemEdicaoLocal && (
+            <div className="max-w-2xl mx-auto mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+              <p className="text-xs text-amber-800">
+                Você fez ajustes pontuais nesta tela — eles <strong>não são gravados</strong> no sistema principal, valem só aqui até você recarregar a página.
+              </p>
+              <button
+                onClick={() => {
+                  setCoordenacaoTemEdicaoLocal(false);
+                  setCoordenacaoContraturnos(contraturnos);
+                  setCoordenacaoDailyExceptions(dailyExceptions);
+                }}
+                className="shrink-0 text-[11px] font-bold text-amber-900 underline cursor-pointer"
+              >
+                Desfazer tudo
+              </button>
+            </div>
+          )}
         </main>
       </div>
     );
