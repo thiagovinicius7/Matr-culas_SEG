@@ -80,6 +80,7 @@ export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const publicStudentId = urlParams.get('alunoId') || urlParams.get('carta');
   const isPublicFichaForm = urlParams.get('novaFicha') === '1' || urlParams.has('novoAluno');
+  const isCoordenacaoView = urlParams.get('coordenacao') === '1';
 
   useEffect(() => {
     const unsubscribe = watchAuthState((user) => {
@@ -94,12 +95,12 @@ export default function App() {
   // (que exigem login) liberem a leitura dos dados da Carta de Intenção.
   useEffect(() => {
     if (isCheckingAuth) return;
-    if (!currentUser && (publicStudentId || isPublicFichaForm)) {
+    if (!currentUser && (publicStudentId || isPublicFichaForm || isCoordenacaoView)) {
       signInAsPublicVisitor().catch(() => {
         showToast('Erro ao abrir a página', 'Não foi possível carregar os dados. Tente atualizar a página.', 'error');
       });
     }
-  }, [isCheckingAuth, currentUser, publicStudentId, isPublicFichaForm]);
+  }, [isCheckingAuth, currentUser, publicStudentId, isPublicFichaForm, isCoordenacaoView]);
 
   // Core App States loaded from Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -110,6 +111,10 @@ export default function App() {
   const [negotiationHistory, setNegotiationHistory] = useState<NegotiationHistoryEntry[]>([]);
   const [dailyExceptions, setDailyExceptions] = useState<ContraturnoDailyException[]>([]);
   const [packDocuments, setPackDocuments] = useState<PackDocument[]>([]);
+  const [settings, setSettings] = useState<{ id: string; value: string }[]>([]);
+  const [coordenacaoDesbloqueada, setCoordenacaoDesbloqueada] = useState(false);
+  const [coordenacaoSenhaInput, setCoordenacaoSenhaInput] = useState('');
+  const [coordenacaoErro, setCoordenacaoErro] = useState('');
   
   // Custom Pricing States
   const [classPrices, setClassPrices] = useState<RegularClass[]>([]);
@@ -241,6 +246,7 @@ export default function App() {
         setNegotiationHistory(loadedNegotiationHistory || []);
         setDailyExceptions(loadedDailyExceptions || []);
         setPackDocuments(loadedPackDocuments || []);
+        setSettings(loadedSettings || []);
 
         // Sanitize loaded Class Prices to ensure all have an 'ano' field
         const sanitizedClassPrices = (loadedClassPrices || []).map(cp => {
@@ -1408,6 +1414,12 @@ export default function App() {
   const pendingEnrollmentsCount = validActiveYearEnrollments.filter(e => e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação').length;
   const confirmedPercent = totalStudentsCount > 0 ? Math.min(100, Math.round((confirmedEnrollmentsCount / totalStudentsCount) * 100)) : 0;
 
+  // Estatísticas específicas da tela de Contraturno (blocos vigentes = dataFim null)
+  const activeContraturnosForHeader = contraturnos.filter(c => c.dataFim === null && validStudentIds.has(c.alunoId));
+  const totalContraturnoCount = activeContraturnosForHeader.length;
+  const totalMelacoCount = activeContraturnosForHeader.filter(c => c.natureza === 'Melaço').length;
+  const totalMarmeladaCount = activeContraturnosForHeader.filter(c => c.natureza === 'Marmelada').length;
+
   if (loading) {
     return (
       <div className="h-screen w-screen bg-brand-cream flex flex-col items-center justify-center font-sans text-slate-800" id="app-loading-viewport">
@@ -1511,6 +1523,95 @@ export default function App() {
     }
     event.target.value = '';
   };
+
+  if (isCoordenacaoView) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+          <div className="text-center space-y-3">
+            <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-sm font-bold text-slate-700 font-display">Carregando...</p>
+          </div>
+        </div>
+      );
+    }
+
+    const senhaConfigurada = settings.find(s => s.id === 'coordenacaoSenha')?.value || '789654';
+
+    if (!coordenacaoDesbloqueada) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (coordenacaoSenhaInput === senhaConfigurada) {
+                setCoordenacaoErro('');
+                setCoordenacaoDesbloqueada(true);
+              } else {
+                setCoordenacaoErro('Senha incorreta.');
+              }
+            }}
+            className="w-full max-w-xs bg-white rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4 text-center"
+          >
+            <div className="w-12 h-12 bg-brand-green-dark rounded-xl flex items-center justify-center mx-auto">
+              <CalendarDays size={22} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold font-display text-brand-green-dark">Coordenação</h1>
+              <p className="text-xs text-slate-500">Escala do Contraturno</p>
+            </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={coordenacaoSenhaInput}
+              onChange={(e) => { setCoordenacaoSenhaInput(e.target.value); setCoordenacaoErro(''); }}
+              placeholder="Senha"
+              className="w-full text-center text-sm px-3 py-2.5 rounded-lg border border-slate-200 focus:border-brand-green-light focus:outline-none tracking-widest"
+            />
+            {coordenacaoErro && <p className="text-xs font-bold text-rose-600">{coordenacaoErro}</p>}
+            <button
+              type="submit"
+              className="w-full py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold uppercase tracking-wider rounded-lg cursor-pointer"
+            >
+              Entrar
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-brand-cream font-sans">
+        <header className="bg-brand-green-dark text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarDays size={18} />
+            <span className="text-sm font-bold font-display">Coordenação — Escala do Contraturno</span>
+          </div>
+          <button
+            onClick={() => { setCoordenacaoDesbloqueada(false); setCoordenacaoSenhaInput(''); }}
+            className="text-[11px] font-bold text-emerald-200 hover:text-white cursor-pointer"
+          >
+            Bloquear
+          </button>
+        </header>
+        <main className="p-4 md:p-6">
+          <ContraturnoSchedule
+            students={students}
+            contraturnos={contraturnos}
+            enrollments={enrollments}
+            classPrices={classPrices}
+            activeYear={activeYear}
+            dailyExceptions={dailyExceptions}
+            onAddDailyException={handleAddDailyException}
+            onRemoveDailyException={handleRemoveDailyException}
+            onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
+            onUpdateContraturnoDays={handleUpdateContraturnoDays}
+          />
+        </main>
+      </div>
+    );
+  }
 
   if (isPublicFichaForm) {
     if (loading) {
@@ -1750,20 +1851,39 @@ export default function App() {
         {/* Global Statistics / Top Header inside Main Content */}
         <header className="bg-white border-b border-[#FAF9F5] py-2 md:py-3 px-4 md:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0" id="main-header">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2 font-display">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total Alunos</p>
-              <p className="text-lg font-extrabold text-brand-green-dark leading-tight">{totalStudentsCount}</p>
-            </div>
-            <div className="sm:border-l sm:pl-8 border-slate-200">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Matriculados {activeYear}</p>
-              <p className="text-lg font-extrabold text-brand-green-dark leading-tight">
-                {confirmedEnrollmentsCount} <span className="text-xs text-brand-green-light font-normal ml-1">({confirmedPercent}%)</span>
-              </p>
-            </div>
-            <div className="sm:border-l sm:pl-8 border-slate-200">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Pendente / Negociação</p>
-              <p className="text-lg font-extrabold text-brand-orange leading-tight">{pendingEnrollmentsCount}</p>
-            </div>
+            {activeTab === 'escala' ? (
+              <>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total no Contraturno</p>
+                  <p className="text-lg font-extrabold text-brand-green-dark leading-tight">{totalContraturnoCount}</p>
+                </div>
+                <div className="sm:border-l sm:pl-8 border-slate-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Melaço</p>
+                  <p className="text-lg font-extrabold text-brand-orange leading-tight">{totalMelacoCount}</p>
+                </div>
+                <div className="sm:border-l sm:pl-8 border-slate-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Marmelada</p>
+                  <p className="text-lg font-extrabold text-brand-green-light leading-tight">{totalMarmeladaCount}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total Alunos</p>
+                  <p className="text-lg font-extrabold text-brand-green-dark leading-tight">{totalStudentsCount}</p>
+                </div>
+                <div className="sm:border-l sm:pl-8 border-slate-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Matriculados {activeYear}</p>
+                  <p className="text-lg font-extrabold text-brand-green-dark leading-tight">
+                    {confirmedEnrollmentsCount} <span className="text-xs text-brand-green-light font-normal ml-1">({confirmedPercent}%)</span>
+                  </p>
+                </div>
+                <div className="sm:border-l sm:pl-8 border-slate-200">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Pendente / Negociação</p>
+                  <p className="text-lg font-extrabold text-brand-orange leading-tight">{pendingEnrollmentsCount}</p>
+                </div>
+              </>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button 
