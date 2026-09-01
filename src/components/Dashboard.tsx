@@ -62,6 +62,7 @@ export default function Dashboard({
     valorMensal: number;
   } | null>(null);
   const [modalSearch, setModalSearch] = useState('');
+  const [selectedFaseForModal, setSelectedFaseForModal] = useState<{ label: string; emoji: string; alunoIds: string[] } | null>(null);
   const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
   const [targetRolloverYear, setTargetRolloverYear] = useState<number>(activeYear === 2026 ? 2027 : activeYear + 1);
   const [isProcessingRollover, setIsProcessingRollover] = useState(false);
@@ -457,13 +458,12 @@ export default function Dashboard({
                 onClick={() => {
                   if (f.alunoIds.length === 1 && onNavigateWithStudent) {
                     onNavigateWithStudent('students', f.alunoIds[0]);
-                  } else if (onNavigateWithStudent) {
-                    onNavigateWithStudent('students', ''); // limpa seleção antiga, abre a busca
-                  } else {
-                    onNavigate('students');
+                  } else if (f.alunoIds.length > 1) {
+                    setSelectedFaseForModal({ label: f.label, emoji: f.emoji, alunoIds: f.alunoIds });
                   }
                 }}
-                className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer"
+                disabled={f.alunoIds.length === 0}
+                className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer disabled:cursor-default"
                 title={`Ver alunos em ${f.label}`}
               >
                 <div
@@ -987,6 +987,55 @@ export default function Dashboard({
                 >
                   Fechar
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: ALUNOS DE UMA FASE DO CICLO DE MATRÍCULA */}
+      <AnimatePresence>
+        {selectedFaseForModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setSelectedFaseForModal(null)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-slate-150 flex items-center justify-between shrink-0">
+                <div>
+                  <h3 className="font-display font-bold text-sm text-brand-green-dark">
+                    {selectedFaseForModal.emoji} {selectedFaseForModal.label}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">{selectedFaseForModal.alunoIds.length} alunos nesta fase</p>
+                </div>
+                <button
+                  onClick={() => setSelectedFaseForModal(null)}
+                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="overflow-y-auto divide-y divide-slate-100">
+                {selectedFaseForModal.alunoIds.map(id => {
+                  const st = students.find(s => s.id === id);
+                  if (!st) return null;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => {
+                        setSelectedFaseForModal(null);
+                        onNavigateWithStudent?.('students', id);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer"
+                    >
+                      <span className="text-sm font-semibold text-slate-800">{st.nome}</span>
+                      <span className="text-slate-300">›</span>
+                    </button>
+                  );
+                })}
               </div>
             </motion.div>
           </div>
