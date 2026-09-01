@@ -161,6 +161,7 @@ export default function Dashboard({
   const faseCounts = faseOrder.map(f => ({
     ...f,
     count: validEnrollments.filter(e => getFaseProcesso(e) === f.key).length,
+    alunoIds: validEnrollments.filter(e => getFaseProcesso(e) === f.key).map(e => e.alunoId),
   }));
   const emProcessoCount = validEnrollments.filter(e => getFaseProcesso(e) !== 'colheita').length;
   const colheitaCount = validEnrollments.filter(e => getFaseProcesso(e) === 'colheita').length;
@@ -424,10 +425,17 @@ export default function Dashboard({
             </div>
           </div>
           <button
-            onClick={() => onNavigate('students')}
+            onClick={() => {
+              const primeiro = novosAutoCadastrados[0];
+              if (primeiro && onNavigateWithStudent) {
+                onNavigateWithStudent('students', primeiro.id);
+              } else {
+                onNavigate('students');
+              }
+            }}
             className="shrink-0 px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-md cursor-pointer"
           >
-            Ver alunos
+            Ver {novosAutoCadastrados.length === 1 ? 'aluno' : 'alunos'}
           </button>
         </div>
       )}
@@ -446,7 +454,15 @@ export default function Dashboard({
           {faseCounts.map((f, idx) => (
             <React.Fragment key={f.key}>
               <button
-                onClick={() => onNavigate('students')}
+                onClick={() => {
+                  if (f.alunoIds.length === 1 && onNavigateWithStudent) {
+                    onNavigateWithStudent('students', f.alunoIds[0]);
+                  } else if (onNavigateWithStudent) {
+                    onNavigateWithStudent('students', ''); // limpa seleção antiga, abre a busca
+                  } else {
+                    onNavigate('students');
+                  }
+                }}
                 className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer"
                 title={`Ver alunos em ${f.label}`}
               >

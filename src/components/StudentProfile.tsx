@@ -79,9 +79,11 @@ export default function StudentProfile({
   }, [selectedStudentId]);
 
   useEffect(() => {
-    if (propSelectedStudentId) {
-      setSelectedStudentId(propSelectedStudentId);
-    }
+    // Sincroniza com o valor vindo de fora (App.tsx) — inclusive para LIMPAR
+    // a seleção (string vazia), não só para trocar de aluno. Sem isso, um
+    // clique em "ver todos" nunca conseguia voltar para a tela de busca
+    // quando a ficha de outro aluno já estava aberta.
+    setSelectedStudentId(propSelectedStudentId || '');
   }, [propSelectedStudentId]);
 
   // Form states for new/editing student
