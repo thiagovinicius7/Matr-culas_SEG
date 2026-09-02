@@ -1705,7 +1705,7 @@ export default function App() {
               rows={2}
               value={coordenacaoSugestaoTexto}
               onChange={(e) => { setCoordenacaoSugestaoTexto(e.target.value); setCoordenacaoSugestaoEnviada(false); }}
-              placeholder="Ex: O Théo passou a sair de terça de vez, pode deixar fixo assim?"
+              placeholder=""
               className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-green-light focus:outline-none"
             />
             <div className="flex items-center justify-between gap-2">

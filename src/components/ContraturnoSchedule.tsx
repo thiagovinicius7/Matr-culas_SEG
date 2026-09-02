@@ -30,7 +30,9 @@ export default function ContraturnoSchedule({
   onUpdateContraturnoNatureza,
   onUpdateContraturnoDays
 }: ContraturnoScheduleProps) {
-  const [viewMode, setViewMode] = useState<'semanal' | 'mensal'>('semanal');
+  const [viewMode, setViewMode] = useState<'semanal' | 'dia' | 'mensal'>('semanal');
+  const [selectedPrintDay, setSelectedPrintDay] = useState<WeekDay>('Seg');
+  const [observacoesGerais, setObservacoesGerais] = useState('');
   const [dayViewMode, setDayViewMode] = useState<'semana' | 'dia'>('semana');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
   const [targetYear, setTargetYear] = useState<number>(activeYear);
@@ -331,13 +333,20 @@ export default function ContraturnoSchedule({
           <div className="text-right">
             <h1 className="text-base font-bold uppercase tracking-wide text-brand-green-dark font-display">Escala de Contraturno</h1>
             <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-              {viewMode === 'semanal' ? 'Semana' : 'Matriz geral'} • Impresso em {new Date().toLocaleDateString('pt-BR')}
+              {viewMode === 'semanal' ? 'Semana' : viewMode === 'dia' ? dayNamesFull[selectedPrintDay] : 'Matriz geral'} • Impresso em {new Date().toLocaleDateString('pt-BR')}
             </p>
           </div>
         </div>
         <div className="h-1.5 bg-brand-orange mx-8 rounded-full mb-5" />
 
         <div className="px-8 pb-8">
+
+        {observacoesGerais.trim() && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 mb-4">
+            <p className="text-[9px] font-bold uppercase text-brand-clay mb-0.5">Observações Gerais</p>
+            <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{observacoesGerais}</p>
+          </div>
+        )}
 
         {viewMode === 'semanal' ? (
           /* WEEKLY PRINT MATRIX */
@@ -391,6 +400,52 @@ export default function ContraturnoSchedule({
             </div>
             <p className="text-[9px] italic text-slate-500 mt-3">* Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.</p>
           </div>
+        ) : viewMode === 'dia' ? (
+          /* SINGLE-DAY PRINT */
+          (() => {
+            const allAttendees = getAttendeesForDay(selectedPrintDay);
+            const attendees = allAttendees.filter(a => a.exceptionStatus !== 'faltou' && a.exceptionStatus !== 'movido_daqui');
+            const melaco = attendees.filter(a => a.segment.natureza === 'Melaço');
+            const marmelada = attendees.filter(a => a.segment.natureza === 'Marmelada');
+            return (
+              <div className="space-y-4 max-w-lg mx-auto">
+                <div className="bg-brand-green-dark text-white text-center py-2.5 rounded-lg">
+                  <h3 className="font-bold text-base font-display">{dayNamesFull[selectedPrintDay]}</h3>
+                  <p className="text-xs font-mono opacity-80">{attendees.length} {attendees.length === 1 ? 'criança' : 'crianças'}</p>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-brand-orange border-b-2 border-brand-orange/30 pb-1 mb-2">Melaço</h4>
+                  <div className="space-y-1.5">
+                    {melaco.map(a => (
+                      <div key={a.segment.id} className="text-sm leading-snug flex items-center justify-between border-b border-dashed border-slate-200 pb-1">
+                        <span>• {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}</span>
+                        {a.exceptionStatus === 'movido_para_ca' && <span className="text-[10px] text-brand-orange font-semibold">veio de outro dia</span>}
+                        {a.exceptionStatus === 'avulso' && <span className="text-[10px] text-emerald-700 font-semibold">diária</span>}
+                      </div>
+                    ))}
+                    {melaco.length === 0 && <p className="text-xs italic text-slate-400">Ninguém</p>}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-brand-green-light border-b-2 border-brand-green-light/30 pb-1 mb-2">Marmelada</h4>
+                  <div className="space-y-1.5">
+                    {marmelada.map(a => (
+                      <div key={a.segment.id} className="text-sm leading-snug flex items-center justify-between border-b border-dashed border-slate-200 pb-1">
+                        <span>• {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}</span>
+                        {a.exceptionStatus === 'movido_para_ca' && <span className="text-[10px] text-brand-orange font-semibold">veio de outro dia</span>}
+                        {a.exceptionStatus === 'avulso' && <span className="text-[10px] text-emerald-700 font-semibold">diária</span>}
+                      </div>
+                    ))}
+                    {marmelada.length === 0 && <p className="text-xs italic text-slate-400">Ninguém</p>}
+                  </div>
+                </div>
+
+                <p className="text-[10px] italic text-slate-500">* Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.</p>
+              </div>
+            );
+          })()
         ) : (
           /* MONTHLY MATRIX PRINT */
           <div className="space-y-3">
@@ -472,6 +527,15 @@ export default function ContraturnoSchedule({
             </button>
             <button
               type="button"
+              onClick={() => setViewMode('dia')}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded transition-all cursor-pointer ${
+                viewMode === 'dia' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Dia
+            </button>
+            <button
+              type="button"
               onClick={() => setViewMode('mensal')}
               className={`px-2.5 py-1 text-[11px] font-bold rounded transition-all cursor-pointer ${
                 viewMode === 'mensal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'
@@ -480,6 +544,16 @@ export default function ContraturnoSchedule({
               Matriz Geral
             </button>
           </div>
+
+          {viewMode === 'dia' && (
+            <select
+              value={selectedPrintDay}
+              onChange={(e) => setSelectedPrintDay(e.target.value as WeekDay)}
+              className="text-[11px] font-bold px-2 py-1 rounded-md border border-slate-200 bg-white cursor-pointer"
+            >
+              {daysOfWeek.map(d => <option key={d} value={d}>{dayNamesFull[d]}</option>)}
+            </select>
+          )}
 
           {/* Print button */}
           <button
@@ -492,6 +566,20 @@ export default function ContraturnoSchedule({
             Imprimir
           </button>
         </div>
+      </div>
+
+      {/* Observações Gerais — texto livre que sai junto na impressão */}
+      <div className="bg-white border border-slate-200 rounded-lg p-3">
+        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+          Observações Gerais (aparece na impressão)
+        </label>
+        <textarea
+          rows={2}
+          value={observacoesGerais}
+          onChange={(e) => setObservacoesGerais(e.target.value)}
+          placeholder="Ex: sexta-feira sem aula à tarde, sair 30 min mais cedo."
+          className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 focus:border-orange-400 focus:outline-none"
+        />
       </div>
 
       {/* Dynamic Views */}
@@ -862,6 +950,52 @@ export default function ContraturnoSchedule({
             })}
           </div>
         </div>
+      ) : viewMode === 'dia' ? (
+        /* LIVE SINGLE-DAY VIEW (preview do que vai para impressão) */
+        (() => {
+          const allAttendees = getAttendeesForDay(selectedPrintDay);
+          const attendees = allAttendees.filter(a => a.exceptionStatus !== 'faltou' && a.exceptionStatus !== 'movido_daqui');
+          const melaco = attendees.filter(a => a.segment.natureza === 'Melaço');
+          const marmelada = attendees.filter(a => a.segment.natureza === 'Marmelada');
+          return (
+            <div className="max-w-lg mx-auto space-y-4">
+              <div className="bg-brand-green-dark text-white text-center py-2.5 rounded-lg">
+                <h3 className="font-bold text-base font-display">{dayNamesFull[selectedPrintDay]}</h3>
+                <p className="text-xs font-mono opacity-80">{attendees.length} {attendees.length === 1 ? 'criança' : 'crianças'}</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <h4 className="text-xs font-bold uppercase text-brand-orange border-b-2 border-brand-orange/30 pb-1 mb-2">Melaço</h4>
+                <div className="space-y-1.5">
+                  {melaco.map(a => (
+                    <div key={a.segment.id} className="text-sm flex items-center justify-between border-b border-dashed border-slate-100 pb-1">
+                      <span>{a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}</span>
+                      {a.exceptionStatus === 'movido_para_ca' && <span className="text-[10px] text-brand-orange font-bold">veio de outro dia</span>}
+                      {a.exceptionStatus === 'avulso' && <span className="text-[10px] text-emerald-700 font-bold">diária</span>}
+                    </div>
+                  ))}
+                  {melaco.length === 0 && <p className="text-xs italic text-slate-400">Ninguém</p>}
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <h4 className="text-xs font-bold uppercase text-brand-green-light border-b-2 border-brand-green-light/30 pb-1 mb-2">Marmelada</h4>
+                <div className="space-y-1.5">
+                  {marmelada.map(a => (
+                    <div key={a.segment.id} className="text-sm flex items-center justify-between border-b border-dashed border-slate-100 pb-1">
+                      <span>{a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}</span>
+                      {a.exceptionStatus === 'movido_para_ca' && <span className="text-[10px] text-brand-orange font-bold">veio de outro dia</span>}
+                      {a.exceptionStatus === 'avulso' && <span className="text-[10px] text-emerald-700 font-bold">diária</span>}
+                    </div>
+                  ))}
+                  {marmelada.length === 0 && <p className="text-xs italic text-slate-400">Ninguém</p>}
+                </div>
+              </div>
+
+              <p className="text-[10px] italic text-slate-400 text-center">* saída antecipada às 15h — use a aba "Semanal (Diário)" para arrastar, marcar falta ou adicionar avulso.</p>
+            </div>
+          );
+        })()
       ) : (
         /* GENERAL MATRIX / CHECKLIST VIEW WITH ADVANCED FILTERS */
         <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden" id="matrix-checklist-view">
