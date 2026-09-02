@@ -178,3 +178,15 @@ export interface PackDocument {
   storagePath: string; // caminho no Firebase Storage, usado para poder substituir/excluir
   atualizadoEm: string; // YYYY-MM-DD
 }
+
+/**
+ * Sugestão de alteração enviada pela tela da Coordenação (que não grava
+ * direto no sistema). A equipe vê essas sugestões ao entrar no app e decide
+ * se aplica a mudança de verdade.
+ */
+export interface CoordenacaoSugestao {
+  id: string;
+  texto: string;
+  criadoEm: string; // YYYY-MM-DD HH:mm
+  resolvida: boolean;
+}

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument } from './types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument, CoordenacaoSugestao } from './types';
 import { 
   calculateAgeAtCutoff,
   getRegularClassForAge,
@@ -112,6 +112,7 @@ export default function App() {
   const [dailyExceptions, setDailyExceptions] = useState<ContraturnoDailyException[]>([]);
   const [packDocuments, setPackDocuments] = useState<PackDocument[]>([]);
   const [settings, setSettings] = useState<{ id: string; value: string }[]>([]);
+  const [coordenacaoSugestoes, setCoordenacaoSugestoes] = useState<CoordenacaoSugestao[]>([]);
   const [coordenacaoDesbloqueada, setCoordenacaoDesbloqueada] = useState(false);
   const [coordenacaoSenhaInput, setCoordenacaoSenhaInput] = useState('');
   const [coordenacaoErro, setCoordenacaoErro] = useState('');
@@ -125,6 +126,8 @@ export default function App() {
   const [coordenacaoContraturnos, setCoordenacaoContraturnos] = useState<ContraturnoSegment[]>([]);
   const [coordenacaoDailyExceptions, setCoordenacaoDailyExceptions] = useState<ContraturnoDailyException[]>([]);
   const [coordenacaoTemEdicaoLocal, setCoordenacaoTemEdicaoLocal] = useState(false);
+  const [coordenacaoSugestaoTexto, setCoordenacaoSugestaoTexto] = useState('');
+  const [coordenacaoSugestaoEnviada, setCoordenacaoSugestaoEnviada] = useState(false);
 
   // Enquanto ela ainda não editou nada nessa sessão, a cópia local segue os
   // dados reais automaticamente (assim um aluno novo cadastrado no sistema
@@ -176,13 +179,14 @@ export default function App() {
           getCollectionData<{ id: string; value: string }>('settings'),
           getCollectionData<NegotiationHistoryEntry>('negotiationHistory'),
           getCollectionData<ContraturnoDailyException>('contraturnoDailyExceptions'),
-          getCollectionData<PackDocument>('packDocuments')
+          getCollectionData<PackDocument>('packDocuments'),
+          getCollectionData<CoordenacaoSugestao>('coordenacaoSugestoes')
         ]);
 
         const collectionNames = [
           'students', 'guardians', 'enrollments', 'contraturnos', 'movements',
           'classPrices', 'contraturnoPrices', 'settings', 'negotiationHistory',
-          'contraturnoDailyExceptions', 'packDocuments'
+          'contraturnoDailyExceptions', 'packDocuments', 'coordenacaoSugestoes'
         ];
         results.forEach((r, i) => {
           if (r.status === 'rejected') {
@@ -201,7 +205,8 @@ export default function App() {
           loadedSettingsResult,
           loadedNegotiationHistoryResult,
           loadedDailyExceptionsResult,
-          loadedPackDocumentsResult
+          loadedPackDocumentsResult,
+          loadedSugestoesResult
         ] = results;
 
         const loadedStudents = loadedStudentsResult.status === 'fulfilled' ? loadedStudentsResult.value : [];
@@ -215,6 +220,7 @@ export default function App() {
         const loadedNegotiationHistory = loadedNegotiationHistoryResult.status === 'fulfilled' ? loadedNegotiationHistoryResult.value : [];
         const loadedDailyExceptions = loadedDailyExceptionsResult.status === 'fulfilled' ? loadedDailyExceptionsResult.value : [];
         const loadedPackDocuments = loadedPackDocumentsResult.status === 'fulfilled' ? loadedPackDocumentsResult.value : [];
+        const loadedSugestoes = loadedSugestoesResult.status === 'fulfilled' ? loadedSugestoesResult.value : [];
 
         const algumaFalhou = results.some(r => r.status === 'rejected');
         if (algumaFalhou) {
@@ -266,6 +272,7 @@ export default function App() {
         setNegotiationHistory(loadedNegotiationHistory || []);
         setDailyExceptions(loadedDailyExceptions || []);
         setPackDocuments(loadedPackDocuments || []);
+        setCoordenacaoSugestoes(loadedSugestoes || []);
         setSettings(loadedSettings || []);
 
         // Sanitize loaded Class Prices to ensure all have an 'ano' field
@@ -1127,6 +1134,26 @@ export default function App() {
     deleteDocument('packDocuments', docId);
   };
 
+  // Handlers: Sugestões de alteração enviadas pela tela da Coordenação
+  const handleEnviarSugestaoCoordenacao = async (texto: string) => {
+    const nova: CoordenacaoSugestao = {
+      id: `sugestao_${Date.now()}`,
+      texto,
+      criadoEm: new Date().toLocaleString('pt-BR'),
+      resolvida: false,
+    };
+    setCoordenacaoSugestoes(prev => [...prev, nova]);
+    await saveDocument('coordenacaoSugestoes', nova);
+  };
+
+  const handleMarcarSugestaoResolvida = (id: string) => {
+    const existente = coordenacaoSugestoes.find(s => s.id === id);
+    if (!existente) return;
+    const atualizada: CoordenacaoSugestao = { ...existente, resolvida: true };
+    setCoordenacaoSugestoes(prev => prev.map(s => s.id === id ? atualizada : s));
+    saveDocument('coordenacaoSugestoes', atualizada);
+  };
+
   // Handler: Change regular class manually (exceptional case)
   const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
     const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
@@ -1667,6 +1694,38 @@ export default function App() {
               </button>
             </div>
           )}
+
+          {/* Enviar sugestão de alteração para o sistema principal */}
+          <div className="max-w-2xl mx-auto mt-4 bg-white border border-slate-200 rounded-lg p-4 space-y-2">
+            <h4 className="text-xs font-bold text-slate-700">💬 Enviar sugestão para a coordenação/equipe</h4>
+            <p className="text-[11px] text-slate-500">
+              Quer que uma mudança dessas vire permanente, ou tem algum outro recado? Escreva aqui — a equipe vê essa mensagem assim que abrir o sistema.
+            </p>
+            <textarea
+              rows={2}
+              value={coordenacaoSugestaoTexto}
+              onChange={(e) => { setCoordenacaoSugestaoTexto(e.target.value); setCoordenacaoSugestaoEnviada(false); }}
+              placeholder="Ex: O Théo passou a sair de terça de vez, pode deixar fixo assim?"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-green-light focus:outline-none"
+            />
+            <div className="flex items-center justify-between gap-2">
+              {coordenacaoSugestaoEnviada ? (
+                <span className="text-[11px] font-bold text-emerald-700">✓ Sugestão enviada!</span>
+              ) : <span />}
+              <button
+                onClick={async () => {
+                  if (!coordenacaoSugestaoTexto.trim()) return;
+                  await handleEnviarSugestaoCoordenacao(coordenacaoSugestaoTexto.trim());
+                  setCoordenacaoSugestaoTexto('');
+                  setCoordenacaoSugestaoEnviada(true);
+                }}
+                disabled={!coordenacaoSugestaoTexto.trim()}
+                className="px-3 py-1.5 bg-brand-green-dark hover:bg-emerald-900 text-white text-xs font-bold rounded-md cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Enviar sugestão
+              </button>
+            </div>
+          </div>
         </main>
       </div>
     );
@@ -1996,6 +2055,8 @@ export default function App() {
                   onAdvanceSchoolYear={handleAdvanceSchoolYear}
                   classPrices={classPrices}
                   packDocuments={packDocuments}
+                  coordenacaoSugestoes={coordenacaoSugestoes}
+                  onResolveSugestao={handleMarcarSugestaoResolvida}
                   onNavigate={setActiveTab} 
                   onNavigateWithStudent={handleNavigateWithStudent}
                   onImportGeraniumData={handleImportGeraniumData}

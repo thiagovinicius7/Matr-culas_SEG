@@ -33,7 +33,7 @@ export default function ContraturnoSchedule({
   const [viewMode, setViewMode] = useState<'semanal' | 'mensal'>('semanal');
   const [dayViewMode, setDayViewMode] = useState<'semana' | 'dia'>('semana');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
-  const [targetYear, setTargetYear] = useState<number>(activeYear === 2026 ? 2027 : activeYear);
+  const [targetYear, setTargetYear] = useState<number>(activeYear);
   const [draggedInfo, setDraggedInfo] = useState<{ alunoId: string; origemDia: WeekDay } | null>(null);
   const [addingAvulsoForDay, setAddingAvulsoForDay] = useState<WeekDay | null>(null);
   const [avulsoNome, setAvulsoNome] = useState('');

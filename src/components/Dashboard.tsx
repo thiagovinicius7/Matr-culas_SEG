@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Student, Enrollment, ContraturnoSegment, RegularClass, PackDocument } from '../types';
+import { Student, Enrollment, ContraturnoSegment, RegularClass, PackDocument, CoordenacaoSugestao } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso } from '../data';
 import { 
   Users, 
@@ -29,6 +29,8 @@ interface DashboardProps {
   activeYear?: number;
   availableYears?: number[];
   packDocuments?: PackDocument[];
+  coordenacaoSugestoes?: CoordenacaoSugestao[];
+  onResolveSugestao?: (id: string) => void;
   onNavigate: (tab: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
   onSelectActiveYear?: (year: number) => void;
@@ -45,6 +47,8 @@ export default function Dashboard({
   activeYear = 2026,
   availableYears = [2026, 2027],
   packDocuments = [],
+  coordenacaoSugestoes = [],
+  onResolveSugestao,
   onNavigate, 
   onNavigateWithStudent,
   onSelectActiveYear,
@@ -438,6 +442,34 @@ export default function Dashboard({
           >
             Ver {novosAutoCadastrados.length === 1 ? 'aluno' : 'alunos'}
           </button>
+        </div>
+      )}
+
+      {/* Aviso: sugestões enviadas pela tela da Coordenação */}
+      {coordenacaoSugestoes.filter(s => !s.resolvida).length > 0 && (
+        <div className="bg-white border-2 border-brand-green-dark rounded-xl p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💬</span>
+            <p className="text-sm font-bold text-brand-green-dark">
+              {coordenacaoSugestoes.filter(s => !s.resolvida).length} sugestão(ões) da Coordenação do Contraturno
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {coordenacaoSugestoes.filter(s => !s.resolvida).map(s => (
+              <div key={s.id} className="flex items-start justify-between gap-3 bg-slate-50 rounded-lg px-3 py-2">
+                <div>
+                  <p className="text-xs text-slate-700">{s.texto}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{s.criadoEm}</p>
+                </div>
+                <button
+                  onClick={() => onResolveSugestao?.(s.id)}
+                  className="shrink-0 text-[10px] font-bold text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 px-2 py-1 rounded-md cursor-pointer"
+                >
+                  ✓ Resolvida
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
