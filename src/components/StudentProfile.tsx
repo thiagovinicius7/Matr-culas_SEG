@@ -71,6 +71,7 @@ export default function StudentProfile({
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [showCartaModal, setShowCartaModal] = useState(false);
   const [showNegotiationModal, setShowNegotiationModal] = useState(false);
+  const [mostrarFichaSaude, setMostrarFichaSaude] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<'visao_geral' | 'responsaveis' | 'financeiro' | 'contraturno' | 'matricula'>('visao_geral');
 
@@ -78,6 +79,7 @@ export default function StudentProfile({
     // Ao trocar de aluno, sempre volta para a primeira aba — evita mostrar
     // a aba "Matrícula" de um aluno anterior por engano.
     setProfileTab('visao_geral');
+    setMostrarFichaSaude(false);
   }, [selectedStudentId]);
 
   useEffect(() => {
@@ -2240,29 +2242,74 @@ export default function StudentProfile({
                         </div>
                       </li>
 
-                      <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
-                        <div>
-                          <p className="text-xs font-semibold text-slate-800">Ficha de Saúde</p>
-                          <p className="text-[10px] text-slate-400">Uma por aluno, não muda por ano letivo</p>
+                      <li className="p-2.5 bg-slate-50 rounded-md space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800">Ficha de Saúde</p>
+                            <p className="text-[10px] text-slate-400">Uma por aluno, não muda por ano letivo</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {fichasSaude.some(f => f.alunoId === activeStudent.id) ? (
+                              <button
+                                type="button"
+                                onClick={() => setMostrarFichaSaude(!mostrarFichaSaude)}
+                                className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-full cursor-pointer"
+                              >
+                                preenchida {mostrarFichaSaude ? '▲' : '▼'}
+                              </button>
+                            ) : (
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const link = `${window.location.origin}${window.location.pathname}?fichaSaude=${activeStudent.id}`;
+                                navigator.clipboard.writeText(link);
+                                alert('Link da Ficha de Saúde copiado!');
+                              }}
+                              className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                            >
+                              copiar link
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {fichasSaude.some(f => f.alunoId === activeStudent.id) ? (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">preenchida</span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const link = `${window.location.origin}${window.location.pathname}?fichaSaude=${activeStudent.id}`;
-                              navigator.clipboard.writeText(link);
-                              alert('Link da Ficha de Saúde copiado!');
-                            }}
-                            className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
-                          >
-                            copiar link
-                          </button>
-                        </div>
+
+                        {mostrarFichaSaude && (() => {
+                          const ficha = fichasSaude.find(f => f.alunoId === activeStudent.id);
+                          if (!ficha) return null;
+                          const campos: [string, string | undefined][] = [
+                            ['Plano de saúde', ficha.planoSaude],
+                            ['Nº da carteirinha', ficha.numeroCarteirinha],
+                            ['Hospital de preferência', ficha.hospitalPreferencia],
+                            ['Tipo sanguíneo', ficha.tipoSanguineo],
+                            ['Doenças pré-existentes', ficha.doencasPreExistentes],
+                            ['Cirurgias / internações', ficha.cirurgiasInternacoes],
+                            ['Alergias', ficha.alergias],
+                            ['Restrição alimentar', ficha.restricaoAlimentar],
+                            ['Medicações de uso contínuo', ficha.medicacoesUso],
+                            ['Acompanhamento terapêutico', ficha.acompanhamentoTerapeutico],
+                            ['Necessidades educativas', ficha.necessidadesEducativas],
+                            ['Contato de emergência', ficha.contatoEmergenciaNome ? `${ficha.contatoEmergenciaNome} (${ficha.contatoEmergenciaParentesco || '—'}) — ${ficha.contatoEmergenciaTelefone}` : undefined],
+                            ['Autoriza procedimento de emergência', ficha.autorizaProcedimentoEmergencia === undefined ? undefined : (ficha.autorizaProcedimentoEmergencia ? 'Sim' : 'Não')],
+                            ['Observações gerais', ficha.observacoesGerais],
+                          ];
+                          const preenchidos = campos.filter(([, v]) => v);
+                          return (
+                            <div className="bg-white border border-emerald-150 rounded-md p-3 space-y-2">
+                              <p className="text-[9px] text-slate-400">Preenchida em {new Date(ficha.preenchidoEm + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                              {preenchidos.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic">A família não preencheu nenhum campo além do contato de emergência.</p>
+                              ) : (
+                                preenchidos.map(([label, valor]) => (
+                                  <div key={label}>
+                                    <p className="text-[10px] font-bold text-slate-500">{label}</p>
+                                    <p className="text-xs text-slate-800 whitespace-pre-wrap">{valor}</p>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          );
+                        })()}
                       </li>
                     </ul>
                   </div>
