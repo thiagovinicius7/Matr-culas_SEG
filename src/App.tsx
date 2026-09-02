@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument, CoordenacaoSugestao } from './types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument, CoordenacaoSugestao, FichaSaude } from './types';
 import { 
   calculateAgeAtCutoff,
   getRegularClassForAge,
@@ -41,6 +41,7 @@ import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
 import ParentCartaPortal from './components/ParentCartaPortal';
 import FichaDadosGeraisForm from './components/FichaDadosGeraisForm';
+import FichaSaudeForm from './components/FichaSaudeForm';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -81,6 +82,7 @@ export default function App() {
   const publicStudentId = urlParams.get('alunoId') || urlParams.get('carta');
   const isPublicFichaForm = urlParams.get('novaFicha') === '1' || urlParams.has('novoAluno');
   const isCoordenacaoView = urlParams.get('coordenacao') === '1';
+  const fichaSaudeStudentId = urlParams.get('fichaSaude');
 
   useEffect(() => {
     const unsubscribe = watchAuthState((user) => {
@@ -95,12 +97,12 @@ export default function App() {
   // (que exigem login) liberem a leitura dos dados da Carta de Intenção.
   useEffect(() => {
     if (isCheckingAuth) return;
-    if (!currentUser && (publicStudentId || isPublicFichaForm || isCoordenacaoView)) {
+    if (!currentUser && (publicStudentId || isPublicFichaForm || isCoordenacaoView || fichaSaudeStudentId)) {
       signInAsPublicVisitor().catch(() => {
         showToast('Erro ao abrir a página', 'Não foi possível carregar os dados. Tente atualizar a página.', 'error');
       });
     }
-  }, [isCheckingAuth, currentUser, publicStudentId, isPublicFichaForm, isCoordenacaoView]);
+  }, [isCheckingAuth, currentUser, publicStudentId, isPublicFichaForm, isCoordenacaoView, fichaSaudeStudentId]);
 
   // Core App States loaded from Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -113,6 +115,7 @@ export default function App() {
   const [packDocuments, setPackDocuments] = useState<PackDocument[]>([]);
   const [settings, setSettings] = useState<{ id: string; value: string }[]>([]);
   const [coordenacaoSugestoes, setCoordenacaoSugestoes] = useState<CoordenacaoSugestao[]>([]);
+  const [fichasSaude, setFichasSaude] = useState<FichaSaude[]>([]);
   const [coordenacaoDesbloqueada, setCoordenacaoDesbloqueada] = useState(false);
   const [coordenacaoSenhaInput, setCoordenacaoSenhaInput] = useState('');
   const [coordenacaoErro, setCoordenacaoErro] = useState('');
@@ -180,13 +183,14 @@ export default function App() {
           getCollectionData<NegotiationHistoryEntry>('negotiationHistory'),
           getCollectionData<ContraturnoDailyException>('contraturnoDailyExceptions'),
           getCollectionData<PackDocument>('packDocuments'),
-          getCollectionData<CoordenacaoSugestao>('coordenacaoSugestoes')
+          getCollectionData<CoordenacaoSugestao>('coordenacaoSugestoes'),
+          getCollectionData<FichaSaude>('fichasSaude')
         ]);
 
         const collectionNames = [
           'students', 'guardians', 'enrollments', 'contraturnos', 'movements',
           'classPrices', 'contraturnoPrices', 'settings', 'negotiationHistory',
-          'contraturnoDailyExceptions', 'packDocuments', 'coordenacaoSugestoes'
+          'contraturnoDailyExceptions', 'packDocuments', 'coordenacaoSugestoes', 'fichasSaude'
         ];
         results.forEach((r, i) => {
           if (r.status === 'rejected') {
@@ -206,7 +210,8 @@ export default function App() {
           loadedNegotiationHistoryResult,
           loadedDailyExceptionsResult,
           loadedPackDocumentsResult,
-          loadedSugestoesResult
+          loadedSugestoesResult,
+          loadedFichasSaudeResult
         ] = results;
 
         const loadedStudents = loadedStudentsResult.status === 'fulfilled' ? loadedStudentsResult.value : [];
@@ -221,6 +226,7 @@ export default function App() {
         const loadedDailyExceptions = loadedDailyExceptionsResult.status === 'fulfilled' ? loadedDailyExceptionsResult.value : [];
         const loadedPackDocuments = loadedPackDocumentsResult.status === 'fulfilled' ? loadedPackDocumentsResult.value : [];
         const loadedSugestoes = loadedSugestoesResult.status === 'fulfilled' ? loadedSugestoesResult.value : [];
+        const loadedFichasSaude = loadedFichasSaudeResult.status === 'fulfilled' ? loadedFichasSaudeResult.value : [];
 
         const algumaFalhou = results.some(r => r.status === 'rejected');
         if (algumaFalhou) {
@@ -273,6 +279,7 @@ export default function App() {
         setDailyExceptions(loadedDailyExceptions || []);
         setPackDocuments(loadedPackDocuments || []);
         setCoordenacaoSugestoes(loadedSugestoes || []);
+        setFichasSaude(loadedFichasSaude || []);
         setSettings(loadedSettings || []);
 
         // Sanitize loaded Class Prices to ensure all have an 'ano' field
@@ -1154,6 +1161,14 @@ export default function App() {
     saveDocument('coordenacaoSugestoes', atualizada);
   };
 
+  // Handler: salvar/atualizar a Ficha de Saúde de um aluno (uma por aluno,
+  // id = alunoId, então enviar de novo simplesmente atualiza a existente)
+  const handleSaveFichaSaude = async (ficha: Omit<FichaSaude, 'id'>) => {
+    const completa: FichaSaude = { ...ficha, id: ficha.alunoId };
+    setFichasSaude(prev => [...prev.filter(f => f.alunoId !== ficha.alunoId), completa]);
+    await saveDocument('fichasSaude', completa);
+  };
+
   // Handler: Change regular class manually (exceptional case)
   const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
     const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
@@ -1731,6 +1746,35 @@ export default function App() {
     );
   }
 
+  if (fichaSaudeStudentId) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+          <div className="text-center space-y-3">
+            <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-sm font-bold text-slate-700 font-display">Carregando Ficha de Saúde...</p>
+          </div>
+        </div>
+      );
+    }
+    const alunoFichaSaude = students.find(s => s.id === fichaSaudeStudentId);
+    if (!alunoFichaSaude) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans text-center">
+          <p className="text-sm font-bold text-slate-600">Link inválido ou aluno não encontrado. Confira o link com a secretaria.</p>
+        </div>
+      );
+    }
+    const fichaExistente = fichasSaude.find(f => f.alunoId === fichaSaudeStudentId);
+    return (
+      <FichaSaudeForm
+        student={alunoFichaSaude}
+        existingFicha={fichaExistente}
+        onSubmit={handleSaveFichaSaude}
+      />
+    );
+  }
+
   if (isPublicFichaForm) {
     if (loading) {
       return (
@@ -2071,6 +2115,7 @@ export default function App() {
                   contraturnos={contraturnos} 
                   movements={movements}
                   negotiationHistory={negotiationHistory}
+                  fichasSaude={fichasSaude}
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   activeYear={activeYear}

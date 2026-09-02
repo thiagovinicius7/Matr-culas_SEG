@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry } from '../types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry, FichaSaude } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -14,6 +14,7 @@ interface StudentProfileProps {
   contraturnos: ContraturnoSegment[];
   movements: FinancialMovement[];
   negotiationHistory?: NegotiationHistoryEntry[];
+  fichasSaude?: FichaSaude[];
   classPrices: RegularClass[];
   contraturnoPrices?: ContraturnoPrice[];
   activeYear?: number;
@@ -44,6 +45,7 @@ export default function StudentProfile({
   contraturnos,
   movements,
   negotiationHistory = [],
+  fichasSaude = [],
   classPrices,
   contraturnoPrices = [],
   activeYear = 2026,
@@ -2231,9 +2233,28 @@ export default function StudentProfile({
                           <span>Termo de Uso de Imagem</span>
                           <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
                         </li>
-                        <li className="flex items-center justify-between">
+                        <li className="flex items-center justify-between gap-2">
                           <span>Ficha de Saúde</span>
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
+                          <div className="flex items-center gap-1.5">
+                            {fichasSaude.some(f => f.alunoId === activeStudent.id) ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">preenchida</span>
+                            ) : (
+                              <>
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const link = `${window.location.origin}${window.location.pathname}?fichaSaude=${activeStudent.id}`;
+                                    navigator.clipboard.writeText(link);
+                                    alert('Link da Ficha de Saúde copiado! Envie para a família preencher.');
+                                  }}
+                                  className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                                >
+                                  copiar link
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </li>
                       </ul>
                     )}

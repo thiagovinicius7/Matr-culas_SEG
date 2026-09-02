@@ -190,3 +190,35 @@ export interface CoordenacaoSugestao {
   criadoEm: string; // YYYY-MM-DD HH:mm
   resolvida: boolean;
 }
+
+/**
+ * Ficha de Saúde do aluno — uma por aluno (não por ano letivo), preenchida
+ * pela família via link público, espelhando o documento oficial em papel.
+ */
+export interface FichaSaude {
+  id: string; // = alunoId (uma ficha por aluno)
+  alunoId: string;
+  // Identificação
+  planoSaude?: string;
+  numeroCarteirinha?: string;
+  hospitalPreferencia?: string;
+  tipoSanguineo?: string;
+  // Histórico de Saúde
+  doencasPreExistentes?: string;
+  cirurgiasInternacoes?: string;
+  // Alergias e Medicações
+  alergias?: string;
+  restricaoAlimentar?: string;
+  medicacoesUso?: string;
+  // Acompanhamento Terapêutico
+  acompanhamentoTerapeutico?: string;
+  // Necessidades Educativas / Desenvolvimento
+  necessidadesEducativas?: string;
+  // Emergência
+  contatoEmergenciaNome?: string;
+  contatoEmergenciaTelefone?: string;
+  contatoEmergenciaParentesco?: string;
+  autorizaProcedimentoEmergencia?: boolean;
+  observacoesGerais?: string;
+  preenchidoEm: string; // YYYY-MM-DD
+}
