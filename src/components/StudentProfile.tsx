@@ -2215,8 +2215,8 @@ export default function StudentProfile({
                     <ul className="space-y-2">
                       <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
                         <div>
-                          <p className="text-xs font-semibold text-slate-800">Carta de Intenção {activeYear}</p>
-                          <p className="text-[10px] text-slate-400">Enviada pela equipe, respondida pela família</p>
+                          <p className="text-xs font-semibold text-slate-800">Carta de Intenção de Rematrícula 2027</p>
+                          <p className="text-[10px] text-slate-400">Confirmação de renovação — não cria matrícula nova, só sinaliza intenção até a virada do ano letivo</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {currentYearEnrollment.statusIntencao2027 === 'Confirmada' ? (
@@ -2313,6 +2313,63 @@ export default function StudentProfile({
                       </li>
                     </ul>
                   </div>
+
+                  {/* Intenção de Rematrícula (próximo ano) — resposta da Carta de Intenção,
+                      que fica gravada em campos separados dentro deste mesmo Enrollment */}
+                  {currentYearEnrollment.statusIntencao2027 && (
+                    <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
+                          📋 Intenção de Rematrícula {activeYear + 1}
+                        </h4>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          currentYearEnrollment.statusIntencao2027 === 'Confirmada' ? 'text-emerald-700 bg-emerald-50'
+                          : currentYearEnrollment.statusIntencao2027 === 'Não Renovará' ? 'text-rose-700 bg-rose-50'
+                          : 'text-amber-700 bg-amber-50'
+                        }`}>
+                          {currentYearEnrollment.statusIntencao2027 === 'Em Análise' ? 'em análise' : currentYearEnrollment.statusIntencao2027.toLowerCase()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {currentYearEnrollment.turmaPropostaId2027 && (
+                          <div>
+                            <p className="text-[10px] text-slate-400">Turma proposta</p>
+                            <p className="font-semibold text-slate-800">
+                              {(classPrices.find(c => c.id === currentYearEnrollment.turmaPropostaId2027)?.nome) || currentYearEnrollment.turmaPropostaId2027}
+                            </p>
+                          </div>
+                        )}
+                        {currentYearEnrollment.valorProposto2027 !== undefined && (
+                          <div>
+                            <p className="text-[10px] text-slate-400">Valor proposto</p>
+                            <p className="font-semibold text-slate-800">
+                              R$ {currentYearEnrollment.valorProposto2027.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        )}
+                        {currentYearEnrollment.dataIntencao2027 && (
+                          <div>
+                            <p className="text-[10px] text-slate-400">Respondida em</p>
+                            <p className="font-semibold text-slate-800">
+                              {new Date(currentYearEnrollment.dataIntencao2027 + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                        )}
+                        {currentYearEnrollment.contraturnoDesejado2027 !== undefined && (
+                          <div>
+                            <p className="text-[10px] text-slate-400">Contraturno {activeYear + 1}</p>
+                            <p className="font-semibold text-slate-800">{currentYearEnrollment.contraturnoDesejado2027 ? 'Sim' : 'Não'}</p>
+                          </div>
+                        )}
+                      </div>
+                      {currentYearEnrollment.observacoesFamilia2027 && (
+                        <div className="pt-1 border-t border-slate-100">
+                          <p className="text-[10px] text-slate-400">Observações da família</p>
+                          <p className="text-xs text-slate-700 whitespace-pre-wrap">{currentYearEnrollment.observacoesFamilia2027}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Checklist da fase atual */}
                   <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-3">
