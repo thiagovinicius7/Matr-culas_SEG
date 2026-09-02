@@ -2199,6 +2199,68 @@ export default function StudentProfile({
                     </div>
                   </div>
 
+                  {/* Links e Fichas deste Aluno — sempre visível, independente da fase */}
+                  <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-3">
+                    <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
+                      🔗 Links e Fichas deste Aluno
+                    </h4>
+                    <ul className="space-y-2">
+                      <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-800">Carta de Intenção {activeYear}</p>
+                          <p className="text-[10px] text-slate-400">Enviada pela equipe, respondida pela família</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {currentYearEnrollment.statusIntencao2027 === 'Confirmada' ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">confirmada</span>
+                          ) : currentYearEnrollment.statusIntencao2027 === 'Não Renovará' ? (
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">não renovará</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                              {currentYearEnrollment.statusIntencao2027 === 'Em Análise' ? 'em análise' : 'pendente'}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const link = `${window.location.origin}${window.location.pathname}?alunoId=${activeStudent.id}`;
+                              navigator.clipboard.writeText(link);
+                              alert('Link da Carta de Intenção copiado!');
+                            }}
+                            className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                          >
+                            copiar link
+                          </button>
+                        </div>
+                      </li>
+
+                      <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-800">Ficha de Saúde</p>
+                          <p className="text-[10px] text-slate-400">Uma por aluno, não muda por ano letivo</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {fichasSaude.some(f => f.alunoId === activeStudent.id) ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">preenchida</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const link = `${window.location.origin}${window.location.pathname}?fichaSaude=${activeStudent.id}`;
+                              navigator.clipboard.writeText(link);
+                              alert('Link da Ficha de Saúde copiado!');
+                            }}
+                            className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                          >
+                            copiar link
+                          </button>
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+
                   {/* Checklist da fase atual */}
                   <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-3">
                     <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
@@ -2233,28 +2295,8 @@ export default function StudentProfile({
                           <span>Termo de Uso de Imagem</span>
                           <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
                         </li>
-                        <li className="flex items-center justify-between gap-2">
-                          <span>Ficha de Saúde</span>
-                          <div className="flex items-center gap-1.5">
-                            {fichasSaude.some(f => f.alunoId === activeStudent.id) ? (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">preenchida</span>
-                            ) : (
-                              <>
-                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const link = `${window.location.origin}${window.location.pathname}?fichaSaude=${activeStudent.id}`;
-                                    navigator.clipboard.writeText(link);
-                                    alert('Link da Ficha de Saúde copiado! Envie para a família preencher.');
-                                  }}
-                                  className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
-                                >
-                                  copiar link
-                                </button>
-                              </>
-                            )}
-                          </div>
+                        <li className="text-[10px] text-slate-400 pt-1">
+                          A Ficha de Saúde está no card "Links e Fichas" acima.
                         </li>
                       </ul>
                     )}
