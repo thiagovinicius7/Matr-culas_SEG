@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry, FichaSaude } from '../types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry, FichaSaude, FichaAnamnese } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,6 +15,7 @@ interface StudentProfileProps {
   movements: FinancialMovement[];
   negotiationHistory?: NegotiationHistoryEntry[];
   fichasSaude?: FichaSaude[];
+  fichasAnamnese?: FichaAnamnese[];
   classPrices: RegularClass[];
   contraturnoPrices?: ContraturnoPrice[];
   activeYear?: number;
@@ -46,6 +47,7 @@ export default function StudentProfile({
   movements,
   negotiationHistory = [],
   fichasSaude = [],
+  fichasAnamnese = [],
   classPrices,
   contraturnoPrices = [],
   activeYear = 2026,
@@ -72,6 +74,7 @@ export default function StudentProfile({
   const [showCartaModal, setShowCartaModal] = useState(false);
   const [showNegotiationModal, setShowNegotiationModal] = useState(false);
   const [mostrarFichaSaude, setMostrarFichaSaude] = useState(false);
+  const [mostrarFichaAnamnese, setMostrarFichaAnamnese] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<'visao_geral' | 'responsaveis' | 'financeiro' | 'contraturno' | 'matricula'>('visao_geral');
 
@@ -80,6 +83,7 @@ export default function StudentProfile({
     // a aba "Matrícula" de um aluno anterior por engano.
     setProfileTab('visao_geral');
     setMostrarFichaSaude(false);
+    setMostrarFichaAnamnese(false);
   }, [selectedStudentId]);
 
   useEffect(() => {
@@ -203,14 +207,13 @@ export default function StudentProfile({
   const activeGuardians = guardians.filter(g => g.alunoId === selectedStudentId);
   const activeGuardian = activeGuardians.find(g => g.financeiro) || activeGuardians[0];
   const activeEnrollments = enrollments.filter(e => e.alunoId === selectedStudentId);
-  // Carta de Intenção / Ficha de Saúde não dependem de existir uma matrícula
-  // formal do ANO ATIVO do sistema — usam o registro mais recente do aluno
-  // que tiver dado de intenção, ou o mais recente disponível. Isso evita que
-  // esses cards "somem" quando o ano ativo é trocado para 2027 antes de
-  // "Virar Ano Letivo" ter sido rodado para os alunos existentes.
-  const enrollmentParaIntencao = activeEnrollments.find(e => e.statusIntencao2027 !== undefined)
-    || [...activeEnrollments].sort((a, b) => b.ano - a.ano)[0];
-  const activeEnrollment = activeEnrollments.find(e => e.ano === 2026) || activeEnrollments[0];
+  // A Carta de Intenção pertence à matrícula do ANO ATIVO do sistema — cada
+  // ano tem sua própria negociação/matrícula, sem misturar dados entre anos.
+  // Se não existe matrícula formal para o ano ativo ainda (ex: antes de
+  // "Virar Ano Letivo"), simplesmente não há Carta de Intenção pra mostrar
+  // nesse ano — isso é o comportamento correto, não um bug.
+  const enrollmentParaIntencao = activeEnrollments.find(e => e.ano === activeYear);
+  const activeEnrollment = activeEnrollments.find(e => e.ano === activeYear) || activeEnrollments[0];
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
   const activeContraturno = activeContraturnos.find(c => c.dataFim === null) || activeContraturnos[0];
   const activeMovements = movements.filter(m => m.alunoId === selectedStudentId).sort((a,b) => b.data.localeCompare(a.data));
@@ -2216,13 +2219,15 @@ export default function StudentProfile({
                     </div>
                   )}
 
-                  {/* Links e Fichas deste Aluno — sempre visível, independente do ano ativo do sistema */}
-                  {enrollmentParaIntencao && (
+                  {/* Links e Fichas deste Aluno — a Ficha de Saúde é sempre visível
+                      (não depende do ano ativo); a Carta de Intenção só aparece
+                      quando existe matrícula formal para o ano ativo */}
                   <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-3">
                     <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
                       🔗 Links e Fichas deste Aluno
                     </h4>
                     <ul className="space-y-2">
+                      {enrollmentParaIntencao && (
                       <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
                         <div>
                           <p className="text-xs font-semibold text-slate-800">Carta de Intenção de Rematrícula {enrollmentParaIntencao.ano + 1}</p>
@@ -2251,6 +2256,7 @@ export default function StudentProfile({
                           </button>
                         </div>
                       </li>
+                      )}
 
                       <li className="p-2.5 bg-slate-50 rounded-md space-y-2">
                         <div className="flex items-center justify-between gap-2">
@@ -2321,9 +2327,98 @@ export default function StudentProfile({
                           );
                         })()}
                       </li>
+
+                      <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-800">Ficha de Dados Gerais</p>
+                          <p className="text-[10px] text-slate-400">Endereço, responsáveis, contatos — a família pode atualizar quando quiser</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const link = `${window.location.origin}${window.location.pathname}?dadosGerais=${activeStudent.id}`;
+                            navigator.clipboard.writeText(link);
+                            alert('Link de atualização de Dados Gerais copiado!');
+                          }}
+                          className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer shrink-0"
+                        >
+                          copiar link
+                        </button>
+                      </li>
+
+                      <li className="p-2.5 bg-slate-50 rounded-md space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800">Ficha de Anamnese</p>
+                            <p className="text-[10px] text-slate-400">Uma por aluno, não muda por ano letivo</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {fichasAnamnese.some(f => f.alunoId === activeStudent.id) ? (
+                              <button
+                                type="button"
+                                onClick={() => setMostrarFichaAnamnese(!mostrarFichaAnamnese)}
+                                className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-full cursor-pointer"
+                              >
+                                preenchida {mostrarFichaAnamnese ? '▲' : '▼'}
+                              </button>
+                            ) : (
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const link = `${window.location.origin}${window.location.pathname}?anamnese=${activeStudent.id}`;
+                                navigator.clipboard.writeText(link);
+                                alert('Link da Ficha de Anamnese copiado!');
+                              }}
+                              className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                            >
+                              copiar link
+                            </button>
+                          </div>
+                        </div>
+
+                        {mostrarFichaAnamnese && (() => {
+                          const ficha = fichasAnamnese.find(f => f.alunoId === activeStudent.id);
+                          if (!ficha) return null;
+                          const campos: [string, string | undefined][] = ficha.natureza === 'Infantil' ? [
+                            ['Gestação e parto', ficha.gestacaoParto],
+                            ['Desenvolvimento motor e linguagem', ficha.desenvolvimentoMotorLinguagem],
+                            ['Hábitos de sono', ficha.habitosSono],
+                            ['Hábitos alimentares', ficha.habitosAlimentares],
+                            ['Autonomia nas atividades diárias', ficha.autonomiaAtividadesDiarias],
+                            ['Rotina familiar', ficha.rotinaFamiliar],
+                            ['Interesses', ficha.interesses],
+                            ['Para a escola conhecer melhor', ficha.paraEscolaConhecerMelhor],
+                          ] : [
+                            ['Trajetória escolar', ficha.trajetoriaEscolar],
+                            ['Aprendizagem', ficha.aprendizagem],
+                            ['Envolvimento e autonomia', ficha.envolvimentoAutonomia],
+                            ['Convivência e relações', ficha.convivenciaRelacoes],
+                            ['Rotina familiar', ficha.rotinaFamiliar],
+                            ['Interesses', ficha.interesses],
+                            ['Para a escola conhecer melhor', ficha.paraEscolaConhecerMelhor],
+                          ];
+                          const preenchidos = campos.filter(([, v]) => v);
+                          return (
+                            <div className="bg-white border border-emerald-150 rounded-md p-3 space-y-2">
+                              <p className="text-[9px] text-slate-400">Perfil {ficha.natureza} • Preenchida em {new Date(ficha.preenchidoEm + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                              {preenchidos.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic">A família não preencheu nenhum campo.</p>
+                              ) : (
+                                preenchidos.map(([label, valor]) => (
+                                  <div key={label}>
+                                    <p className="text-[10px] font-bold text-slate-500">{label}</p>
+                                    <p className="text-xs text-slate-800 whitespace-pre-wrap">{valor}</p>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </li>
                     </ul>
                   </div>
-                  )}
 
                   {/* Intenção de Rematrícula (próximo ano) — resposta da Carta de Intenção,
                       que fica gravada em campos separados dentro do Enrollment mais recente do aluno */}

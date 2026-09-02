@@ -7,10 +7,17 @@ import { motion } from 'motion/react';
 interface FichaDadosGeraisFormProps {
   classPrices: RegularClass[];
   activeYear: number;
-  onSubmit: (
+  existingStudent?: Student;
+  existingGuardians?: Guardian[];
+  onSubmit?: (
     student: Omit<Student, 'id'>,
     guardiansList: Omit<Guardian, 'id' | 'alunoId'>[],
     enrollmentAno: number
+  ) => Promise<void>;
+  onUpdate?: (
+    studentId: string,
+    updatedFields: Partial<Omit<Student, 'id'>>,
+    guardiansList: Omit<Guardian, 'id' | 'alunoId'>[]
   ) => Promise<void>;
 }
 
@@ -35,15 +42,35 @@ const novoResponsavel = (financeiro: boolean): TempGuardian => ({
   cpf: '', rg: '', endereco: '', dataNascimento: '', estadoCivil: '', financeiro,
 });
 
-export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit }: FichaDadosGeraisFormProps) {
+const guardianParaTemp = (g: Guardian): TempGuardian => {
+  const isOutro = !['Mãe', 'Pai', 'Avó', 'Avô', 'Tio', 'Tia'].includes(g.parentesco);
+  return {
+    nome: g.nome,
+    parentesco: isOutro ? 'Outro' : g.parentesco,
+    parentescoOutro: isOutro ? g.parentesco.replace(/^Outro:\s*/, '') : '',
+    telefone: g.telefone,
+    email: g.email || '',
+    cpf: g.cpf || '',
+    rg: g.rg || '',
+    endereco: g.endereco || '',
+    dataNascimento: g.dataNascimento || '',
+    estadoCivil: g.estadoCivil || '',
+    financeiro: g.financeiro,
+  };
+};
+
+export default function FichaDadosGeraisForm({ classPrices, activeYear, existingStudent, existingGuardians, onSubmit, onUpdate }: FichaDadosGeraisFormProps) {
+  const isUpdateMode = !!existingStudent;
   const [anoPretendido, setAnoPretendido] = useState<number>(activeYear);
-  const [nomeAluno, setNomeAluno] = useState('');
-  const [nascimento, setNascimento] = useState('');
-  const [cpfAluno, setCpfAluno] = useState('');
-  const [comoConheceu, setComoConheceu] = useState('');
-  const [autorizadosBuscar, setAutorizadosBuscar] = useState('');
+  const [nomeAluno, setNomeAluno] = useState(existingStudent?.nome || '');
+  const [nascimento, setNascimento] = useState(existingStudent?.nascimento || '');
+  const [cpfAluno, setCpfAluno] = useState(existingStudent?.cpf || '');
+  const [comoConheceu, setComoConheceu] = useState(existingStudent?.comoConheceuEscola || '');
+  const [autorizadosBuscar, setAutorizadosBuscar] = useState(existingStudent?.autorizadosBuscar || '');
   const [somenteContraturno, setSomenteContraturno] = useState(false);
-  const [responsaveis, setResponsaveis] = useState<TempGuardian[]>([novoResponsavel(true)]);
+  const [responsaveis, setResponsaveis] = useState<TempGuardian[]>(
+    existingGuardians && existingGuardians.length > 0 ? existingGuardians.map(guardianParaTemp) : [novoResponsavel(true)]
+  );
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [erro, setErro] = useState('');
@@ -72,18 +99,6 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
       return;
     }
 
-    const newStudent: Omit<Student, 'id'> = {
-      nome: nomeAluno.trim(),
-      nascimento,
-      dataEntrada: new Date().toISOString().split('T')[0],
-      observacoes: '',
-      status: 'ativo',
-      cpf: cpfAluno || undefined,
-      comoConheceuEscola: comoConheceu || undefined,
-      autorizadosBuscar: autorizadosBuscar || undefined,
-      origemCadastro: 'auto',
-    };
-
     const guardiansList: Omit<Guardian, 'id' | 'alunoId'>[] = responsaveisValidos.map(r => ({
       nome: r.nome.trim(),
       parentesco: r.parentesco === 'Outro' ? `Outro: ${r.parentescoOutro}` : r.parentesco,
@@ -99,7 +114,32 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
 
     setIsSubmitting(true);
     try {
-      await onSubmit(newStudent, guardiansList, anoPretendido);
+      if (isUpdateMode && existingStudent && onUpdate) {
+        await onUpdate(
+          existingStudent.id,
+          {
+            nome: nomeAluno.trim(),
+            nascimento,
+            cpf: cpfAluno || undefined,
+            comoConheceuEscola: comoConheceu || undefined,
+            autorizadosBuscar: autorizadosBuscar || undefined,
+          },
+          guardiansList
+        );
+      } else if (onSubmit) {
+        const newStudent: Omit<Student, 'id'> = {
+          nome: nomeAluno.trim(),
+          nascimento,
+          dataEntrada: new Date().toISOString().split('T')[0],
+          observacoes: '',
+          status: 'ativo',
+          cpf: cpfAluno || undefined,
+          comoConheceuEscola: comoConheceu || undefined,
+          autorizadosBuscar: autorizadosBuscar || undefined,
+          origemCadastro: 'auto',
+        };
+        await onSubmit(newStudent, guardiansList, anoPretendido);
+      }
       setSubmitted(true);
     } catch (err) {
       console.error(err);
@@ -120,10 +160,13 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
           <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 size={30} className="text-emerald-600" />
           </div>
-          <h2 className="text-lg font-bold font-display text-brand-green-dark">Ficha recebida!</h2>
+          <h2 className="text-lg font-bold font-display text-brand-green-dark">
+            {isUpdateMode ? 'Dados atualizados!' : 'Ficha recebida!'}
+          </h2>
           <p className="text-sm text-slate-600">
-            Obrigado por preencher os dados de <strong>{nomeAluno}</strong>. A equipe do Sítio-Escola Geranium vai
-            entrar em contato em breve para os próximos passos da matrícula.
+            {isUpdateMode
+              ? <>Os dados de <strong>{nomeAluno}</strong> foram atualizados. Obrigado por manter tudo em dia!</>
+              : <>Obrigado por preencher os dados de <strong>{nomeAluno}</strong>. A equipe do Sítio-Escola Geranium vai entrar em contato em breve para os próximos passos da matrícula.</>}
           </p>
         </motion.div>
       </div>
@@ -146,17 +189,22 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
           </div>
           <h1 className="text-xl sm:text-2xl font-black font-display tracking-tight uppercase">Sítio-Escola Geranium</h1>
           <p className="text-emerald-200 text-xs sm:text-sm font-medium mt-1 flex items-center justify-center gap-1.5">
-            <Sprout size={14} /> Ficha de Dados Gerais — Pré-Matrícula
+            <Sprout size={14} /> {isUpdateMode ? 'Atualização de Dados' : 'Ficha de Dados Gerais — Pré-Matrícula'}
           </p>
+          {isUpdateMode && existingStudent && (
+            <p className="text-[11px] text-emerald-100 mt-2 font-semibold">{existingStudent.nome}</p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           <p className="text-xs text-slate-500">
-            Preencha os dados abaixo para iniciar o processo de matrícula do seu filho(a) no Sítio-Escola Geranium.
-            Em breve nossa equipe entrará em contato.
+            {isUpdateMode
+              ? 'Confira e atualize os dados abaixo. Só altere o que precisar — o que já está certo pode ficar como está.'
+              : 'Preencha os dados abaixo para iniciar o processo de matrícula do seu filho(a) no Sítio-Escola Geranium. Em breve nossa equipe entrará em contato.'}
           </p>
 
-          {/* Ano pretendido */}
+          {/* Ano pretendido — só faz sentido para cadastro de aluno novo */}
+          {!isUpdateMode && (
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Matrícula para qual ano letivo?</label>
             <div className="flex gap-2">
@@ -176,6 +224,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
               ))}
             </div>
           </div>
+          )}
 
           {/* Dados do aluno */}
           <div className="space-y-3">
@@ -204,8 +253,8 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
               </div>
             </div>
 
-            {/* Turma calculada automaticamente */}
-            {turmaSugerida && (
+            {/* Turma calculada automaticamente / somente contraturno — só no cadastro novo */}
+            {!isUpdateMode && turmaSugerida && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-emerald-700 uppercase">Turma pretendida (calculada automaticamente)</p>
@@ -215,6 +264,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
               </div>
             )}
 
+            {!isUpdateMode && (
             <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
               <input
                 type="checkbox" checked={somenteContraturno}
@@ -223,6 +273,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
               />
               <span className="text-xs text-slate-700">Meu filho(a) frequentará <strong>somente o contraturno</strong> (sem ensino regular)</span>
             </label>
+            )}
           </div>
 
           {/* Responsáveis */}
@@ -368,7 +419,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, onSubmit
             disabled={isSubmitting}
             className="w-full py-3.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-sm font-bold font-display uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Enviando...' : 'Enviar Ficha de Dados Gerais'}
+            {isSubmitting ? 'Enviando...' : isUpdateMode ? 'Atualizar Dados' : 'Enviar Ficha de Dados Gerais'}
           </button>
         </form>
       </div>

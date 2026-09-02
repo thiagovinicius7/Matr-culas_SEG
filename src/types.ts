@@ -222,3 +222,30 @@ export interface FichaSaude {
   observacoesGerais?: string;
   preenchidoEm: string; // YYYY-MM-DD
 }
+
+/**
+ * Ficha de Anamnese do aluno — uma por aluno (não por ano), com estrutura
+ * diferente conforme o perfil (Infantil ou Fundamental), preenchida pela
+ * família via link público.
+ */
+export interface FichaAnamnese {
+  id: string; // = alunoId
+  alunoId: string;
+  natureza: 'Infantil' | 'Fundamental'; // perfil no momento do preenchimento
+  // Campos comuns aos dois perfis
+  rotinaFamiliar?: string;
+  interesses?: string;
+  paraEscolaConhecerMelhor?: string;
+  // Perfil Infantil
+  gestacaoParto?: string;
+  desenvolvimentoMotorLinguagem?: string;
+  habitosSono?: string;
+  habitosAlimentares?: string;
+  autonomiaAtividadesDiarias?: string;
+  // Perfil Fundamental
+  trajetoriaEscolar?: string;
+  aprendizagem?: string;
+  envolvimentoAutonomia?: string;
+  convivenciaRelacoes?: string;
+  preenchidoEm: string; // YYYY-MM-DD
+}

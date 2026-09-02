@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument, CoordenacaoSugestao, FichaSaude } from './types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument, CoordenacaoSugestao, FichaSaude, FichaAnamnese } from './types';
 import { 
   calculateAgeAtCutoff,
   getRegularClassForAge,
@@ -42,6 +42,7 @@ import LoginScreen from './components/LoginScreen';
 import ParentCartaPortal from './components/ParentCartaPortal';
 import FichaDadosGeraisForm from './components/FichaDadosGeraisForm';
 import FichaSaudeForm from './components/FichaSaudeForm';
+import FichaAnamneseForm from './components/FichaAnamneseForm';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -83,6 +84,8 @@ export default function App() {
   const isPublicFichaForm = urlParams.get('novaFicha') === '1' || urlParams.has('novoAluno');
   const isCoordenacaoView = urlParams.get('coordenacao') === '1';
   const fichaSaudeStudentId = urlParams.get('fichaSaude');
+  const dadosGeraisStudentId = urlParams.get('dadosGerais');
+  const anamneseStudentId = urlParams.get('anamnese');
 
   useEffect(() => {
     const unsubscribe = watchAuthState((user) => {
@@ -97,12 +100,12 @@ export default function App() {
   // (que exigem login) liberem a leitura dos dados da Carta de Intenção.
   useEffect(() => {
     if (isCheckingAuth) return;
-    if (!currentUser && (publicStudentId || isPublicFichaForm || isCoordenacaoView || fichaSaudeStudentId)) {
+    if (!currentUser && (publicStudentId || isPublicFichaForm || isCoordenacaoView || fichaSaudeStudentId || dadosGeraisStudentId || anamneseStudentId)) {
       signInAsPublicVisitor().catch(() => {
         showToast('Erro ao abrir a página', 'Não foi possível carregar os dados. Tente atualizar a página.', 'error');
       });
     }
-  }, [isCheckingAuth, currentUser, publicStudentId, isPublicFichaForm, isCoordenacaoView, fichaSaudeStudentId]);
+  }, [isCheckingAuth, currentUser, publicStudentId, isPublicFichaForm, isCoordenacaoView, fichaSaudeStudentId, dadosGeraisStudentId, anamneseStudentId]);
 
   // Core App States loaded from Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -116,6 +119,7 @@ export default function App() {
   const [settings, setSettings] = useState<{ id: string; value: string }[]>([]);
   const [coordenacaoSugestoes, setCoordenacaoSugestoes] = useState<CoordenacaoSugestao[]>([]);
   const [fichasSaude, setFichasSaude] = useState<FichaSaude[]>([]);
+  const [fichasAnamnese, setFichasAnamnese] = useState<FichaAnamnese[]>([]);
   const [coordenacaoDesbloqueada, setCoordenacaoDesbloqueada] = useState(false);
   const [coordenacaoSenhaInput, setCoordenacaoSenhaInput] = useState('');
   const [coordenacaoErro, setCoordenacaoErro] = useState('');
@@ -184,13 +188,14 @@ export default function App() {
           getCollectionData<ContraturnoDailyException>('contraturnoDailyExceptions'),
           getCollectionData<PackDocument>('packDocuments'),
           getCollectionData<CoordenacaoSugestao>('coordenacaoSugestoes'),
-          getCollectionData<FichaSaude>('fichasSaude')
+          getCollectionData<FichaSaude>('fichasSaude'),
+          getCollectionData<FichaAnamnese>('fichasAnamnese')
         ]);
 
         const collectionNames = [
           'students', 'guardians', 'enrollments', 'contraturnos', 'movements',
           'classPrices', 'contraturnoPrices', 'settings', 'negotiationHistory',
-          'contraturnoDailyExceptions', 'packDocuments', 'coordenacaoSugestoes', 'fichasSaude'
+          'contraturnoDailyExceptions', 'packDocuments', 'coordenacaoSugestoes', 'fichasSaude', 'fichasAnamnese'
         ];
         results.forEach((r, i) => {
           if (r.status === 'rejected') {
@@ -211,7 +216,8 @@ export default function App() {
           loadedDailyExceptionsResult,
           loadedPackDocumentsResult,
           loadedSugestoesResult,
-          loadedFichasSaudeResult
+          loadedFichasSaudeResult,
+          loadedFichasAnamneseResult
         ] = results;
 
         const loadedStudents = loadedStudentsResult.status === 'fulfilled' ? loadedStudentsResult.value : [];
@@ -227,6 +233,7 @@ export default function App() {
         const loadedPackDocuments = loadedPackDocumentsResult.status === 'fulfilled' ? loadedPackDocumentsResult.value : [];
         const loadedSugestoes = loadedSugestoesResult.status === 'fulfilled' ? loadedSugestoesResult.value : [];
         const loadedFichasSaude = loadedFichasSaudeResult.status === 'fulfilled' ? loadedFichasSaudeResult.value : [];
+        const loadedFichasAnamnese = loadedFichasAnamneseResult.status === 'fulfilled' ? loadedFichasAnamneseResult.value : [];
 
         const algumaFalhou = results.some(r => r.status === 'rejected');
         if (algumaFalhou) {
@@ -280,6 +287,7 @@ export default function App() {
         setPackDocuments(loadedPackDocuments || []);
         setCoordenacaoSugestoes(loadedSugestoes || []);
         setFichasSaude(loadedFichasSaude || []);
+        setFichasAnamnese(loadedFichasAnamnese || []);
         setSettings(loadedSettings || []);
 
         // Sanitize loaded Class Prices to ensure all have an 'ano' field
@@ -1169,6 +1177,40 @@ export default function App() {
     await saveDocument('fichasSaude', completa);
   };
 
+  const handleSaveFichaAnamnese = async (ficha: Omit<FichaAnamnese, 'id'>) => {
+    const completa: FichaAnamnese = { ...ficha, id: ficha.alunoId };
+    setFichasAnamnese(prev => [...prev.filter(f => f.alunoId !== ficha.alunoId), completa]);
+    await saveDocument('fichasAnamnese', completa);
+  };
+
+  // Handler: família atualiza a Ficha de Dados Gerais de um aluno JÁ EXISTENTE
+  // (endereço mudou, novo responsável, etc.) — substitui os responsáveis
+  // antigos pelos enviados agora, e atualiza só os campos de dados gerais
+  // do Student (não mexe em status, dataEntrada, observacoes internas etc.)
+  const handleUpdateStudentDadosGerais = async (
+    studentId: string,
+    updatedFields: Partial<Omit<Student, 'id'>>,
+    guardiansList: Omit<Guardian, 'id' | 'alunoId'>[]
+  ) => {
+    const existing = students.find(s => s.id === studentId);
+    if (!existing) return;
+    const updatedStudent: Student = { ...existing, ...updatedFields };
+    setStudents(prev => prev.map(s => s.id === studentId ? updatedStudent : s));
+    await saveDocument('students', updatedStudent);
+
+    const oldGuardians = guardians.filter(g => g.alunoId === studentId);
+    const newGuardians: Guardian[] = guardiansList.map((g, idx) => ({
+      ...g,
+      id: `g_${Date.now()}_${idx}`,
+      alunoId: studentId
+    }));
+    setGuardians(prev => [...prev.filter(g => g.alunoId !== studentId), ...newGuardians]);
+    await Promise.all([
+      ...oldGuardians.map(g => deleteDocument('guardians', g.id)),
+      ...newGuardians.map(g => saveDocument('guardians', g))
+    ]);
+  };
+
   // Handler: Change regular class manually (exceptional case)
   const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
     const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
@@ -1775,6 +1817,68 @@ export default function App() {
     );
   }
 
+  if (dadosGeraisStudentId) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+          <div className="text-center space-y-3">
+            <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-sm font-bold text-slate-700 font-display">Carregando...</p>
+          </div>
+        </div>
+      );
+    }
+    const alunoDadosGerais = students.find(s => s.id === dadosGeraisStudentId);
+    if (!alunoDadosGerais) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans text-center">
+          <p className="text-sm font-bold text-slate-600">Link inválido ou aluno não encontrado. Confira o link com a secretaria.</p>
+        </div>
+      );
+    }
+    return (
+      <FichaDadosGeraisForm
+        classPrices={classPrices}
+        activeYear={activeYear}
+        existingStudent={alunoDadosGerais}
+        existingGuardians={guardians.filter(g => g.alunoId === dadosGeraisStudentId)}
+        onUpdate={handleUpdateStudentDadosGerais}
+      />
+    );
+  }
+
+  if (anamneseStudentId) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+          <div className="text-center space-y-3">
+            <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-sm font-bold text-slate-700 font-display">Carregando Ficha de Anamnese...</p>
+          </div>
+        </div>
+      );
+    }
+    const alunoAnamnese = students.find(s => s.id === anamneseStudentId);
+    if (!alunoAnamnese) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans text-center">
+          <p className="text-sm font-bold text-slate-600">Link inválido ou aluno não encontrado. Confira o link com a secretaria.</p>
+        </div>
+      );
+    }
+    const idadeParaNatureza = calculateAgeAtCutoff(alunoAnamnese.nascimento, activeYear);
+    const naturezaAluno = getRegularClassForAgeDynamic(idadeParaNatureza, classPrices, activeYear).natureza;
+    const fichaAnamneseExistente = fichasAnamnese.find(f => f.alunoId === anamneseStudentId);
+    return (
+      <FichaAnamneseForm
+        student={alunoAnamnese}
+        natureza={naturezaAluno}
+        existingFicha={fichaAnamneseExistente}
+        onSubmit={handleSaveFichaAnamnese}
+      />
+    );
+  }
+
   if (isPublicFichaForm) {
     if (loading) {
       return (
@@ -1810,7 +1914,10 @@ export default function App() {
     const parentStudent = students.find(s => s.id === publicStudentId);
     if (parentStudent) {
       const parentGuardian = guardians.find(g => g.alunoId === parentStudent.id && g.financeiro) || guardians.find(g => g.alunoId === parentStudent.id);
-      const parentEnrollment = enrollments.find(e => e.alunoId === parentStudent.id && e.ano === 2026) || enrollments.find(e => e.alunoId === parentStudent.id);
+      // A Carta de Intenção deve operar sobre a matrícula do ANO ATIVO —
+      // depois de "Virar Ano Letivo", isso já é o registro de 2027 (criado
+      // em Preparo da Terra), não mais o de 2026.
+      const parentEnrollment = enrollments.find(e => e.alunoId === parentStudent.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === parentStudent.id);
       const parentContraturno = contraturnos.find(c => c.alunoId === parentStudent.id && c.dataFim === null);
 
       return (
@@ -2116,6 +2223,7 @@ export default function App() {
                   movements={movements}
                   negotiationHistory={negotiationHistory}
                   fichasSaude={fichasSaude}
+                  fichasAnamnese={fichasAnamnese}
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   activeYear={activeYear}
