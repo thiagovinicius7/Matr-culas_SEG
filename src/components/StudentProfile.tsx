@@ -1286,7 +1286,7 @@ export default function StudentProfile({
                   { key: 'responsaveis', label: 'Responsáveis' },
                   { key: 'financeiro', label: 'Financeiro' },
                   { key: 'contraturno', label: 'Contraturno' },
-                  ...(emProcessoDeMatricula ? [{ key: 'matricula', label: `Matrícula ${activeYear}` }] : []),
+                  { key: 'matricula', label: `Matrícula ${activeYear}` },
                 ] as const).map(tab => (
                   <button
                     key={tab.key}
@@ -1297,7 +1297,7 @@ export default function StudentProfile({
                         : 'border-transparent text-slate-400 hover:text-slate-600'
                     }`}
                   >
-                    {tab.key === 'matricula' ? `🌿 ${tab.label}` : tab.label}
+                    {tab.key === 'matricula' ? (emProcessoDeMatricula ? `🌿 ${tab.label}` : tab.label) : tab.label}
                   </button>
                 ))}
               </div>
@@ -2163,6 +2163,12 @@ export default function StudentProfile({
               )}
 
               {/* ===================== ABA: MATRÍCULA [ano] ===================== */}
+              {profileTab === 'matricula' && !currentYearEnrollment && (
+                <div className="bg-white p-6 rounded-lg border border-dashed border-slate-200 text-center">
+                  <p className="text-xs text-slate-500">Nenhuma matrícula registrada para {activeYear}.</p>
+                </div>
+              )}
+
               {profileTab === 'matricula' && currentYearEnrollment && (
                 <div className="space-y-4">
                   {/* Trilha das 5 fases */}
@@ -2312,6 +2318,12 @@ export default function StudentProfile({
                           <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">pendente</span>
                         </li>
                       </ul>
+                    )}
+
+                    {currentYearFase === 'colheita' && (
+                      <p className="text-xs text-emerald-700 flex items-center gap-1.5">
+                        <span className="text-base">✓</span> Matrícula {activeYear} concluída — todas as etapas foram cumpridas.
+                      </p>
                     )}
 
                     {onSaveEnrollment && currentYearFase !== 'colheita' && (
