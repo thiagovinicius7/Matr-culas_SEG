@@ -203,6 +203,13 @@ export default function StudentProfile({
   const activeGuardians = guardians.filter(g => g.alunoId === selectedStudentId);
   const activeGuardian = activeGuardians.find(g => g.financeiro) || activeGuardians[0];
   const activeEnrollments = enrollments.filter(e => e.alunoId === selectedStudentId);
+  // Carta de Intenção / Ficha de Saúde não dependem de existir uma matrícula
+  // formal do ANO ATIVO do sistema — usam o registro mais recente do aluno
+  // que tiver dado de intenção, ou o mais recente disponível. Isso evita que
+  // esses cards "somem" quando o ano ativo é trocado para 2027 antes de
+  // "Virar Ano Letivo" ter sido rodado para os alunos existentes.
+  const enrollmentParaIntencao = activeEnrollments.find(e => e.statusIntencao2027 !== undefined)
+    || [...activeEnrollments].sort((a, b) => b.ano - a.ano)[0];
   const activeEnrollment = activeEnrollments.find(e => e.ano === 2026) || activeEnrollments[0];
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
   const activeContraturno = activeContraturnos.find(c => c.dataFim === null) || activeContraturnos[0];
@@ -2165,49 +2172,52 @@ export default function StudentProfile({
               )}
 
               {/* ===================== ABA: MATRÍCULA [ano] ===================== */}
-              {profileTab === 'matricula' && !currentYearEnrollment && (
-                <div className="bg-white p-6 rounded-lg border border-dashed border-slate-200 text-center">
-                  <p className="text-xs text-slate-500">Nenhuma matrícula registrada para {activeYear}.</p>
-                </div>
-              )}
-
-              {profileTab === 'matricula' && currentYearEnrollment && (
+              {profileTab === 'matricula' && (
                 <div className="space-y-4">
-                  {/* Trilha das 5 fases */}
-                  <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
-                    <div className="flex items-stretch justify-between gap-1">
-                      {faseOrderList.map((faseKey, idx) => {
-                        const currentIdx = faseOrderList.indexOf(currentYearFase);
-                        const isDone = idx < currentIdx;
-                        const isCurrent = idx === currentIdx;
-                        return (
-                          <React.Fragment key={faseKey}>
-                            <div className="flex-1 flex flex-col items-center gap-1.5">
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
-                                  isDone
-                                    ? 'bg-emerald-600 border-emerald-600 text-white'
-                                    : isCurrent
-                                      ? 'bg-brand-orange border-brand-orange text-white'
-                                      : 'bg-slate-50 border-slate-200 text-slate-300'
-                                }`}
-                              >
-                                {isDone ? '✓' : faseLabels[faseKey].emoji}
+                  {currentYearEnrollment ? (
+                    <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
+                      <div className="flex items-stretch justify-between gap-1">
+                        {faseOrderList.map((faseKey, idx) => {
+                          const currentIdx = faseOrderList.indexOf(currentYearFase);
+                          const isDone = idx < currentIdx;
+                          const isCurrent = idx === currentIdx;
+                          return (
+                            <React.Fragment key={faseKey}>
+                              <div className="flex-1 flex flex-col items-center gap-1.5">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
+                                    isDone
+                                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                                      : isCurrent
+                                        ? 'bg-brand-orange border-brand-orange text-white'
+                                        : 'bg-slate-50 border-slate-200 text-slate-300'
+                                  }`}
+                                >
+                                  {isDone ? '✓' : faseLabels[faseKey].emoji}
+                                </div>
+                                <span className={`text-[9px] text-center leading-tight ${isCurrent ? 'font-bold text-slate-800' : 'text-slate-400'}`}>
+                                  {faseLabels[faseKey].label}
+                                </span>
                               </div>
-                              <span className={`text-[9px] text-center leading-tight ${isCurrent ? 'font-bold text-slate-800' : 'text-slate-400'}`}>
-                                {faseLabels[faseKey].label}
-                              </span>
-                            </div>
-                            {idx < faseOrderList.length - 1 && (
-                              <div className={`w-4 sm:w-8 h-0.5 self-center mt-[-14px] ${idx < currentIdx ? 'bg-emerald-600' : 'bg-slate-200'}`} />
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
+                              {idx < faseOrderList.length - 1 && (
+                                <div className={`w-4 sm:w-8 h-0.5 self-center mt-[-14px] ${idx < currentIdx ? 'bg-emerald-600' : 'bg-slate-200'}`} />
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="bg-white p-4 rounded-lg border border-dashed border-slate-200 text-center">
+                      <p className="text-xs text-slate-500">
+                        Sem matrícula formal registrada para {activeYear} ainda (isso é normal antes de "Virar Ano Letivo").
+                        Os links e fichas abaixo continuam disponíveis.
+                      </p>
+                    </div>
+                  )}
 
-                  {/* Links e Fichas deste Aluno — sempre visível, independente da fase */}
+                  {/* Links e Fichas deste Aluno — sempre visível, independente do ano ativo do sistema */}
+                  {enrollmentParaIntencao && (
                   <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-3">
                     <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
                       🔗 Links e Fichas deste Aluno
@@ -2215,17 +2225,17 @@ export default function StudentProfile({
                     <ul className="space-y-2">
                       <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
                         <div>
-                          <p className="text-xs font-semibold text-slate-800">Carta de Intenção de Rematrícula 2027</p>
+                          <p className="text-xs font-semibold text-slate-800">Carta de Intenção de Rematrícula {enrollmentParaIntencao.ano + 1}</p>
                           <p className="text-[10px] text-slate-400">Confirmação de renovação — não cria matrícula nova, só sinaliza intenção até a virada do ano letivo</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {currentYearEnrollment.statusIntencao2027 === 'Confirmada' ? (
+                          {enrollmentParaIntencao.statusIntencao2027 === 'Confirmada' ? (
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">confirmada</span>
-                          ) : currentYearEnrollment.statusIntencao2027 === 'Não Renovará' ? (
+                          ) : enrollmentParaIntencao.statusIntencao2027 === 'Não Renovará' ? (
                             <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">não renovará</span>
                           ) : (
                             <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                              {currentYearEnrollment.statusIntencao2027 === 'Em Análise' ? 'em análise' : 'pendente'}
+                              {enrollmentParaIntencao.statusIntencao2027 === 'Em Análise' ? 'em análise' : 'pendente'}
                             </span>
                           )}
                           <button
@@ -2313,65 +2323,67 @@ export default function StudentProfile({
                       </li>
                     </ul>
                   </div>
+                  )}
 
                   {/* Intenção de Rematrícula (próximo ano) — resposta da Carta de Intenção,
-                      que fica gravada em campos separados dentro deste mesmo Enrollment */}
-                  {currentYearEnrollment.statusIntencao2027 && (
+                      que fica gravada em campos separados dentro do Enrollment mais recente do aluno */}
+                  {enrollmentParaIntencao && enrollmentParaIntencao.statusIntencao2027 && (
                     <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-2">
                       <div className="flex items-center justify-between">
                         <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
-                          📋 Intenção de Rematrícula {activeYear + 1}
+                          📋 Intenção de Rematrícula {enrollmentParaIntencao.ano + 1}
                         </h4>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          currentYearEnrollment.statusIntencao2027 === 'Confirmada' ? 'text-emerald-700 bg-emerald-50'
-                          : currentYearEnrollment.statusIntencao2027 === 'Não Renovará' ? 'text-rose-700 bg-rose-50'
+                          enrollmentParaIntencao.statusIntencao2027 === 'Confirmada' ? 'text-emerald-700 bg-emerald-50'
+                          : enrollmentParaIntencao.statusIntencao2027 === 'Não Renovará' ? 'text-rose-700 bg-rose-50'
                           : 'text-amber-700 bg-amber-50'
                         }`}>
-                          {currentYearEnrollment.statusIntencao2027 === 'Em Análise' ? 'em análise' : currentYearEnrollment.statusIntencao2027.toLowerCase()}
+                          {enrollmentParaIntencao.statusIntencao2027 === 'Em Análise' ? 'em análise' : enrollmentParaIntencao.statusIntencao2027.toLowerCase()}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        {currentYearEnrollment.turmaPropostaId2027 && (
+                        {enrollmentParaIntencao.turmaPropostaId2027 && (
                           <div>
                             <p className="text-[10px] text-slate-400">Turma proposta</p>
                             <p className="font-semibold text-slate-800">
-                              {(classPrices.find(c => c.id === currentYearEnrollment.turmaPropostaId2027)?.nome) || currentYearEnrollment.turmaPropostaId2027}
+                              {(classPrices.find(c => c.id === enrollmentParaIntencao.turmaPropostaId2027)?.nome) || enrollmentParaIntencao.turmaPropostaId2027}
                             </p>
                           </div>
                         )}
-                        {currentYearEnrollment.valorProposto2027 !== undefined && (
+                        {enrollmentParaIntencao.valorProposto2027 !== undefined && (
                           <div>
                             <p className="text-[10px] text-slate-400">Valor proposto</p>
                             <p className="font-semibold text-slate-800">
-                              R$ {currentYearEnrollment.valorProposto2027.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              R$ {enrollmentParaIntencao.valorProposto2027.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </p>
                           </div>
                         )}
-                        {currentYearEnrollment.dataIntencao2027 && (
+                        {enrollmentParaIntencao.dataIntencao2027 && (
                           <div>
                             <p className="text-[10px] text-slate-400">Respondida em</p>
                             <p className="font-semibold text-slate-800">
-                              {new Date(currentYearEnrollment.dataIntencao2027 + 'T00:00:00').toLocaleDateString('pt-BR')}
+                              {new Date(enrollmentParaIntencao.dataIntencao2027 + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </p>
                           </div>
                         )}
-                        {currentYearEnrollment.contraturnoDesejado2027 !== undefined && (
+                        {enrollmentParaIntencao.contraturnoDesejado2027 !== undefined && (
                           <div>
-                            <p className="text-[10px] text-slate-400">Contraturno {activeYear + 1}</p>
-                            <p className="font-semibold text-slate-800">{currentYearEnrollment.contraturnoDesejado2027 ? 'Sim' : 'Não'}</p>
+                            <p className="text-[10px] text-slate-400">Contraturno {enrollmentParaIntencao.ano + 1}</p>
+                            <p className="font-semibold text-slate-800">{enrollmentParaIntencao.contraturnoDesejado2027 ? 'Sim' : 'Não'}</p>
                           </div>
                         )}
                       </div>
-                      {currentYearEnrollment.observacoesFamilia2027 && (
+                      {enrollmentParaIntencao.observacoesFamilia2027 && (
                         <div className="pt-1 border-t border-slate-100">
                           <p className="text-[10px] text-slate-400">Observações da família</p>
-                          <p className="text-xs text-slate-700 whitespace-pre-wrap">{currentYearEnrollment.observacoesFamilia2027}</p>
+                          <p className="text-xs text-slate-700 whitespace-pre-wrap">{enrollmentParaIntencao.observacoesFamilia2027}</p>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Checklist da fase atual */}
+                  {/* Checklist da fase atual — só existe quando há matrícula formal do ano ativo */}
+                  {currentYearEnrollment && (
                   <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-3">
                     <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
                       {faseLabels[currentYearFase].emoji} {faseLabels[currentYearFase].label}
@@ -2445,6 +2457,7 @@ export default function StudentProfile({
                       </button>
                     )}
                   </div>
+                  )}
                 </div>
               )}
             </motion.div>
