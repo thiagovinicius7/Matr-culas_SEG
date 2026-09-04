@@ -193,59 +193,160 @@ export interface CoordenacaoSugestao {
 
 /**
  * Ficha de Saúde do aluno — uma por aluno (não por ano letivo), preenchida
- * pela família via link público, espelhando o documento oficial em papel.
+ * pela família via link público. Espelha fielmente o documento oficial
+ * "Ficha de Saúde do Aluno" (Word), seção por seção.
  */
 export interface FichaSaude {
-  id: string; // = alunoId (uma ficha por aluno)
+  id: string; // = alunoId
   alunoId: string;
-  // Identificação
-  planoSaude?: string;
-  numeroCarteirinha?: string;
-  hospitalPreferencia?: string;
+  // 1. Identificação
+  numeroMatricula?: string;
+  nomePlanoSaude?: string;
+  numeroInscricaoPlano?: string;
+  // 2. Histórico de Saúde
+  doencasContagiosas?: string[]; // Catapora, Caxumba, Coqueluche, Escarlatina, Rubéola, Sarampo
+  doencasContagiosasOutras?: string;
+  doencasCronicas?: string[]; // Asma, Hipertensão, Hemofilia, Bronquite, Reumatismo, Doença Celíaca
+  doencasCronicasOutras?: string;
+  temEpilepsia?: boolean;
+  epilepsiaEmTratamento?: boolean;
+  temDiabetes?: boolean;
+  diabetesEmTratamento?: boolean;
+  diabetesDependenteInsulina?: boolean;
+  temDoencaCongenita?: boolean;
+  doencaCongenitaQual?: string;
   tipoSanguineo?: string;
-  // Histórico de Saúde
-  doencasPreExistentes?: string;
-  cirurgiasInternacoes?: string;
-  // Alergias e Medicações
-  alergias?: string;
-  restricaoAlimentar?: string;
-  medicacoesUso?: string;
-  // Acompanhamento Terapêutico
-  acompanhamentoTerapeutico?: string;
-  // Necessidades Educativas / Desenvolvimento
-  necessidadesEducativas?: string;
-  // Emergência
-  contatoEmergenciaNome?: string;
-  contatoEmergenciaTelefone?: string;
-  contatoEmergenciaParentesco?: string;
-  autorizaProcedimentoEmergencia?: boolean;
-  observacoesGerais?: string;
+  alergiasTipos?: string[]; // Picadas de insetos, Corantes, Medicação, Outros
+  alergiaCorantesQual?: string;
+  alergiaMedicacaoQual?: string;
+  alergiaOutrosQual?: string;
+  alergicoMedicamento?: boolean;
+  alergicoMedicamentoQuais?: string;
+  medicacaoAtual?: boolean;
+  medicacaoAtualQual?: string;
+  // 3. Acompanhamento Terapêutico
+  acompanhamentos?: Partial<Record<'Psicologia' | 'Fonoaudiologia' | 'Terapia Ocupacional' | 'Fisioterapia' | 'Psicopedagogia' | 'Outros', { qual?: string; nome?: string; telefone?: string }>>;
+  // 4. Necessidades Educativas Especiais e Desenvolvimento
+  temNecessidadeEducativa?: boolean;
+  necessidadesEducativasTipos?: string[]; // Deficiência auditiva, Falha no processamento auditivo, Mental (Cognitiva), Física, Visual, Fala, Surdo
+  necessidadesEducativasOutras?: string;
+  temSindrome?: boolean;
+  sindromeQual?: string;
+  condicoes?: string[]; // Dislexia, TDAH, TEA
+  lateralidade?: 'Destro' | 'Canhoto';
+  gestacaoSemanas?: string;
+  tipoParto?: 'Normal' | 'Cesárea';
+  idadeSentou?: string;
+  idadeEngatinhou?: string;
+  idadeAndou?: string;
+  idadeFalou?: string;
+  idade1aDenticao?: string;
+  // 5. Alimentação
+  temRestricaoAlimentar?: boolean;
+  restricaoAlimentarQual?: string;
+  // 6. Emergência
+  contatoEmergencia1Nome?: string;
+  contatoEmergencia1RG?: string;
+  contatoEmergencia1Telefone?: string;
+  contatoEmergencia1Parentesco?: string;
+  contatoEmergencia2Nome?: string;
+  contatoEmergencia2RG?: string;
+  contatoEmergencia2Telefone?: string;
+  contatoEmergencia2Parentesco?: string;
+  hospitalTelefone?: string;
+  hospitalEndereco?: string;
+  medicoTipo?: 'Alopata' | 'Homeopata';
+  medicoNome?: string;
+  febreAltaMedicar?: boolean;
+  febreAltaPosologia?: string;
   preenchidoEm: string; // YYYY-MM-DD
 }
 
 /**
- * Ficha de Anamnese do aluno — uma por aluno (não por ano), com estrutura
- * diferente conforme o perfil (Infantil ou Fundamental), preenchida pela
- * família via link público.
+ * Ficha de Anamnese do aluno ("Ficha de Conhecimento e Acompanhamento da
+ * Criança") — uma por aluno (não por ano), com estrutura diferente conforme
+ * o perfil (Infantil ou Fundamental), espelhando fielmente os dois
+ * documentos oficiais (PDF) enviados pelo Thiago.
  */
 export interface FichaAnamnese {
   id: string; // = alunoId
   alunoId: string;
   natureza: 'Infantil' | 'Fundamental'; // perfil no momento do preenchimento
-  // Campos comuns aos dois perfis
-  rotinaFamiliar?: string;
-  interesses?: string;
-  paraEscolaConhecerMelhor?: string;
-  // Perfil Infantil
-  gestacaoParto?: string;
-  desenvolvimentoMotorLinguagem?: string;
-  habitosSono?: string;
-  habitosAlimentares?: string;
-  autonomiaAtividadesDiarias?: string;
-  // Perfil Fundamental
-  trajetoriaEscolar?: string;
-  aprendizagem?: string;
-  envolvimentoAutonomia?: string;
-  convivenciaRelacoes?: string;
   preenchidoEm: string; // YYYY-MM-DD
+
+  // ===== INFANTIL =====
+  // 1. Rotina e Autonomia
+  autonomiaDiaADia?: string;
+  alimentacaoOpcoes?: string[];
+  alimentacaoOutro?: string;
+  banheiroOpcao?: string;
+  reacaoMudancaRotina?: string;
+  // 2. Relações e Emoções
+  relacionamentoOutrasCriancas?: string;
+  quandoContrariado?: string;
+  quandoConflito?: string;
+  comoDemonstraSentimentos?: string[];
+  comoDemonstraSentimentosOutra?: string;
+  oQueAjudaTristeBravaFrustrada?: string;
+  // 3. Aprendizagem e Interesses (Infantil)
+  atividadesInteresseInfantil?: string[];
+  atividadesInteresseInfantilOutras?: string;
+  quandoAtividadeDificil?: string;
+  mantemEnvolvida?: string;
+  comoAprendeMelhor?: string;
+  // 4. Experiência Escolar
+  jaFrequentouOutraEscola?: 'Não' | 'Sim';
+  comoFoiExperienciaAnterior?: string;
+  adaptacaoNovosAmbientes?: string;
+  situacaoEscolarPreocupacao?: 'Não' | 'Sim';
+  situacaoEscolarPreocupacaoQual?: string;
+  // 5. Para Conhecermos Melhor (Infantil)
+  principaisCaracteristicas?: string;
+  oQueDeixaInseguro?: string;
+  oQueEscolaDeveSaberInfantil?: string;
+  expectativasFamilia?: string;
+  outrasInformacoesInfantil?: string;
+
+  // ===== FUNDAMENTAL =====
+  // 1. Trajetória Escolar
+  adaptacaoExperienciasAnteriores?: string;
+  oQueFuncionouBem?: string;
+  experienciaAnteriorImportante?: string;
+  // 2. Aprendizagem — Leitura / Escrita / Matemática
+  leituraFazBem?: string[];
+  leituraPodeAvancar?: string[];
+  leituraPodeAvancarOutro?: string;
+  leituraAjuda?: string[];
+  leituraAjudaOutro?: string;
+  escritaFazBem?: string[];
+  escritaPodeAvancar?: string[];
+  escritaPodeAvancarOutro?: string;
+  escritaAjuda?: string[];
+  escritaAjudaOutro?: string;
+  matematicaFazBem?: string[];
+  matematicaPodeAvancar?: string[];
+  matematicaPodeAvancarOutro?: string;
+  matematicaAjuda?: string[];
+  matematicaAjudaOutro?: string;
+  // 3. Envolvimento e Autonomia
+  envolvimentoFazBem?: string[];
+  envolvimentoPodeAvancar?: string[];
+  envolvimentoAjuda?: string[];
+  envolvimentoAjudaOutro?: string;
+  // 4. Convivência e Relações
+  convivenciaFazBem?: string[];
+  convivenciaPodeAvancar?: string[];
+  convivenciaOQueAjudaConflito?: string;
+  convivenciaQuandoContrariada?: string;
+  convivenciaQuandoContrariadaOutra?: string;
+  // 5. Interesses e Potencialidades
+  interessesAtividadesFundamental?: string[];
+  interessesAtividadesFundamentalOutras?: string;
+  principaisQualidadesFundamental?: string;
+  oQueMotiva?: string;
+  // 6. Para a Escola Conhecer Melhor (Fundamental)
+  habilidadeDesenvolvidaRecentemente?: string;
+  aspectoDesenvolverEsteAno?: string;
+  oQueProfessorDeveSaber?: string;
+  outrasInformacoesFundamental?: string;
 }

@@ -2293,21 +2293,38 @@ export default function StudentProfile({
                         {mostrarFichaSaude && (() => {
                           const ficha = fichasSaude.find(f => f.alunoId === activeStudent.id);
                           if (!ficha) return null;
+                          const simNao = (v: boolean | undefined) => v === undefined ? undefined : (v ? 'Sim' : 'Não');
+                          const acompText = ficha.acompanhamentos && Object.keys(ficha.acompanhamentos).length > 0
+                            ? Object.entries(ficha.acompanhamentos).map(([tipo, d]) =>
+                                `${tipo}${d?.qual ? ` (${d.qual})` : ''}${d?.nome ? ` — ${d.nome}` : ''}${d?.telefone ? ` — ${d.telefone}` : ''}`
+                              ).join('; ')
+                            : undefined;
                           const campos: [string, string | undefined][] = [
-                            ['Plano de saúde', ficha.planoSaude],
-                            ['Nº da carteirinha', ficha.numeroCarteirinha],
-                            ['Hospital de preferência', ficha.hospitalPreferencia],
+                            ['RM / nº matrícula', ficha.numeroMatricula],
+                            ['Plano de saúde', ficha.nomePlanoSaude],
+                            ['Nº de inscrição', ficha.numeroInscricaoPlano],
                             ['Tipo sanguíneo', ficha.tipoSanguineo],
-                            ['Doenças pré-existentes', ficha.doencasPreExistentes],
-                            ['Cirurgias / internações', ficha.cirurgiasInternacoes],
-                            ['Alergias', ficha.alergias],
-                            ['Restrição alimentar', ficha.restricaoAlimentar],
-                            ['Medicações de uso contínuo', ficha.medicacoesUso],
-                            ['Acompanhamento terapêutico', ficha.acompanhamentoTerapeutico],
-                            ['Necessidades educativas', ficha.necessidadesEducativas],
-                            ['Contato de emergência', ficha.contatoEmergenciaNome ? `${ficha.contatoEmergenciaNome} (${ficha.contatoEmergenciaParentesco || '—'}) — ${ficha.contatoEmergenciaTelefone}` : undefined],
-                            ['Autoriza procedimento de emergência', ficha.autorizaProcedimentoEmergencia === undefined ? undefined : (ficha.autorizaProcedimentoEmergencia ? 'Sim' : 'Não')],
-                            ['Observações gerais', ficha.observacoesGerais],
+                            ['Doenças contagiosas', [...(ficha.doencasContagiosas || []), ficha.doencasContagiosasOutras].filter(Boolean).join(', ') || undefined],
+                            ['Doenças crônicas', [...(ficha.doencasCronicas || []), ficha.doencasCronicasOutras].filter(Boolean).join(', ') || undefined],
+                            ['Epilepsia', simNao(ficha.temEpilepsia) ? `${simNao(ficha.temEpilepsia)}${ficha.temEpilepsia ? ` — em tratamento: ${simNao(ficha.epilepsiaEmTratamento) || '—'}` : ''}` : undefined],
+                            ['Diabetes', simNao(ficha.temDiabetes) ? `${simNao(ficha.temDiabetes)}${ficha.temDiabetes ? ` — em tratamento: ${simNao(ficha.diabetesEmTratamento) || '—'}, dependente de insulina: ${simNao(ficha.diabetesDependenteInsulina) || '—'}` : ''}` : undefined],
+                            ['Doença congênita', ficha.temDoencaCongenita ? `Sim — ${ficha.doencaCongenitaQual || '—'}` : simNao(ficha.temDoencaCongenita)],
+                            ['Alergias', [...(ficha.alergiasTipos || []), ficha.alergiaCorantesQual, ficha.alergiaMedicacaoQual, ficha.alergiaOutrosQual].filter(Boolean).join(', ') || undefined],
+                            ['Alérgico a medicamento', ficha.alergicoMedicamento ? `Sim — ${ficha.alergicoMedicamentoQuais || '—'}` : simNao(ficha.alergicoMedicamento)],
+                            ['Medicação atual', ficha.medicacaoAtual ? `Sim — ${ficha.medicacaoAtualQual || '—'}` : simNao(ficha.medicacaoAtual)],
+                            ['Acompanhamento terapêutico', acompText],
+                            ['Necessidade educativa especial', ficha.temNecessidadeEducativa ? [...(ficha.necessidadesEducativasTipos || []), ficha.necessidadesEducativasOutras].filter(Boolean).join(', ') || 'Sim' : simNao(ficha.temNecessidadeEducativa)],
+                            ['Síndrome', ficha.temSindrome ? `Sim — ${ficha.sindromeQual || '—'}` : simNao(ficha.temSindrome)],
+                            ['Dislexia / TDAH / TEA', ficha.condicoes && ficha.condicoes.length > 0 ? ficha.condicoes.join(', ') : undefined],
+                            ['Lateralidade', ficha.lateralidade],
+                            ['Gestação / parto', [ficha.gestacaoSemanas ? `${ficha.gestacaoSemanas} semanas` : null, ficha.tipoParto].filter(Boolean).join(' — ') || undefined],
+                            ['Desenvolvimento', [ficha.idadeSentou && `sentou: ${ficha.idadeSentou}`, ficha.idadeEngatinhou && `engatinhou: ${ficha.idadeEngatinhou}`, ficha.idadeAndou && `andou: ${ficha.idadeAndou}`, ficha.idadeFalou && `falou: ${ficha.idadeFalou}`, ficha.idade1aDenticao && `1ª dentição: ${ficha.idade1aDenticao}`].filter(Boolean).join(', ') || undefined],
+                            ['Restrição alimentar', ficha.temRestricaoAlimentar ? `Sim — ${ficha.restricaoAlimentarQual || '—'}` : simNao(ficha.temRestricaoAlimentar)],
+                            ['Contato de emergência 1', ficha.contatoEmergencia1Nome ? `${ficha.contatoEmergencia1Nome} (${ficha.contatoEmergencia1Parentesco || '—'}) — ${ficha.contatoEmergencia1Telefone}` : undefined],
+                            ['Contato de emergência 2', ficha.contatoEmergencia2Nome ? `${ficha.contatoEmergencia2Nome} (${ficha.contatoEmergencia2Parentesco || '—'}) — ${ficha.contatoEmergencia2Telefone}` : undefined],
+                            ['Hospital / clínica', [ficha.hospitalTelefone, ficha.hospitalEndereco].filter(Boolean).join(' — ') || undefined],
+                            ['Médico do aluno', [ficha.medicoTipo, ficha.medicoNome].filter(Boolean).join(' — ') || undefined],
+                            ['Febre alta — medicar', ficha.febreAltaMedicar ? `Sim — posologia: ${ficha.febreAltaPosologia || '—'}` : simNao(ficha.febreAltaMedicar)],
                           ];
                           const preenchidos = campos.filter(([, v]) => v);
                           return (
@@ -2381,23 +2398,56 @@ export default function StudentProfile({
                         {mostrarFichaAnamnese && (() => {
                           const ficha = fichasAnamnese.find(f => f.alunoId === activeStudent.id);
                           if (!ficha) return null;
+                          const arr = (a?: string[], outro?: string) => [...(a || []), outro].filter(Boolean).join(', ') || undefined;
                           const campos: [string, string | undefined][] = ficha.natureza === 'Infantil' ? [
-                            ['Gestação e parto', ficha.gestacaoParto],
-                            ['Desenvolvimento motor e linguagem', ficha.desenvolvimentoMotorLinguagem],
-                            ['Hábitos de sono', ficha.habitosSono],
-                            ['Hábitos alimentares', ficha.habitosAlimentares],
-                            ['Autonomia nas atividades diárias', ficha.autonomiaAtividadesDiarias],
-                            ['Rotina familiar', ficha.rotinaFamiliar],
-                            ['Interesses', ficha.interesses],
-                            ['Para a escola conhecer melhor', ficha.paraEscolaConhecerMelhor],
+                            ['Autonomia no dia a dia', ficha.autonomiaDiaADia],
+                            ['Alimentação', arr(ficha.alimentacaoOpcoes, ficha.alimentacaoOutro)],
+                            ['Banheiro', ficha.banheiroOpcao],
+                            ['Reação a mudanças de rotina', ficha.reacaoMudancaRotina],
+                            ['Relacionamento com outras crianças', ficha.relacionamentoOutrasCriancas],
+                            ['Quando contrariado(a)', ficha.quandoContrariado],
+                            ['Quando há conflito', ficha.quandoConflito],
+                            ['Como demonstra sentimentos', arr(ficha.comoDemonstraSentimentos, ficha.comoDemonstraSentimentosOutra)],
+                            ['O que ajuda quando triste/brava/frustrada', ficha.oQueAjudaTristeBravaFrustrada],
+                            ['Atividades de maior interesse', arr(ficha.atividadesInteresseInfantil, ficha.atividadesInteresseInfantilOutras)],
+                            ['Quando atividade é difícil', ficha.quandoAtividadeDificil],
+                            ['Mantém-se envolvida', ficha.mantemEnvolvida],
+                            ['Como aprende melhor', ficha.comoAprendeMelhor],
+                            ['Já frequentou outra escola', ficha.jaFrequentouOutraEscola === 'Sim' ? `Sim — ${ficha.comoFoiExperienciaAnterior || '—'}` : ficha.jaFrequentouOutraEscola],
+                            ['Adaptação a novos ambientes', ficha.adaptacaoNovosAmbientes],
+                            ['Situação escolar de preocupação', ficha.situacaoEscolarPreocupacao === 'Sim' ? `Sim — ${ficha.situacaoEscolarPreocupacaoQual || '—'}` : ficha.situacaoEscolarPreocupacao],
+                            ['Principais características/qualidades', ficha.principaisCaracteristicas],
+                            ['O que deixa inseguro(a)/triste/irritado(a)', ficha.oQueDeixaInseguro],
+                            ['O que a escola deve saber', ficha.oQueEscolaDeveSaberInfantil],
+                            ['Expectativas da família', ficha.expectativasFamilia],
+                            ['Outras informações', ficha.outrasInformacoesInfantil],
                           ] : [
-                            ['Trajetória escolar', ficha.trajetoriaEscolar],
-                            ['Aprendizagem', ficha.aprendizagem],
-                            ['Envolvimento e autonomia', ficha.envolvimentoAutonomia],
-                            ['Convivência e relações', ficha.convivenciaRelacoes],
-                            ['Rotina familiar', ficha.rotinaFamiliar],
-                            ['Interesses', ficha.interesses],
-                            ['Para a escola conhecer melhor', ficha.paraEscolaConhecerMelhor],
+                            ['Adaptação em experiências anteriores', ficha.adaptacaoExperienciasAnteriores],
+                            ['O que funcionou bem', ficha.oQueFuncionouBem],
+                            ['Experiência anterior importante', ficha.experienciaAnteriorImportante],
+                            ['Leitura — o que já faz bem', arr(ficha.leituraFazBem)],
+                            ['Leitura — onde pode avançar', arr(ficha.leituraPodeAvancar, ficha.leituraPodeAvancarOutro)],
+                            ['Leitura — o que ajuda', arr(ficha.leituraAjuda, ficha.leituraAjudaOutro)],
+                            ['Escrita — o que já faz bem', arr(ficha.escritaFazBem)],
+                            ['Escrita — onde pode avançar', arr(ficha.escritaPodeAvancar, ficha.escritaPodeAvancarOutro)],
+                            ['Escrita — o que ajuda', arr(ficha.escritaAjuda, ficha.escritaAjudaOutro)],
+                            ['Matemática — o que já faz bem', arr(ficha.matematicaFazBem)],
+                            ['Matemática — onde pode avançar', arr(ficha.matematicaPodeAvancar, ficha.matematicaPodeAvancarOutro)],
+                            ['Matemática — o que ajuda', arr(ficha.matematicaAjuda, ficha.matematicaAjudaOutro)],
+                            ['Envolvimento — o que já faz bem', arr(ficha.envolvimentoFazBem)],
+                            ['Envolvimento — onde pode avançar', arr(ficha.envolvimentoPodeAvancar)],
+                            ['Envolvimento — o que ajuda', arr(ficha.envolvimentoAjuda, ficha.envolvimentoAjudaOutro)],
+                            ['Convivência — o que já faz bem', arr(ficha.convivenciaFazBem)],
+                            ['Convivência — onde pode avançar', arr(ficha.convivenciaPodeAvancar)],
+                            ['O que ajuda em conflito', ficha.convivenciaOQueAjudaConflito],
+                            ['Quando contrariada', ficha.convivenciaQuandoContrariada === 'Outra situação' ? ficha.convivenciaQuandoContrariadaOutra : ficha.convivenciaQuandoContrariada],
+                            ['Atividades de maior interesse', arr(ficha.interessesAtividadesFundamental, ficha.interessesAtividadesFundamentalOutras)],
+                            ['Principais qualidades/potencialidades', ficha.principaisQualidadesFundamental],
+                            ['O que motiva a aprender', ficha.oQueMotiva],
+                            ['Habilidade desenvolvida recentemente', ficha.habilidadeDesenvolvidaRecentemente],
+                            ['Aspecto a desenvolver este ano', ficha.aspectoDesenvolverEsteAno],
+                            ['O que o professor deve saber', ficha.oQueProfessorDeveSaber],
+                            ['Outras informações', ficha.outrasInformacoesFundamental],
                           ];
                           const preenchidos = campos.filter(([, v]) => v);
                           return (
