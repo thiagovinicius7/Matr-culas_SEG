@@ -67,7 +67,8 @@ export default function CartaIntencaoForm({
 
   const valorTabelaRegular2027 = selectedClass2027Details.valorMensal;
 
-  // Discount / Negotiation state for 2027
+  // Discount / Negotiation state for 2027 — pode ser em R$ (valor fixo) ou % (percentual sobre a tabela)
+  const [tipoDescontoRegular2027, setTipoDescontoRegular2027] = useState<'reais' | 'porcentagem'>('reais');
   const [descontoRegular2027, setDescontoRegular2027] = useState<number>(() => {
     if (enrollment?.valorProposto2027 !== undefined) {
       return Math.max(0, valorTabelaRegular2027 - enrollment.valorProposto2027);
@@ -135,16 +136,6 @@ export default function CartaIntencaoForm({
     return enrollment?.diaVencimento2027 || '05';
   });
 
-  const [descontoPontualidadeAtivo, setDescontoPontualidadeAtivo] = useState<boolean>(() => {
-    if (enrollment?.descontoPontualidadeAtivo2027 !== undefined) return enrollment.descontoPontualidadeAtivo2027;
-    return true;
-  });
-
-  const [valorDescontoPontualidade, setValorDescontoPontualidade] = useState<number>(() => {
-    if (enrollment?.valorDescontoPontualidade2027 !== undefined) return enrollment.valorDescontoPontualidade2027;
-    return 50;
-  });
-
   const [statusIntencao, setStatusIntencao] = useState<'Pendente' | 'Confirmada' | 'Em Análise' | 'Não Renovará'>(() => {
     return enrollment?.statusIntencao2027 || 'Pendente';
   });
@@ -186,7 +177,6 @@ export default function CartaIntencaoForm({
 
   // Total 2027 Estimated
   const total2027 = Number(valorProposto2027 || 0) + valorContraturno2027 + lanchePrice2027 + almocoPrice2027;
-  const diffTotal = total2027 - currentTotal;
 
   // Handle Save
   const handleSaveForm = () => {
@@ -212,8 +202,6 @@ export default function CartaIntencaoForm({
       adicionarAlmoco2027: contraturnoDesejado ? false : adicionarAlmoco,
       valorAlmoco2027: valorAlmoco2027,
       diaVencimento2027: diaVencimento,
-      descontoPontualidadeAtivo2027: descontoPontualidadeAtivo,
-      valorDescontoPontualidade2027: valorDescontoPontualidade,
       statusIntencao2027: statusIntencao,
       observacoesFamilia2027: observacoesFamilia,
       dataIntencao2027: new Date().toISOString().split('T')[0]
@@ -407,7 +395,10 @@ export default function CartaIntencaoForm({
                         || classPrices.find(c => c.id === newId) 
                         || suggestedClass2027;
                       if (selected) {
-                        setValorProposto2027(Math.max(0, selected.valorMensal - descontoRegular2027));
+                        const discReais = tipoDescontoRegular2027 === 'porcentagem'
+                          ? (selected.valorMensal * descontoRegular2027 / 100)
+                          : descontoRegular2027;
+                        setValorProposto2027(Math.max(0, selected.valorMensal - discReais));
                       }
                     }}
                     className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-slate-800 font-medium focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none"
@@ -435,20 +426,52 @@ export default function CartaIntencaoForm({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Desconto / Abatimento de Negociação (R$):
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-slate-600">
+                        Desconto / Abatimento de Negociação:
+                      </label>
+                      <div className="flex bg-slate-100 rounded p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tipoDescontoRegular2027 === 'reais') return;
+                            const discReais = valorTabelaRegular2027 * descontoRegular2027 / 100;
+                            setDescontoRegular2027(Number(discReais.toFixed(2)));
+                            setTipoDescontoRegular2027('reais');
+                          }}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer ${tipoDescontoRegular2027 === 'reais' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+                        >
+                          R$
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tipoDescontoRegular2027 === 'porcentagem') return;
+                            const pct = valorTabelaRegular2027 > 0 ? (descontoRegular2027 / valorTabelaRegular2027) * 100 : 0;
+                            setDescontoRegular2027(Number(pct.toFixed(2)));
+                            setTipoDescontoRegular2027('porcentagem');
+                          }}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer ${tipoDescontoRegular2027 === 'porcentagem' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+                        >
+                          %
+                        </button>
+                      </div>
+                    </div>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-slate-400 font-semibold text-xs">R$</span>
+                      <span className="absolute left-3 top-2 text-slate-400 font-semibold text-xs">{tipoDescontoRegular2027 === 'reais' ? 'R$' : '%'}</span>
                       <input
                         type="number"
                         step="1"
                         min="0"
+                        max={tipoDescontoRegular2027 === 'porcentagem' ? 100 : undefined}
                         value={descontoRegular2027}
                         onChange={(e) => {
-                          const disc = Number(e.target.value);
-                          setDescontoRegular2027(disc);
-                          setValorProposto2027(Math.max(0, valorTabelaRegular2027 - disc));
+                          const inputVal = Number(e.target.value);
+                          setDescontoRegular2027(inputVal);
+                          const discReais = tipoDescontoRegular2027 === 'porcentagem'
+                            ? (valorTabelaRegular2027 * inputVal / 100)
+                            : inputVal;
+                          setValorProposto2027(Math.max(0, valorTabelaRegular2027 - discReais));
                         }}
                         className="w-full pl-8 pr-2 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
                         placeholder="0,00"
@@ -470,7 +493,12 @@ export default function CartaIntencaoForm({
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           setValorProposto2027(val);
-                          setDescontoRegular2027(Math.max(0, valorTabelaRegular2027 - val));
+                          const discReais = Math.max(0, valorTabelaRegular2027 - val);
+                          setDescontoRegular2027(
+                            tipoDescontoRegular2027 === 'porcentagem'
+                              ? (valorTabelaRegular2027 > 0 ? Number(((discReais / valorTabelaRegular2027) * 100).toFixed(2)) : 0)
+                              : discReais
+                          );
                         }}
                         className="w-full pl-8 pr-2 py-1.5 bg-amber-50/50 border border-brand-orange/40 rounded text-xs font-extrabold text-brand-orange focus:ring-2 focus:ring-brand-orange outline-none"
                         placeholder="Digite o valor mensal final"
@@ -483,66 +511,27 @@ export default function CartaIntencaoForm({
                   * Os valores base de tabela de 2027 vêm da tela de Configuração de Mensalidades. Aqui você ajusta o desconto específico deste aluno antes de disponibilizar aos pais.
                 </p>
 
-                {/* Desconto por Pontualidade & Vencimento */}
-                <div className="pt-3 border-t border-slate-100 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={descontoPontualidadeAtivo}
-                        onChange={(e) => setDescontoPontualidadeAtivo(e.target.checked)}
-                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                      />
-                      <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                        <Sparkles size={14} className="text-emerald-600" />
-                        Conceder Desconto por Pontualidade no Pagamento em Dia
-                      </span>
-                    </label>
+                {/* Dia de Vencimento Padrão / Sugerido */}
+                <div className="pt-3 border-t border-slate-100">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Dia de Vencimento Padrão / Sugerido:
+                  </label>
+                  <div className="flex gap-1">
+                    {(['01', '05', '10', '15', '20'] as const).map(dia => (
+                      <button
+                        key={dia}
+                        type="button"
+                        onClick={() => setDiaVencimento(dia)}
+                        className={`flex-1 py-1 text-xs font-bold rounded border cursor-pointer transition-colors ${
+                          diaVencimento === dia
+                            ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {dia}
+                      </button>
+                    ))}
                   </div>
-
-                  {descontoPontualidadeAtivo && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6 pt-1">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Valor do Desconto por Pontualidade (R$):
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-2.5 top-1.5 text-slate-400 font-semibold text-xs">R$</span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            value={valorDescontoPontualidade}
-                            onChange={(e) => setValorDescontoPontualidade(Number(e.target.value))}
-                            className="w-full pl-8 pr-2 py-1 bg-emerald-50/50 border border-emerald-300 rounded text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
-                            placeholder="50,00"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Dia de Vencimento Padrão / Sugerido:
-                        </label>
-                        <div className="flex gap-1">
-                          {(['01', '05', '10', '15', '20'] as const).map(dia => (
-                            <button
-                              key={dia}
-                              type="button"
-                              onClick={() => setDiaVencimento(dia)}
-                              className={`flex-1 py-1 text-xs font-bold rounded border cursor-pointer transition-colors ${
-                                diaVencimento === dia
-                                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
-                                  : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
-                              }`}
-                            >
-                              {dia}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Option for Lanche in Ensino Regular — só para o Ensino Fundamental
@@ -646,11 +635,7 @@ export default function CartaIntencaoForm({
 
               {/* Total 2027 Summary Box */}
               <div className="bg-brand-green-dark text-white p-4 rounded-xl space-y-1 shadow-sm">
-                <div className="flex justify-between items-center text-xs text-emerald-200">
-                  <span>Valor Estimado Total para 2027:</span>
-                  <span>{diffTotal >= 0 ? `+ R$ ${diffTotal.toFixed(2)}` : `- R$ ${Math.abs(diffTotal).toFixed(2)}`} em relação a 2026</span>
-                </div>
-                <div className="flex justify-between items-end pt-1">
+                <div className="flex justify-between items-end">
                   <span className="text-sm font-bold font-display uppercase tracking-wider text-emerald-100">
                     Mensalidade Proposta 2027:
                   </span>

@@ -105,15 +105,6 @@ export default function ParentCartaPortal({
     return enrollment?.diaVencimento2027 || '05';
   });
 
-  const [descontoPontualidadeAtivo, setDescontoPontualidadeAtivo] = useState<boolean>(() => {
-    if (enrollment?.descontoPontualidadeAtivo2027 !== undefined) return enrollment.descontoPontualidadeAtivo2027;
-    return true;
-  });
-
-  const [valorDescontoPontualidade, setValorDescontoPontualidade] = useState<number>(() => {
-    return enrollment?.valorDescontoPontualidade2027 !== undefined ? enrollment.valorDescontoPontualidade2027 : 50;
-  });
-
   const [statusIntencao, setStatusIntencao] = useState<'Confirmada' | 'Em Análise' | 'Não Renovará'>(() => {
     if (enrollment?.statusIntencao2027 && enrollment.statusIntencao2027 !== 'Pendente') {
       return enrollment.statusIntencao2027;
@@ -146,9 +137,6 @@ export default function ParentCartaPortal({
   const almocoVal = (!contraturnoDesejado && adicionarAlmoco) ? valorAlmoco : 0;
 
   const totalCalculado = Number(valorRegularProposto) + valorContraturno + lancheVal + almocoVal;
-  const totalComPontualidade = (descontoPontualidadeAtivo && valorDescontoPontualidade > 0)
-    ? Math.max(0, totalCalculado - valorDescontoPontualidade)
-    : totalCalculado;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,8 +160,6 @@ export default function ParentCartaPortal({
       adicionarAlmoco2027: contraturnoDesejado ? false : adicionarAlmoco,
       valorAlmoco2027: valorAlmoco,
       diaVencimento2027: diaVencimento,
-      descontoPontualidadeAtivo2027: descontoPontualidadeAtivo,
-      valorDescontoPontualidade2027: valorDescontoPontualidade,
       statusIntencao2027: statusIntencao,
       observacoesFamilia2027: observacoesFamilia,
       dataIntencao2027: new Date().toISOString().split('T')[0]
@@ -329,15 +315,6 @@ export default function ParentCartaPortal({
                   </div>
                 </div>
 
-                {descontoPontualidadeAtivo && valorDescontoPontualidade > 0 && (
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-2 text-xs text-emerald-900">
-                    <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-extrabold text-emerald-950">Desconto por Pontualidade: </span>
-                      Pagando até o <strong>dia {diaVencimento}</strong> de cada mês, a família tem um desconto pontual de <strong>R$ {valorDescontoPontualidade.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> na mensalidade!
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Lanche Escolar no Ensino Regular — só para o Ensino Fundamental
@@ -435,20 +412,9 @@ export default function ParentCartaPortal({
                 </div>
 
                 <div className="text-right">
-                  {descontoPontualidadeAtivo && valorDescontoPontualidade > 0 ? (
-                    <div>
-                      <span className="text-xs text-emerald-200 line-through block">
-                        R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
-                      </span>
-                      <span className="text-xl font-black text-brand-orange font-display">
-                        R$ {totalComPontualidade.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-emerald-200">com pontualidade</span>
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-xl font-extrabold text-brand-orange font-display">
-                      R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
-                    </span>
-                  )}
+                  <span className="text-xl font-extrabold text-brand-orange font-display">
+                    R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
+                  </span>
                 </div>
               </div>
             </div>
