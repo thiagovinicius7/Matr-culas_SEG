@@ -89,15 +89,24 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
     e.preventDefault();
     setErro('');
 
-    if (!nomeAluno.trim() || !nascimento) {
-      setErro('Preencha o nome completo e a data de nascimento do aluno(a).');
+    if (!nomeAluno.trim() || !nascimento || !cpfAluno.trim()) {
+      setErro('Preencha todos os dados do aluno(a): nome, data de nascimento e CPF.');
       return;
     }
-    const responsaveisValidos = responsaveis.filter(r => r.nome.trim() && r.telefone.trim());
-    if (responsaveisValidos.length === 0) {
-      setErro('Preencha ao menos um responsável, com nome e telefone.');
+    if (!comoConheceu.trim() || !autorizadosBuscar.trim()) {
+      setErro('Preencha "Como conheceu a escola?" e "Outras pessoas autorizadas a buscar a criança".');
       return;
     }
+    const responsavelIncompleto = responsaveis.some(r =>
+      !r.nome.trim() || !r.telefone.trim() || !r.email.trim() || !r.cpf.trim() || !r.rg.trim() ||
+      !r.endereco.trim() || !r.dataNascimento || !r.estadoCivil ||
+      (r.parentesco === 'Outro' && !r.parentescoOutro.trim())
+    );
+    if (responsavelIncompleto) {
+      setErro('Preencha todos os campos de cada responsável (nome, parentesco, telefone, e-mail, CPF, RG, data de nascimento, estado civil e endereço).');
+      return;
+    }
+    const responsaveisValidos = responsaveis;
 
     const guardiansList: Omit<Guardian, 'id' | 'alunoId'>[] = responsaveisValidos.map(r => ({
       nome: r.nome.trim(),
@@ -245,9 +254,9 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-500">CPF do aluno (opcional)</label>
+                <label className="text-[11px] font-bold text-slate-500">CPF do aluno</label>
                 <input
-                  type="text" value={cpfAluno} onChange={(e) => setCpfAluno(e.target.value)}
+                  type="text" required value={cpfAluno} onChange={(e) => setCpfAluno(e.target.value)}
                   className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-green-light focus:outline-none"
                 />
               </div>
@@ -290,7 +299,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                   )}
                 </div>
                 <input
-                  type="text" placeholder="Nome completo" required={idx === 0}
+                  type="text" placeholder="Nome completo" required
                   value={r.nome} onChange={(e) => updateResponsavel(idx, 'nome', e.target.value)}
                   className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                 />
@@ -309,7 +318,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                     />
                   ) : (
                     <input
-                      type="text" placeholder="Telefone / WhatsApp" required={idx === 0}
+                      type="text" placeholder="Telefone / WhatsApp" required
                       value={r.telefone} onChange={(e) => updateResponsavel(idx, 'telefone', e.target.value)}
                       className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                     />
@@ -317,18 +326,19 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                 </div>
                 {r.parentesco === 'Outro' && (
                   <input
-                    type="text" placeholder="Telefone / WhatsApp" required={idx === 0}
+                    type="text" placeholder="Telefone / WhatsApp" required
                     value={r.telefone} onChange={(e) => updateResponsavel(idx, 'telefone', e.target.value)}
                     className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                   />
                 )}
                 <div className="grid grid-cols-2 gap-2">
                   <input
-                    type="email" placeholder="E-mail" value={r.email}
+                    type="email" placeholder="E-mail" required value={r.email}
                     onChange={(e) => updateResponsavel(idx, 'email', e.target.value)}
                     className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                   />
                   <select
+                    required
                     value={r.estadoCivil} onChange={(e) => updateResponsavel(idx, 'estadoCivil', e.target.value)}
                     className="text-xs px-2 py-1.5 rounded-md border border-slate-200 bg-white"
                   >
@@ -343,32 +353,32 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-0.5">
-                    <label className="text-[9px] font-bold text-slate-400 block">CPF (opcional)</label>
+                    <label className="text-[9px] font-bold text-slate-400 block">CPF</label>
                     <input
-                      type="text" placeholder="000.000.000-00" value={r.cpf}
+                      type="text" placeholder="000.000.000-00" required value={r.cpf}
                       onChange={(e) => updateResponsavel(idx, 'cpf', e.target.value)}
                       className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                     />
                   </div>
                   <div className="space-y-0.5">
-                    <label className="text-[9px] font-bold text-slate-400 block">RG (opcional)</label>
+                    <label className="text-[9px] font-bold text-slate-400 block">RG</label>
                     <input
-                      type="text" placeholder="00.000.000-0" value={r.rg}
+                      type="text" placeholder="00.000.000-0" required value={r.rg}
                       onChange={(e) => updateResponsavel(idx, 'rg', e.target.value)}
                       className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                     />
                   </div>
                   <div className="space-y-0.5">
-                    <label className="text-[9px] font-bold text-slate-400 block">Data de nascimento (opcional)</label>
+                    <label className="text-[9px] font-bold text-slate-400 block">Data de nascimento</label>
                     <input
-                      type="date" value={r.dataNascimento}
+                      type="date" required value={r.dataNascimento}
                       onChange={(e) => updateResponsavel(idx, 'dataNascimento', e.target.value)}
                       className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                     />
                   </div>
                 </div>
                 <input
-                  type="text" placeholder="Endereço completo (rua, número, bairro, cidade, CEP)" value={r.endereco}
+                  type="text" placeholder="Endereço completo (rua, número, bairro, cidade, CEP)" required value={r.endereco}
                   onChange={(e) => updateResponsavel(idx, 'endereco', e.target.value)}
                   className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                 />
@@ -397,16 +407,16 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-brand-green-dark uppercase tracking-wide border-b border-slate-100 pb-1">Outras informações</h3>
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-500">Como conheceu a escola? (opcional)</label>
+              <label className="text-[11px] font-bold text-slate-500">Como conheceu a escola?</label>
               <input
-                type="text" value={comoConheceu} onChange={(e) => setComoConheceu(e.target.value)}
+                type="text" required value={comoConheceu} onChange={(e) => setComoConheceu(e.target.value)}
                 className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-green-light focus:outline-none"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-500">Outras pessoas autorizadas a buscar a criança (opcional)</label>
+              <label className="text-[11px] font-bold text-slate-500">Outras pessoas autorizadas a buscar a criança</label>
               <input
-                type="text" value={autorizadosBuscar} onChange={(e) => setAutorizadosBuscar(e.target.value)}
+                type="text" required value={autorizadosBuscar} onChange={(e) => setAutorizadosBuscar(e.target.value)}
                 className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-green-light focus:outline-none"
               />
             </div>

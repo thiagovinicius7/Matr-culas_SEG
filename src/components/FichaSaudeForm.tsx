@@ -72,7 +72,7 @@ function Section({ number, title, children }: { number: number; title: string; c
 
 export default function FichaSaudeForm({ student, existingFicha, onSubmit }: FichaSaudeFormProps) {
   const f = existingFicha;
-  const [numeroMatricula, setNumeroMatricula] = useState(f?.numeroMatricula || '');
+  const [nomeCompleto, setNomeCompleto] = useState(f?.nomeCompleto || student.nome || '');
   const [nomePlanoSaude, setNomePlanoSaude] = useState(f?.nomePlanoSaude || '');
   const [numeroInscricaoPlano, setNumeroInscricaoPlano] = useState(f?.numeroInscricaoPlano || '');
 
@@ -106,6 +106,7 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
   const [temSindrome, setTemSindrome] = useState<boolean | undefined>(f?.temSindrome);
   const [sindromeQual, setSindromeQual] = useState(f?.sindromeQual || '');
   const [condicoes, setCondicoes] = useState<string[]>(f?.condicoes || []);
+  const [condicoesOutras, setCondicoesOutras] = useState(f?.condicoesOutras || '');
   const [lateralidade, setLateralidade] = useState<string>(f?.lateralidade || '');
   const [gestacaoSemanas, setGestacaoSemanas] = useState(f?.gestacaoSemanas || '');
   const [tipoParto, setTipoParto] = useState<string>(f?.tipoParto || '');
@@ -130,9 +131,6 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
   const [hospitalEndereco, setHospitalEndereco] = useState(f?.hospitalEndereco || '');
   const [medicoTipo, setMedicoTipo] = useState<string>(f?.medicoTipo || '');
   const [medicoNome, setMedicoNome] = useState(f?.medicoNome || '');
-  const [febreAltaMedicar, setFebreAltaMedicar] = useState<boolean | undefined>(f?.febreAltaMedicar);
-  const [febreAltaPosologia, setFebreAltaPosologia] = useState(f?.febreAltaPosologia || '');
-
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [erro, setErro] = useState('');
@@ -164,7 +162,7 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
 
     const ficha: Omit<FichaSaude, 'id'> = {
       alunoId: student.id,
-      numeroMatricula: numeroMatricula || undefined,
+      nomeCompleto: nomeCompleto || undefined,
       nomePlanoSaude: nomePlanoSaude || undefined,
       numeroInscricaoPlano: numeroInscricaoPlano || undefined,
       doencasContagiosas: doencasContagiosas.length ? doencasContagiosas : undefined,
@@ -189,6 +187,7 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
       necessidadesEducativasOutras: necessidadesEducativasOutras || undefined,
       temSindrome, sindromeQual: temSindrome ? (sindromeQual || undefined) : undefined,
       condicoes: condicoes.length ? condicoes : undefined,
+      condicoesOutras: condicoesOutras || undefined,
       lateralidade: (lateralidade || undefined) as FichaSaude['lateralidade'],
       gestacaoSemanas: gestacaoSemanas || undefined,
       tipoParto: (tipoParto || undefined) as FichaSaude['tipoParto'],
@@ -210,7 +209,6 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
       hospitalEndereco: hospitalEndereco || undefined,
       medicoTipo: (medicoTipo || undefined) as FichaSaude['medicoTipo'],
       medicoNome: medicoNome || undefined,
-      febreAltaMedicar, febreAltaPosologia: febreAltaMedicar ? (febreAltaPosologia || undefined) : undefined,
       preenchidoEm: new Date().toISOString().split('T')[0],
     };
 
@@ -263,7 +261,7 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           <Section number={1} title="Identificação">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <TextField label="RM (nº de matrícula, se souber)" value={numeroMatricula} onChange={setNumeroMatricula} />
+              <TextField label="Nome completo do aluno(a)" value={nomeCompleto} onChange={setNomeCompleto} />
               <TextField label="Tipo sanguíneo" value={tipoSanguineo} onChange={setTipoSanguineo} placeholder="Ex: O+" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -348,6 +346,8 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-500">O aluno apresenta:</label>
               <CheckboxGroup options={['Dislexia', 'TDAH', 'TEA']} selected={condicoes} onChange={setCondicoes} />
+              <input type="text" placeholder="Outros" value={condicoesOutras} onChange={(e) => setCondicoesOutras(e.target.value)}
+                className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -425,8 +425,6 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
               </div>
               <TextField label="Nome" value={medicoNome} onChange={setMedicoNome} />
             </div>
-            <SimNao label="Em caso de febre alta, o aluno deverá ser medicado?" value={febreAltaMedicar} onChange={setFebreAltaMedicar} />
-            {febreAltaMedicar && <TextField label="Se sim, posologia (quantidade)" value={febreAltaPosologia} onChange={setFebreAltaPosologia} />}
           </Section>
 
           {erro && <p className="text-xs font-bold text-rose-600 text-center">{erro}</p>}

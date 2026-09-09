@@ -200,7 +200,7 @@ export interface FichaSaude {
   id: string; // = alunoId
   alunoId: string;
   // 1. Identificação
-  numeroMatricula?: string;
+  nomeCompleto?: string;
   nomePlanoSaude?: string;
   numeroInscricaoPlano?: string;
   // 2. Histórico de Saúde
@@ -233,6 +233,7 @@ export interface FichaSaude {
   temSindrome?: boolean;
   sindromeQual?: string;
   condicoes?: string[]; // Dislexia, TDAH, TEA
+  condicoesOutras?: string;
   lateralidade?: 'Destro' | 'Canhoto';
   gestacaoSemanas?: string;
   tipoParto?: 'Normal' | 'Cesárea';
@@ -257,8 +258,6 @@ export interface FichaSaude {
   hospitalEndereco?: string;
   medicoTipo?: 'Alopata' | 'Homeopata';
   medicoNome?: string;
-  febreAltaMedicar?: boolean;
-  febreAltaPosologia?: string;
   preenchidoEm: string; // YYYY-MM-DD
 }
 

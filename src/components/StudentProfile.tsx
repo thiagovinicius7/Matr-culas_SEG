@@ -2300,7 +2300,7 @@ export default function StudentProfile({
                               ).join('; ')
                             : undefined;
                           const campos: [string, string | undefined][] = [
-                            ['RM / nº matrícula', ficha.numeroMatricula],
+                            ['Nome completo do aluno(a)', ficha.nomeCompleto],
                             ['Plano de saúde', ficha.nomePlanoSaude],
                             ['Nº de inscrição', ficha.numeroInscricaoPlano],
                             ['Tipo sanguíneo', ficha.tipoSanguineo],
@@ -2315,7 +2315,7 @@ export default function StudentProfile({
                             ['Acompanhamento terapêutico', acompText],
                             ['Necessidade educativa especial', ficha.temNecessidadeEducativa ? [...(ficha.necessidadesEducativasTipos || []), ficha.necessidadesEducativasOutras].filter(Boolean).join(', ') || 'Sim' : simNao(ficha.temNecessidadeEducativa)],
                             ['Síndrome', ficha.temSindrome ? `Sim — ${ficha.sindromeQual || '—'}` : simNao(ficha.temSindrome)],
-                            ['Dislexia / TDAH / TEA', ficha.condicoes && ficha.condicoes.length > 0 ? ficha.condicoes.join(', ') : undefined],
+                            ['Dislexia / TDAH / TEA', [...(ficha.condicoes || []), ficha.condicoesOutras].filter(Boolean).join(', ') || undefined],
                             ['Lateralidade', ficha.lateralidade],
                             ['Gestação / parto', [ficha.gestacaoSemanas ? `${ficha.gestacaoSemanas} semanas` : null, ficha.tipoParto].filter(Boolean).join(' — ') || undefined],
                             ['Desenvolvimento', [ficha.idadeSentou && `sentou: ${ficha.idadeSentou}`, ficha.idadeEngatinhou && `engatinhou: ${ficha.idadeEngatinhou}`, ficha.idadeAndou && `andou: ${ficha.idadeAndou}`, ficha.idadeFalou && `falou: ${ficha.idadeFalou}`, ficha.idade1aDenticao && `1ª dentição: ${ficha.idade1aDenticao}`].filter(Boolean).join(', ') || undefined],
@@ -2324,7 +2324,6 @@ export default function StudentProfile({
                             ['Contato de emergência 2', ficha.contatoEmergencia2Nome ? `${ficha.contatoEmergencia2Nome} (${ficha.contatoEmergencia2Parentesco || '—'}) — ${ficha.contatoEmergencia2Telefone}` : undefined],
                             ['Hospital / clínica', [ficha.hospitalTelefone, ficha.hospitalEndereco].filter(Boolean).join(' — ') || undefined],
                             ['Médico do aluno', [ficha.medicoTipo, ficha.medicoNome].filter(Boolean).join(' — ') || undefined],
-                            ['Febre alta — medicar', ficha.febreAltaMedicar ? `Sim — posologia: ${ficha.febreAltaPosologia || '—'}` : simNao(ficha.febreAltaMedicar)],
                           ];
                           const preenchidos = campos.filter(([, v]) => v);
                           return (
