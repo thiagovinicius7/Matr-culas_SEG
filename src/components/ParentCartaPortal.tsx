@@ -273,11 +273,16 @@ export default function ParentCartaPortal({
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <span className="block text-slate-500 font-medium">Mensalidade Regular Base:</span>
+                  <span className="block text-slate-500 font-medium">Mensalidade Regular (Tabela 2027):</span>
                   <span className="text-sm font-bold text-slate-800">
-                    R$ {Number(valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
+                    R$ {Number(selectedClassDetails.valorMensal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
                   </span>
-                  <span className="block text-[10px] text-slate-500">Acordo/Proposta exclusiva da escola</span>
+                  {valorRegularProposto < selectedClassDetails.valorMensal && (
+                    <span className="block text-[11px] font-bold text-emerald-700 mt-1">
+                      Desconto especial concedido: − R$ {(selectedClassDetails.valorMensal - valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    </span>
+                  )}
+                  <span className="block text-[10px] text-slate-500 mt-1">Acordo/Proposta exclusiva da escola</span>
                 </div>
               </div>
 
