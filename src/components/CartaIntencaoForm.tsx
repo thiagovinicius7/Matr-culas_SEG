@@ -151,6 +151,7 @@ export default function CartaIntencaoForm({
   const parentUrl = `${window.location.origin}${window.location.pathname}?alunoId=${student.id}`;
 
   const handleCopyLink = () => {
+    handleSaveForm();
     navigator.clipboard.writeText(parentUrl);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2500);
@@ -228,6 +229,7 @@ export default function CartaIntencaoForm({
   };
 
   const handleCopyWhatsApp = () => {
+    handleSaveForm();
     const msg = generateWhatsAppMessage();
     navigator.clipboard.writeText(msg);
     setIsCopied(true);
