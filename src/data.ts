@@ -86,16 +86,21 @@ export function getRegularClassForAgeDynamic(
   const listToUse = filtered.length > 0 ? filtered : classPricesList;
   
   const sorted = [...listToUse].sort((a, b) => a.idadeRef - b.idadeRef);
-  
-  if (age <= 2) return sorted[0];
-  if (age === 3) return sorted[1] || sorted[0];
-  if (age === 4) return sorted[2] || sorted[0];
-  if (age === 5) return sorted[3] || sorted[sorted.length - 1];
-  if (age === 6) return sorted[4] || sorted[sorted.length - 1];
-  if (age === 7) return sorted[5] || sorted[sorted.length - 1];
-  if (age === 8) return sorted[6] || sorted[sorted.length - 1];
-  if (age === 9) return sorted[7] || sorted[sorted.length - 1];
-  return sorted[8] || sorted[sorted.length - 1];
+
+  // Busca a turma cuja idadeRef bate exatamente com a idade calculada — não
+  // confia na POSIÇÃO da turma dentro da lista. O jeito antigo (sorted[0],
+  // sorted[1]...) quebrava silenciosamente e empurrava alunos pra turma
+  // errada sempre que a configuração de mensalidades de um ano tivesse uma
+  // turma faltando, duplicada ou fora de ordem — foi exatamente isso que
+  // fez o Radeck "pular" do 1º pro 3º ano na virada pra 2027.
+  const exactMatch = sorted.find(c => c.idadeRef === age);
+  if (exactMatch) return exactMatch;
+
+  // Sem correspondência exata: usa a turma mais nova pra idade abaixo da
+  // mínima configurada, ou a mais velha pra idade acima da máxima
+  if (sorted.length === 0) return getRegularClassForAge(age);
+  if (age < sorted[0].idadeRef) return sorted[0];
+  return sorted[sorted.length - 1];
 }
 
 // Default prices for Somente Contraturno ("Dia no Sítio-Escola")

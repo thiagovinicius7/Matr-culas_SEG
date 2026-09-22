@@ -1537,6 +1537,50 @@ export default function App() {
     }
   };
 
+  // Handler: Zerar dados de rematrícula de teste — apaga as matrículas de
+  // um ano futuro (ex: 2027) criadas nos testes, e limpa os campos de
+  // intenção (statusIntencao2027, turmaPropostaId2027 etc.) que ficaram
+  // gravados nas matrículas do ano base. Usado pra recomeçar do zero antes
+  // de trabalhar "pra valer" com a rematrícula real.
+  const handleResetRematriculas = async (targetYear: number) => {
+    try {
+      setLoading(true);
+
+      const toDelete = enrollments.filter(e => e.ano === targetYear);
+      await Promise.all(toDelete.map(e => deleteDocument('enrollments', e.id)));
+
+      const camposParaLimpar: (keyof Enrollment)[] = [
+        'valorProposto2027', 'turmaPropostaId2027', 'contraturnoDesejado2027',
+        'diasContraturno2027', 'horarioSaida2027', 'periodoContraturno2027',
+        'adicionarLanche2027', 'valorLanche2027', 'adicionarAlmoco2027', 'valorAlmoco2027',
+        'diaVencimento2027', 'descontoPontualidadeAtivo2027', 'valorDescontoPontualidade2027',
+        'statusIntencao2027', 'observacoesFamilia2027', 'dataIntencao2027'
+      ];
+      const baseYearEnrollments = enrollments.filter(e => e.ano === targetYear - 1);
+      const cleanedBaseYear = baseYearEnrollments.map(e => {
+        const clean: Enrollment = { ...e };
+        camposParaLimpar.forEach(campo => { delete (clean as any)[campo]; });
+        return clean;
+      });
+      await Promise.all(cleanedBaseYear.map(e => saveDocument('enrollments', e)));
+
+      setEnrollments(prev => {
+        const withoutTargetYear = prev.filter(e => e.ano !== targetYear);
+        return withoutTargetYear.map(e => cleanedBaseYear.find(c => c.id === e.id) || e);
+      });
+
+      if (activeYear >= targetYear) setActiveYear(targetYear - 1);
+
+      showToast('Rematrículas zeradas', `Matrículas de ${targetYear} apagadas e respostas de intenção limpas. Pronto pra começar de verdade.`, 'success', 6000);
+    } catch (error) {
+      console.error('Error resetting rematriculas:', error);
+      showToast('Erro ao zerar', 'Ocorreu um problema ao zerar os dados de rematrícula.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   // Handler: Logout / Lock session
   const handleLogout = async () => {
     await signOutUser();
@@ -2259,6 +2303,7 @@ export default function App() {
                   availableYears={availableYears}
                   onSelectActiveYear={setActiveYear}
                   onAdvanceSchoolYear={handleAdvanceSchoolYear}
+                  onResetRematriculas={handleResetRematriculas}
                   classPrices={classPrices}
                   packDocuments={packDocuments}
                   coordenacaoSugestoes={coordenacaoSugestoes}

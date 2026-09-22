@@ -35,6 +35,7 @@ interface DashboardProps {
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
   onSelectActiveYear?: (year: number) => void;
   onAdvanceSchoolYear?: (fromYear: number, targetYear: number) => Promise<void> | void;
+  onResetRematriculas?: (targetYear: number) => Promise<void> | void;
   onImportGeraniumData?: () => void;
   onClearDatabase?: () => void;
 }
@@ -53,6 +54,7 @@ export default function Dashboard({
   onNavigateWithStudent,
   onSelectActiveYear,
   onAdvanceSchoolYear,
+  onResetRematriculas,
   onImportGeraniumData, 
   onClearDatabase 
 }: DashboardProps) {
@@ -288,6 +290,23 @@ export default function Dashboard({
             Todos os cálculos, status de rematrícula, progressão de turmas e faturamento refletem o ciclo <strong>{activeYear}</strong>.
           </p>
         </div>
+
+        {onResetRematriculas && availableYears.length > 1 && (
+          <button
+            onClick={() => {
+              const anoParaZerar = Math.max(...availableYears);
+              if (confirm(
+                `Isso vai APAGAR de vez todas as matrículas de ${anoParaZerar} (inclusive pré-matrículas automáticas) e limpar as respostas da Carta de Intenção guardadas em ${anoParaZerar - 1} — de todos os alunos.\n\nOs dados de ${anoParaZerar - 1} (aluno, responsáveis, fichas, matrícula) NÃO são afetados.\n\nTem certeza que quer zerar tudo isso?`
+              )) {
+                onResetRematriculas(anoParaZerar);
+              }
+            }}
+            className="shrink-0 self-start text-[11px] font-bold text-slate-400 hover:text-rose-600 underline decoration-dotted cursor-pointer"
+            title={`Apaga as matrículas de teste de ${Math.max(...availableYears)} pra recomeçar do zero`}
+          >
+            🗑️ Zerar rematrículas de teste
+          </button>
+        )}
       </div>
 
       {/* Notice if viewing a new cycle (e.g. 2027) with pending enrollments */}
@@ -512,7 +531,8 @@ export default function Dashboard({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4"
+          onClick={() => setSelectedFaseForModal({ label: 'Total de Alunos', emoji: '👥', alunoIds: activeStudents.map(s => s.id) })}
+          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4 cursor-pointer hover:border-brand-green-light transition-colors"
         >
           <div className="p-2.5 bg-emerald-50 text-brand-green-light rounded-lg">
             <Users size={20} />
@@ -528,7 +548,11 @@ export default function Dashboard({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.05 }}
-          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4"
+          onClick={() => setSelectedFaseForModal({
+            label: `Confirmadas (${activeYear})`, emoji: '✅',
+            alunoIds: validEnrollments.filter(e => e.statusNegociacao === 'Confirmada').map(e => e.alunoId)
+          })}
+          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4 cursor-pointer hover:border-brand-green-light transition-colors"
         >
           <div className="p-2.5 bg-emerald-100 text-brand-green-dark rounded-lg">
             <CheckCircle size={20} />
@@ -544,7 +568,11 @@ export default function Dashboard({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4"
+          onClick={() => setSelectedFaseForModal({
+            label: `Em Negociação (${activeYear})`, emoji: '⏳',
+            alunoIds: validEnrollments.filter(e => e.statusNegociacao === 'Em Negociação').map(e => e.alunoId)
+          })}
+          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4 cursor-pointer hover:border-brand-green-light transition-colors"
         >
           <div className="p-2.5 bg-orange-50 text-brand-orange rounded-lg">
             <Clock size={20} />
