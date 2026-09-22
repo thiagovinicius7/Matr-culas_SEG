@@ -117,6 +117,7 @@ export interface Enrollment {
   diasContraturno2027?: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[];
   horarioSaida2027?: '15:30' | '17:30';
   periodoContraturno2027?: 'Parcial' | 'Completo';
+  valorContraturnoProposto2027?: number; // Valor personalizado editável para o contraturno de 2027 (com desconto já aplicado)
   adicionarLanche2027?: boolean;
   valorLanche2027?: number;
   adicionarAlmoco2027?: boolean;

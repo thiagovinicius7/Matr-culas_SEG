@@ -140,7 +140,11 @@ export default function ParentCartaPortal({
 
   // Dynamic calculations
   const frequencia = contraturnoDesejado ? diasContraturno.length : 0;
-  const valorContraturno = contraturnoDesejado ? getContraturnoPriceDynamic(frequencia, periodoContraturno, contraturnoPrices, 2027) : 0;
+  const valorContraturnoTabela = contraturnoDesejado ? getContraturnoPriceDynamic(frequencia, periodoContraturno, contraturnoPrices, 2027) : 0;
+  // Respeita o desconto que a equipe já concedeu e salvou, se houver
+  const valorContraturno = contraturnoDesejado
+    ? (enrollment?.valorContraturnoProposto2027 !== undefined ? enrollment.valorContraturnoProposto2027 : valorContraturnoTabela)
+    : 0;
   const lancheVal = adicionarLanche ? valorLanche : 0;
   // Almoço na escola é se a pessoa NÃO optar pelo contraturno, mas quer que a criança almoce
   const almocoVal = (!contraturnoDesejado && adicionarAlmoco) ? valorAlmoco : 0;
@@ -159,6 +163,7 @@ export default function ParentCartaPortal({
       ...enrollment,
       statusNegociacao: mappedStatus,
       valorProposto2027: Number(valorRegularProposto),
+      valorContraturnoProposto2027: contraturnoDesejado ? Number(valorContraturno) : undefined,
       turmaPropostaId2027: turmaPropostaId,
       contraturnoDesejado2027: contraturnoDesejado,
       diasContraturno2027: contraturnoDesejado ? diasContraturno : [],

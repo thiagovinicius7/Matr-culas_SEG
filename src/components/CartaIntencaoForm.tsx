@@ -123,6 +123,35 @@ export default function CartaIntencaoForm({
 
   const periodoContraturno: 'Parcial' | 'Completo' = horarioSaida === '17:30' ? 'Completo' : 'Parcial';
 
+  // Calculate 2027 Contraturno Tabela Price dynamically
+  const frequencia = contraturnoDesejado ? diasContraturno.length : 0;
+  const valorContraturnoTabela2027 = contraturnoDesejado ? getContraturnoPriceDynamic(frequencia, periodoContraturno, contraturnoPrices, 2027) : 0;
+
+  // Desconto / Negociação do Contraturno para 2027 — mesmo esquema R$/% do
+  // regular (desconto ↔ valor final sincronizados), independente dele.
+  const [tipoDescontoContraturno2027, setTipoDescontoContraturno2027] = useState<'reais' | 'porcentagem'>('reais');
+  const [descontoContraturno2027, setDescontoContraturno2027] = useState<number>(() => {
+    if (enrollment?.valorContraturnoProposto2027 !== undefined) {
+      return Math.max(0, valorContraturnoTabela2027 - enrollment.valorContraturnoProposto2027);
+    }
+    return 0;
+  });
+  const [valorContraturnoProposto2027, setValorContraturnoProposto2027] = useState<number>(() => {
+    if (enrollment?.valorContraturnoProposto2027 !== undefined) return enrollment.valorContraturnoProposto2027;
+    return valorContraturnoTabela2027;
+  });
+
+  // Reaplica o desconto atual sempre que a tabela do contraturno mudar
+  // (trocou dias/horário/ligou-desligou) — mesmo padrão do reajuste que já
+  // existe quando a turma regular muda.
+  useEffect(() => {
+    const discReais = tipoDescontoContraturno2027 === 'porcentagem'
+      ? (valorContraturnoTabela2027 * descontoContraturno2027 / 100)
+      : descontoContraturno2027;
+    setValorContraturnoProposto2027(Math.max(0, valorContraturnoTabela2027 - discReais));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valorContraturnoTabela2027]);
+
   const [adicionarLanche, setAdicionarLanche] = useState<boolean>(() => {
     if (enrollment?.adicionarLanche2027 !== undefined) return enrollment.adicionarLanche2027;
     return enrollment?.adicionarLanche || false;
@@ -181,16 +210,12 @@ export default function CartaIntencaoForm({
     });
   };
 
-  // Calculate 2027 Contraturno Price dynamically
-  const frequencia = contraturnoDesejado ? diasContraturno.length : 0;
-  const valorContraturno2027 = contraturnoDesejado ? getContraturnoPriceDynamic(frequencia, periodoContraturno, contraturnoPrices, 2027) : 0;
-
   // Lanche (Ensino Regular) and Almoco (Alimentação na escola apenas para quem NÃO faz Contraturno)
   const lanchePrice2027 = adicionarLanche ? valorLanche2027 : 0;
   const almocoPrice2027 = (!contraturnoDesejado && adicionarAlmoco) ? valorAlmoco2027 : 0;
 
   // Total 2027 Estimated
-  const total2027 = Number(valorProposto2027 || 0) + valorContraturno2027 + lanchePrice2027 + almocoPrice2027;
+  const total2027 = Number(valorProposto2027 || 0) + Number(valorContraturnoProposto2027 || 0) + lanchePrice2027 + almocoPrice2027;
 
   // Handle Save
   const handleSaveForm = () => {
@@ -206,6 +231,7 @@ export default function CartaIntencaoForm({
       ...enrollment,
       statusNegociacao: mappedStatus,
       valorProposto2027: Number(valorProposto2027),
+      valorContraturnoProposto2027: contraturnoDesejado ? Number(valorContraturnoProposto2027) : undefined,
       turmaPropostaId2027,
       contraturnoDesejado2027: contraturnoDesejado,
       diasContraturno2027: contraturnoDesejado ? diasContraturno : [],
@@ -443,7 +469,7 @@ export default function CartaIntencaoForm({
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-[11px] font-bold text-slate-600">
-                        Desconto / Abatimento de Negociação:
+                        Desconto:
                       </label>
                       <div className="flex bg-slate-100 rounded p-0.5">
                         <button
@@ -595,7 +621,7 @@ export default function CartaIntencaoForm({
                   </label>
                   {contraturnoDesejado && (
                     <span className="text-[11px] font-bold text-brand-orange">
-                      R$ {valorContraturno2027.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      R$ {valorContraturnoProposto2027.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
                     </span>
                   )}
                 </div>
@@ -644,6 +670,93 @@ export default function CartaIntencaoForm({
                         ))}
                       </select>
                     </div>
+
+                    {/* Desconto do Contraturno */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold text-slate-600">
+                            Desconto do Contraturno:
+                          </label>
+                          <div className="flex bg-slate-100 rounded p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (tipoDescontoContraturno2027 === 'reais') return;
+                                const discReais = valorContraturnoTabela2027 * descontoContraturno2027 / 100;
+                                setDescontoContraturno2027(Number(discReais.toFixed(2)));
+                                setTipoDescontoContraturno2027('reais');
+                              }}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer ${tipoDescontoContraturno2027 === 'reais' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+                            >
+                              R$
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (tipoDescontoContraturno2027 === 'porcentagem') return;
+                                const pct = valorContraturnoTabela2027 > 0 ? (descontoContraturno2027 / valorContraturnoTabela2027) * 100 : 0;
+                                setDescontoContraturno2027(Number(pct.toFixed(2)));
+                                setTipoDescontoContraturno2027('porcentagem');
+                              }}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer ${tipoDescontoContraturno2027 === 'porcentagem' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+                            >
+                              %
+                            </button>
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-slate-400 font-semibold text-xs">{tipoDescontoContraturno2027 === 'reais' ? 'R$' : '%'}</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max={tipoDescontoContraturno2027 === 'porcentagem' ? 100 : undefined}
+                            value={descontoContraturno2027}
+                            onChange={(e) => {
+                              const inputVal = Number(e.target.value);
+                              setDescontoContraturno2027(inputVal);
+                              const discReais = tipoDescontoContraturno2027 === 'porcentagem'
+                                ? (valorContraturnoTabela2027 * inputVal / 100)
+                                : inputVal;
+                              setValorContraturnoProposto2027(Math.max(0, valorContraturnoTabela2027 - discReais));
+                            }}
+                            className="w-full pl-8 pr-2 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
+                            placeholder="0,00"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                          Valor Final do Contraturno (R$):
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-slate-400 font-semibold text-xs">R$</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            value={valorContraturnoProposto2027}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setValorContraturnoProposto2027(val);
+                              const discReais = Math.max(0, valorContraturnoTabela2027 - val);
+                              setDescontoContraturno2027(
+                                tipoDescontoContraturno2027 === 'porcentagem'
+                                  ? (valorContraturnoTabela2027 > 0 ? Number(((discReais / valorContraturnoTabela2027) * 100).toFixed(2)) : 0)
+                                  : discReais
+                              );
+                            }}
+                            className="w-full pl-8 pr-2 py-1.5 bg-amber-50/50 border border-brand-orange/40 rounded text-xs font-extrabold text-brand-orange focus:ring-2 focus:ring-brand-orange outline-none"
+                            placeholder="Digite o valor mensal final"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Tabela do contraturno 2027 (sem desconto): R$ {valorContraturnoTabela2027.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    </p>
                   </div>
                 )}
               </div>
