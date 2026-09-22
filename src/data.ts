@@ -124,21 +124,7 @@ export function getNextYearClass(
   const ageInTargetYear = calculateAgeAtCutoff(student.nascimento, targetYear);
   const fallback = getRegularClassForAgeDynamic(ageInTargetYear, classPricesList, targetYear);
 
-  // DIAGNÓSTICO TEMPORÁRIO — remover depois de resolver o bug de progressão
-  // de turma. Mostra no console exatamente por que a função está (ou não)
-  // conseguindo achar a turma atual do aluno pra avançar a partir dela.
-  // eslint-disable-next-line no-console
-  console.warn('[getNextYearClass]', {
-    aluno: student.nome,
-    currentEnrollmentAno: currentEnrollment?.ano,
-    currentEnrollmentTurmaRegularId: currentEnrollment?.turmaRegularId,
-    targetYear,
-    ageInTargetYear,
-    fallbackNome: fallback.nome,
-  });
-
   if (!currentEnrollment || !currentEnrollment.turmaRegularId || currentEnrollment.turmaRegularId === 'sem_regular') {
-    console.warn('[getNextYearClass] sem currentEnrollment válido, usando fallback por idade:', fallback.nome);
     return fallback;
   }
 
@@ -149,20 +135,12 @@ export function getNextYearClass(
     || classPricesList.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
     || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId));
 
-  console.warn('[getNextYearClass] currentClassDetails encontrado?', currentClassDetails ? `${currentClassDetails.nome} (idadeRef ${currentClassDetails.idadeRef})` : 'NÃO ACHOU', {
-    turmaRegularIdBuscado: currentEnrollment.turmaRegularId,
-    turmaRegularIdNormalizado: normalizeClassId(currentEnrollment.turmaRegularId),
-    fromYearClassesIds: fromYearClasses.map(c => `${c.id} (norm: ${normalizeClassId(c.id)})`),
-  });
-
   if (!currentClassDetails) return fallback;
 
   const targetYearClasses = classPricesList.filter(c => (c.ano || 2026) === targetYear);
   const nextByProgression =
     targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1)
     || targetYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => rc.idadeRef === currentClassDetails.idadeRef + 1)?.nome || '').trim().toLowerCase());
-
-  console.warn('[getNextYearClass] resultado final:', nextByProgression ? nextByProgression.nome : `fallback (${fallback.nome})`);
 
   return nextByProgression || fallback;
 }

@@ -2020,7 +2020,10 @@ export default function App() {
       // A Carta de Intenção deve operar sobre a matrícula do ANO ATIVO —
       // depois de "Virar Ano Letivo", isso já é o registro de 2027 (criado
       // em Preparo da Terra), não mais o de 2026.
-      const parentEnrollment = enrollments.find(e => e.alunoId === parentStudent.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === parentStudent.id);
+      // A Carta de Intenção 2027 é sempre baseada no ano 2026, independente
+      // do "ano ativo" global do sistema — ver mesma correção em
+      // StudentProfile.tsx (enrollmentBaseParaCarta).
+      const parentEnrollment = enrollments.find(e => e.alunoId === parentStudent.id && e.ano === 2026) || enrollments.find(e => e.alunoId === parentStudent.id);
       const parentContraturno = contraturnos.find(c => c.alunoId === parentStudent.id && c.dataFim === null);
 
       return (

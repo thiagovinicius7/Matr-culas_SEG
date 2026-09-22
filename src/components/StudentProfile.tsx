@@ -223,6 +223,13 @@ export default function StudentProfile({
   const enrollmentParaIntencao = enrollmentComResposta
     || [...activeEnrollments].sort((a, b) => b.ano - a.ano)[0];
   const activeEnrollment = activeEnrollments.find(e => e.ano === activeYear) || activeEnrollments[0];
+  // A Carta de Intenção 2027 é sempre baseada no ano 2026 (é onde os campos
+  // *2027 ficam gravados) — INDEPENDENTE de qual ano está selecionado como
+  // "ano ativo" no Painel. Usar activeEnrollment aqui quebrava sempre que
+  // alguém estivesse testando com o ano ativo em 2027: a carta acabava
+  // pegando o registro de 2027 (às vezes já com dado errado de teste
+  // anterior) como se fosse a base, piorando o erro a cada tentativa.
+  const enrollmentBaseParaCarta = activeEnrollments.find(e => e.ano === 2026) || activeEnrollment;
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
   const activeContraturno = activeContraturnos.find(c => c.dataFim === null) || activeContraturnos[0];
   const activeMovements = movements.filter(m => m.alunoId === selectedStudentId).sort((a,b) => b.data.localeCompare(a.data));
@@ -2670,7 +2677,7 @@ export default function StudentProfile({
               <CartaIntencaoForm
                 student={activeStudent}
                 guardian={activeGuardian}
-                enrollment={activeEnrollment}
+                enrollment={enrollmentBaseParaCarta}
                 activeContraturno={activeContraturno}
                 classPrices={classPrices}
                 contraturnoPrices={contraturnoPrices}
