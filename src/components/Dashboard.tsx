@@ -97,6 +97,7 @@ export default function Dashboard({
     const targetClassId = normalizeClassId(selectedClassForModal.id);
 
     return students
+      .filter(student => student.status === 'ativo')
       .filter(student => getStudentClassId(student) === targetClassId)
       .map(student => {
         const e = enrollments.find(e => e.alunoId === student.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === student.id) || {
@@ -124,9 +125,11 @@ export default function Dashboard({
       .sort((a, b) => a.student.nome.localeCompare(b.student.nome, 'pt-BR'));
   };
 
-  // Map of student counts per normalized class ID across all students
+  // Map of student counts per normalized class ID — só conta alunos ATIVOS;
+  // quem foi cancelado ou trancado sai da contagem/lista de vagas ocupadas
+  // e fica só no histórico como ex-aluno.
   const studentCountByClassId: Record<string, number> = {};
-  students.forEach(student => {
+  students.filter(s => s.status === 'ativo').forEach(student => {
     const classId = getStudentClassId(student);
     studentCountByClassId[classId] = (studentCountByClassId[classId] || 0) + 1;
   });
