@@ -75,6 +75,7 @@ export default function StudentProfile({
   const [showNegotiationModal, setShowNegotiationModal] = useState(false);
   const [mostrarFichaSaude, setMostrarFichaSaude] = useState(false);
   const [mostrarFichaAnamnese, setMostrarFichaAnamnese] = useState(false);
+  const [matriculaAnoSelecionado, setMatriculaAnoSelecionado] = useState<number | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<'visao_geral' | 'responsaveis' | 'financeiro' | 'contraturno' | 'matricula'>('visao_geral');
 
@@ -84,6 +85,7 @@ export default function StudentProfile({
     setProfileTab('visao_geral');
     setMostrarFichaSaude(false);
     setMostrarFichaAnamnese(false);
+    setMatriculaAnoSelecionado(null);
   }, [selectedStudentId]);
 
   useEffect(() => {
@@ -212,11 +214,13 @@ export default function StudentProfile({
   // Se não existe matrícula formal para o ano ativo ainda (ex: antes de
   // "Virar Ano Letivo"), simplesmente não há Carta de Intenção pra mostrar
   // nesse ano — isso é o comportamento correto, não um bug.
-  // A resposta da Carta de Intenção (statusIntencao2027 e campos relacionados)
-  // fica gravada no Enrollment do ano BASE (o ano a partir do qual a carta foi
-  // enviada), não no ano ativo do sistema — por isso a busca é independente
-  // do activeYear, senão a resposta "some" quando o ano ativo muda.
-  const enrollmentParaIntencao = activeEnrollments.find(e => e.statusIntencao2027 !== undefined)
+  // A Carta de Intenção de REMATRÍCULA só faz sentido pra quem já concluiu
+  // (colheita) uma matrícula alguma vez, ou já tem resposta registrada — um
+  // aluno novo ainda em processo de matrícula não deveria ver "rematrícula".
+  const jaTeveMatriculaCompleta = activeEnrollments.some(e => getFaseProcesso(e) === 'colheita');
+  const enrollmentComResposta = activeEnrollments.find(e => e.statusIntencao2027 !== undefined);
+  const cartaDeIntencaoAplicavel = !!enrollmentComResposta || jaTeveMatriculaCompleta;
+  const enrollmentParaIntencao = enrollmentComResposta
     || [...activeEnrollments].sort((a, b) => b.ano - a.ano)[0];
   const activeEnrollment = activeEnrollments.find(e => e.ano === activeYear) || activeEnrollments[0];
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
@@ -269,8 +273,16 @@ export default function StudentProfile({
     }
   };
 
-  // Enrollment do ano ativo (usado na trilha da aba "Matrícula [ano]")
-  const currentYearEnrollment = activeEnrollments.find(e => e.ano === activeYear);
+  // Anos com matrícula (formal, colheita anterior etc.) deste aluno — a aba
+  // Matrícula deixa escolher qualquer um deles direto na ficha, sem precisar
+  // mexer no seletor de "ano ativo" que é global pro sistema inteiro.
+  const anosComMatricula = [...new Set(activeEnrollments.map(e => e.ano))].sort((a, b) => b - a);
+  const anoMatriculaExibido = matriculaAnoSelecionado
+    ?? (anosComMatricula.includes(activeYear) ? activeYear : (anosComMatricula[0] ?? activeYear));
+
+  // Enrollment do ano escolhido na aba "Matrícula" (não necessariamente o
+  // ano ativo global — ver anoMatriculaExibido acima)
+  const currentYearEnrollment = activeEnrollments.find(e => e.ano === anoMatriculaExibido);
   const currentYearFase = currentYearEnrollment ? getFaseProcesso(currentYearEnrollment) : null;
   const emProcessoDeMatricula = !!currentYearEnrollment && currentYearFase !== 'colheita';
 
@@ -1303,7 +1315,7 @@ export default function StudentProfile({
                   { key: 'responsaveis', label: 'Responsáveis' },
                   { key: 'financeiro', label: 'Financeiro' },
                   { key: 'contraturno', label: 'Contraturno' },
-                  { key: 'matricula', label: `Matrícula ${activeYear}` },
+                  { key: 'matricula', label: 'Matrícula' },
                 ] as const).map(tab => (
                   <button
                     key={tab.key}
@@ -2182,6 +2194,26 @@ export default function StudentProfile({
               {/* ===================== ABA: MATRÍCULA [ano] ===================== */}
               {profileTab === 'matricula' && (
                 <div className="space-y-4">
+                  {anosComMatricula.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Ver matrícula de:</span>
+                      {anosComMatricula.map(ano => (
+                        <button
+                          key={ano}
+                          type="button"
+                          onClick={() => setMatriculaAnoSelecionado(ano)}
+                          className={`px-3 py-1 text-xs font-bold rounded-full border cursor-pointer transition-colors ${
+                            ano === anoMatriculaExibido
+                              ? 'bg-brand-green-dark text-white border-brand-green-dark'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-brand-green-light'
+                          }`}
+                        >
+                          {ano}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {currentYearEnrollment ? (
                     <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
                       <div className="flex items-stretch justify-between gap-1">
@@ -2218,7 +2250,7 @@ export default function StudentProfile({
                   ) : (
                     <div className="bg-white p-4 rounded-lg border border-dashed border-slate-200 text-center">
                       <p className="text-xs text-slate-500">
-                        Sem matrícula formal registrada para {activeYear} ainda (isso é normal antes de "Virar Ano Letivo").
+                        Sem matrícula formal registrada para {anoMatriculaExibido} ainda (isso é normal antes de "Virar Ano Letivo").
                         Os links e fichas abaixo continuam disponíveis.
                       </p>
                     </div>
@@ -2232,7 +2264,7 @@ export default function StudentProfile({
                       🔗 Links e Fichas deste Aluno
                     </h4>
                     <ul className="space-y-2">
-                      {enrollmentParaIntencao && (
+                      {cartaDeIntencaoAplicavel && enrollmentParaIntencao && (
                       <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
                         <div>
                           <p className="text-xs font-semibold text-slate-800">Carta de Intenção de Rematrícula {enrollmentParaIntencao.ano + 1}</p>
@@ -2587,7 +2619,7 @@ export default function StudentProfile({
 
                     {currentYearFase === 'colheita' && (
                       <p className="text-xs text-emerald-700 flex items-center gap-1.5">
-                        <span className="text-base">✓</span> Matrícula {activeYear} concluída — todas as etapas foram cumpridas.
+                        <span className="text-base">✓</span> Matrícula {anoMatriculaExibido} concluída — todas as etapas foram cumpridas.
                       </p>
                     )}
 
