@@ -212,7 +212,12 @@ export default function StudentProfile({
   // Se não existe matrícula formal para o ano ativo ainda (ex: antes de
   // "Virar Ano Letivo"), simplesmente não há Carta de Intenção pra mostrar
   // nesse ano — isso é o comportamento correto, não um bug.
-  const enrollmentParaIntencao = activeEnrollments.find(e => e.ano === activeYear);
+  // A resposta da Carta de Intenção (statusIntencao2027 e campos relacionados)
+  // fica gravada no Enrollment do ano BASE (o ano a partir do qual a carta foi
+  // enviada), não no ano ativo do sistema — por isso a busca é independente
+  // do activeYear, senão a resposta "some" quando o ano ativo muda.
+  const enrollmentParaIntencao = activeEnrollments.find(e => e.statusIntencao2027 !== undefined)
+    || [...activeEnrollments].sort((a, b) => b.ano - a.ano)[0];
   const activeEnrollment = activeEnrollments.find(e => e.ano === activeYear) || activeEnrollments[0];
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
   const activeContraturno = activeContraturnos.find(c => c.dataFim === null) || activeContraturnos[0];
@@ -2240,7 +2245,7 @@ export default function StudentProfile({
                             <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">não renovará</span>
                           ) : (
                             <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                              {enrollmentParaIntencao.statusIntencao2027 === 'Em Análise' ? 'em análise' : 'pendente'}
+                              {enrollmentParaIntencao.statusIntencao2027 === 'Em Análise' ? 'em análise' : 'aguardando resposta'}
                             </span>
                           )}
                           <button

@@ -10,7 +10,8 @@ import {
   getRegularClassForAge,
   getRegularClassForAgeDynamic,
   REGULAR_CLASSES,
-  normalizeClassId
+  normalizeClassId,
+  getFaseProcesso
 } from './data';
 import {
   seedDatabaseIfEmpty,
@@ -1294,6 +1295,60 @@ export default function App() {
     });
 
     saveDocument('enrollments', updatedEnrollment);
+
+    // Assim que a Carta de Intenção de Rematrícula é respondida (qualquer
+    // resposta — Confirmada, Em Análise ou Não Renovará), cria automaticamente
+    // a pré-matrícula do próximo ano, entrando em "Preparo da Terra". Isso dá
+    // uma ideia real de vagas prováveis sem precisar esperar "Virar Ano
+    // Letivo". Se a família responder de novo depois (mudou de ideia) e a
+    // pré-matrícula ainda estiver em Preparo da Terra (equipe não mexeu
+    // nela ainda), atualiza; se a equipe já avançou a fase, não mexe mais —
+    // respeita o trabalho manual já feito.
+    const nextYear = updatedEnrollment.ano + 1;
+    const respostaCarta = updatedEnrollment.statusIntencao2027;
+    if (respostaCarta && respostaCarta !== 'Pendente') {
+      const turmaId = updatedEnrollment.turmaPropostaId2027;
+      const turmaDetails = turmaId
+        ? (classPrices.find(c => c.id === turmaId && (c.ano || 2026) === nextYear) || classPrices.find(c => c.id === turmaId))
+        : undefined;
+      const valorTabela = turmaDetails?.valorMensal ?? (updatedEnrollment.valorProposto2027 ?? 0);
+      const valorFinal = updatedEnrollment.valorProposto2027 !== undefined ? updatedEnrollment.valorProposto2027 : valorTabela;
+      const statusNegociacaoMap: Record<string, Enrollment['statusNegociacao']> = {
+        'Confirmada': 'Confirmada',
+        'Em Análise': 'Em Negociação',
+        'Não Renovará': 'Cancelada',
+      };
+
+      const existingPreMatricula = enrollments.find(e => e.alunoId === updatedEnrollment.alunoId && e.ano === nextYear);
+
+      if (!existingPreMatricula) {
+        const preMatricula: Enrollment = {
+          id: `enroll_${updatedEnrollment.alunoId}_${nextYear}`,
+          alunoId: updatedEnrollment.alunoId,
+          ano: nextYear,
+          turmaRegularId: turmaId || updatedEnrollment.turmaRegularId,
+          valorRegularOriginal: valorTabela,
+          descontoMensal: Math.max(0, valorTabela - valorFinal),
+          valorFinalRegular: valorFinal,
+          statusNegociacao: statusNegociacaoMap[respostaCarta] || 'Pendente',
+          faseProcesso: 'preparo_terra',
+          anotacoes: `Pré-matrícula criada automaticamente a partir da resposta da Carta de Intenção de Rematrícula (${respostaCarta}).`
+        };
+        setEnrollments(prev => [...prev, preMatricula]);
+        saveDocument('enrollments', preMatricula);
+      } else if (getFaseProcesso(existingPreMatricula) === 'preparo_terra') {
+        const preMatriculaAtualizada: Enrollment = {
+          ...existingPreMatricula,
+          turmaRegularId: turmaId || existingPreMatricula.turmaRegularId,
+          valorRegularOriginal: valorTabela,
+          descontoMensal: Math.max(0, valorTabela - valorFinal),
+          valorFinalRegular: valorFinal,
+          statusNegociacao: statusNegociacaoMap[respostaCarta] || existingPreMatricula.statusNegociacao,
+        };
+        setEnrollments(prev => prev.map(e => e.id === existingPreMatricula.id ? preMatriculaAtualizada : e));
+        saveDocument('enrollments', preMatriculaAtualizada);
+      }
+    }
 
     if (logMovement) {
       const student = students.find(s => s.id === updatedEnrollment.alunoId);
