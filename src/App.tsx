@@ -1460,10 +1460,21 @@ export default function App() {
 
         if (prevEnrollment && prevEnrollment.turmaRegularId !== 'sem_regular') {
           const fromYearClasses = classPrices.filter(c => (c.ano || 2026) === fromYear);
-          const currentClassDetails = fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(prevEnrollment.turmaRegularId));
+          // Tenta achar a turma atual do aluno de vários jeitos, do mais
+          // específico pro mais genérico — dado antigo/importado às vezes
+          // tem o id da turma num formato que não bate certinho com a
+          // configuração de mensalidades atual, e se a busca falhar
+          // silenciosamente o sistema caía de volta pra calcular pela
+          // idade (o bug que estava empurrando aluno pra série errada).
+          const currentClassDetails =
+            fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(prevEnrollment.turmaRegularId))
+            || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(prevEnrollment.turmaRegularId))
+            || fromYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(prevEnrollment.turmaRegularId))?.nome || '').trim().toLowerCase())
+            || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(prevEnrollment.turmaRegularId));
           if (currentClassDetails) {
             const targetYearClasses = classPrices.filter(c => (c.ano || 2026) === targetYear);
-            const nextByProgression = targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1);
+            const nextByProgression = targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1)
+              || targetYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => rc.idadeRef === currentClassDetails.idadeRef + 1)?.nome || '').trim().toLowerCase());
             if (nextByProgression) {
               nextClass = nextByProgression;
             }
