@@ -164,6 +164,9 @@ export default function ParentCartaPortal({
       statusNegociacao: mappedStatus,
       valorProposto2027: Number(valorRegularProposto),
       valorContraturnoProposto2027: contraturnoDesejado ? Number(valorContraturno) : undefined,
+      // Desconto por Pontualidade é decisão exclusiva da equipe — a família
+      // só visualiza, nunca marca/desmarca; preserva o que já estava salvo.
+      descontoPontualidadeAtivo2027: enrollment?.descontoPontualidadeAtivo2027 || false,
       turmaPropostaId2027: turmaPropostaId,
       contraturnoDesejado2027: contraturnoDesejado,
       diasContraturno2027: contraturnoDesejado ? diasContraturno : [],
@@ -421,6 +424,16 @@ export default function ParentCartaPortal({
                 )}
               </div>
 
+              {enrollment?.descontoPontualidadeAtivo2027 && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-2 text-xs text-emerald-900">
+                  <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-extrabold text-emerald-950">Desconto por Pontualidade: </span>
+                    Pagando a mensalidade regular até o <strong>dia {diaVencimento}</strong> de cada mês, vocês têm <strong>3% de desconto</strong> nela — de R$ {Number(valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para R$ {(Number(valorRegularProposto) * 0.97).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês.
+                  </div>
+                </div>
+              )}
+
               {/* Total Calculation Display */}
               <div className="bg-brand-green-dark text-white p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
                 <div>
@@ -431,9 +444,20 @@ export default function ParentCartaPortal({
                 </div>
 
                 <div className="text-right">
-                  <span className="text-xl font-extrabold text-brand-orange font-display">
-                    R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
-                  </span>
+                  {enrollment?.descontoPontualidadeAtivo2027 ? (
+                    <div>
+                      <span className="text-xs text-emerald-200 line-through block">
+                        R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
+                      </span>
+                      <span className="text-xl font-black text-brand-orange font-display">
+                        R$ {(totalCalculado - Number(valorRegularProposto) * 0.03).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-emerald-200">com pontualidade</span>
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xl font-extrabold text-brand-orange font-display">
+                      R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

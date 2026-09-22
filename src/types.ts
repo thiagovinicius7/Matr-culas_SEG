@@ -123,8 +123,7 @@ export interface Enrollment {
   adicionarAlmoco2027?: boolean;
   valorAlmoco2027?: number;
   diaVencimento2027?: '01' | '05' | '10' | '15' | '20';
-  descontoPontualidadeAtivo2027?: boolean;
-  valorDescontoPontualidade2027?: number;
+  descontoPontualidadeAtivo2027?: boolean; // 3% fixo sobre a regular, só se a escola oferecer — família nunca escolhe
   statusIntencao2027?: 'Pendente' | 'Confirmada' | 'Em Análise' | 'Não Renovará';
   observacoesFamilia2027?: string;
   dataIntencao2027?: string;

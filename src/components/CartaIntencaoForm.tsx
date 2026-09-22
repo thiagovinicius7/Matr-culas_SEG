@@ -178,6 +178,13 @@ export default function CartaIntencaoForm({
     return enrollment?.diaVencimento2027 || '05';
   });
 
+  // Desconto por Pontualidade — 3% fixo, só sobre a mensalidade REGULAR
+  // (nunca contraturno). É a equipe quem decide oferecer ou não; se não
+  // marcar aqui, a família nunca vê nem pode escolher essa opção.
+  const [descontoPontualidadeAtivo, setDescontoPontualidadeAtivo] = useState<boolean>(() => {
+    return enrollment?.descontoPontualidadeAtivo2027 || false;
+  });
+
   const [statusIntencao, setStatusIntencao] = useState<'Pendente' | 'Confirmada' | 'Em Análise' | 'Não Renovará'>(() => {
     return enrollment?.statusIntencao2027 || 'Pendente';
   });
@@ -242,6 +249,7 @@ export default function CartaIntencaoForm({
       adicionarAlmoco2027: contraturnoDesejado ? false : adicionarAlmoco,
       valorAlmoco2027: valorAlmoco2027,
       diaVencimento2027: diaVencimento,
+      descontoPontualidadeAtivo2027: descontoPontualidadeAtivo,
       statusIntencao2027: statusIntencao,
       observacoesFamilia2027: observacoesFamilia,
       dataIntencao2027: new Date().toISOString().split('T')[0]
@@ -573,6 +581,26 @@ export default function CartaIntencaoForm({
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Desconto por Pontualidade — 3% fixo, só regular, só a equipe decide */}
+                <div className="pt-3 border-t border-slate-100">
+                  <label className="flex items-center justify-between cursor-pointer select-none">
+                    <span className="flex items-center gap-2 font-bold text-slate-800 text-xs">
+                      <Sparkles size={14} className="text-emerald-600" />
+                      Conceder Desconto por Pontualidade (3% na Regular)
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={descontoPontualidadeAtivo}
+                      onChange={(e) => setDescontoPontualidadeAtivo(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                  </label>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Essa opção é só da equipe — se você não marcar aqui, a família não vê nem pode escolher isso na carta dela.
+                    {descontoPontualidadeAtivo && ` Com 3% de desconto: R$ ${(valorProposto2027 * 0.97).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês na regular, pagando até o dia ${diaVencimento}.`}
+                  </p>
                 </div>
 
                 {/* Option for Lanche in Ensino Regular — só para o Ensino Fundamental

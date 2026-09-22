@@ -1557,7 +1557,7 @@ export default function App() {
         'valorProposto2027', 'turmaPropostaId2027', 'contraturnoDesejado2027',
         'diasContraturno2027', 'horarioSaida2027', 'periodoContraturno2027',
         'adicionarLanche2027', 'valorLanche2027', 'adicionarAlmoco2027', 'valorAlmoco2027',
-        'diaVencimento2027', 'descontoPontualidadeAtivo2027', 'valorDescontoPontualidade2027',
+        'valorContraturnoProposto2027', 'diaVencimento2027', 'descontoPontualidadeAtivo2027',
         'statusIntencao2027', 'observacoesFamilia2027', 'dataIntencao2027'
       ];
       const baseYearEnrollments = enrollments.filter(e => e.ano === targetYear - 1);
