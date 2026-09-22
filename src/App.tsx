@@ -11,6 +11,7 @@ import {
   getRegularClassForAgeDynamic,
   REGULAR_CLASSES,
   normalizeClassId,
+  getNextYearClass,
   getFaseProcesso
 } from './data';
 import {
@@ -1447,39 +1448,12 @@ export default function App() {
         // Get previous year enrollment
         const prevEnrollment = updatedEnrollments.find(e => e.alunoId === st.id && e.ano === fromYear);
 
-        // Calcular a próxima turma: prioriza avançar EXATAMENTE 1 série a
-        // partir da turma atual do aluno (fromYear), em vez de recalcular do
-        // zero pela idade — recalcular do zero pode divergir da progressão
-        // real quando o aniversário do aluno não bate certinho com o corte
-        // padrão de idade (foi isso que fez um aluno do 1º ano "pular" pro
-        // 3º ano em vez de ir pro 2º ano esperado). Só cai pra idade quando
-        // não há turma anterior pra basear (aluno novo) ou a série seguinte
-        // não existe na tabela do ano de destino.
-        const ageInTargetYear = calculateAgeAtCutoff(st.nascimento, targetYear);
-        let nextClass = getRegularClassForAgeDynamic(ageInTargetYear, classPrices, targetYear);
-
-        if (prevEnrollment && prevEnrollment.turmaRegularId !== 'sem_regular') {
-          const fromYearClasses = classPrices.filter(c => (c.ano || 2026) === fromYear);
-          // Tenta achar a turma atual do aluno de vários jeitos, do mais
-          // específico pro mais genérico — dado antigo/importado às vezes
-          // tem o id da turma num formato que não bate certinho com a
-          // configuração de mensalidades atual, e se a busca falhar
-          // silenciosamente o sistema caía de volta pra calcular pela
-          // idade (o bug que estava empurrando aluno pra série errada).
-          const currentClassDetails =
-            fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(prevEnrollment.turmaRegularId))
-            || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(prevEnrollment.turmaRegularId))
-            || fromYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(prevEnrollment.turmaRegularId))?.nome || '').trim().toLowerCase())
-            || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(prevEnrollment.turmaRegularId));
-          if (currentClassDetails) {
-            const targetYearClasses = classPrices.filter(c => (c.ano || 2026) === targetYear);
-            const nextByProgression = targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1)
-              || targetYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => rc.idadeRef === currentClassDetails.idadeRef + 1)?.nome || '').trim().toLowerCase());
-            if (nextByProgression) {
-              nextClass = nextByProgression;
-            }
-          }
-        }
+        // Calcular a próxima turma usando a função central getNextYearClass
+        // (data.ts) — prioriza avançar 1 série a partir da turma atual do
+        // aluno, só cai pra idade pura se ele for novo ou a série seguinte
+        // não existir. A mesma função é usada na Carta de Intenção, pra não
+        // ter duas contas diferentes divergindo entre si.
+        const nextClass = getNextYearClass(st, prevEnrollment, classPrices, targetYear);
 
         const isOnlyContraturno = prevEnrollment?.turmaRegularId === 'sem_regular';
         const baseRegularPrice = isOnlyContraturno ? 0 : nextClass.valorMensal;

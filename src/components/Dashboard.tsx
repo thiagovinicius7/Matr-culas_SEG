@@ -92,12 +92,20 @@ export default function Dashboard({
     return normalizeClassId(info.id);
   };
 
+  // Aluno com a matrícula do ano ativo CANCELADA não deve contar como vaga
+  // ocupada em nenhuma turma, mesmo que o cadastro dele (Student.status)
+  // continue "ativo" — cancelar é por matrícula/ano, não apaga o aluno.
+  const isEnrollmentCancelledForActiveYear = (student: Student): boolean => {
+    const e = enrollments.find(e => e.alunoId === student.id && e.ano === activeYear);
+    return e?.statusNegociacao === 'Cancelada';
+  };
+
   const getModalClassStudents = () => {
     if (!selectedClassForModal) return [];
     const targetClassId = normalizeClassId(selectedClassForModal.id);
 
     return students
-      .filter(student => student.status === 'ativo')
+      .filter(student => student.status === 'ativo' && !isEnrollmentCancelledForActiveYear(student))
       .filter(student => getStudentClassId(student) === targetClassId)
       .map(student => {
         const e = enrollments.find(e => e.alunoId === student.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === student.id) || {
@@ -129,7 +137,7 @@ export default function Dashboard({
   // quem foi cancelado ou trancado sai da contagem/lista de vagas ocupadas
   // e fica só no histórico como ex-aluno.
   const studentCountByClassId: Record<string, number> = {};
-  students.filter(s => s.status === 'ativo').forEach(student => {
+  students.filter(s => s.status === 'ativo' && !isEnrollmentCancelledForActiveYear(s)).forEach(student => {
     const classId = getStudentClassId(student);
     studentCountByClassId[classId] = (studentCountByClassId[classId] || 0) + 1;
   });

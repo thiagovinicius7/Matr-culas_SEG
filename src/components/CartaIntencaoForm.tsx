@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass } from '../data';
 import { FileText, Save, Printer, Share2, MessageCircle, Calendar, Clock, DollarSign, UserCheck, AlertCircle, CheckCircle, HelpCircle, XCircle, Edit3, ArrowRight, ShieldCheck, Sparkles, Check, ChevronDown, Link2, ExternalLink, Utensils } from 'lucide-react';
 
 interface CartaIntencaoFormProps {
@@ -47,7 +47,10 @@ export default function CartaIntencaoForm({
 
   // Suggested class for 2027 based on cutoff
   const class2026 = getRegularClassForAgeDynamic(age2026, classPrices, 2026);
-  const suggestedClass2027 = getRegularClassForAgeDynamic(age2027, classPrices, 2027);
+  // Prioriza avançar 1 série a partir da turma atual (2026) do aluno — só
+  // cai pra cálculo puro por idade se ele for realmente novo (sem matrícula
+  // anterior) ou a série seguinte não existir na tabela de 2027.
+  const suggestedClass2027 = getNextYearClass(student, enrollment, classPrices, 2027);
 
   // 2026 Current Financial State
   const currentRegularVal = enrollment?.valorFinalRegular || class2026.valorMensal;

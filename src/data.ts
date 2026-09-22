@@ -103,6 +103,48 @@ export function getRegularClassForAgeDynamic(
   return sorted[sorted.length - 1];
 }
 
+/**
+ * Turma seguinte de um aluno pra um ano-alvo — usada em QUALQUER lugar que
+ * precise saber "pra qual turma esse aluno vai" (Carta de Intenção, virada
+ * de ano, pré-matrícula automática). Sempre PRIORIZA avançar exatamente 1
+ * série a partir da turma que o aluno JÁ está matriculado (respeitando
+ * retenção/avanço reais), e só cai pra cálculo puro por idade quando não há
+ * matrícula anterior pra basear (aluno realmente novo) ou a série seguinte
+ * não existe na tabela do ano de destino. Nunca ignorar o histórico do
+ * aluno em favor da idade sozinha — foi exatamente isso que causou alunos
+ * "pulando" ou indo pra série errada quando cada tela calculava do seu
+ * jeito, só pela idade.
+ */
+export function getNextYearClass(
+  student: Student,
+  currentEnrollment: Enrollment | undefined,
+  classPricesList: RegularClass[],
+  targetYear: number
+): RegularClass {
+  const ageInTargetYear = calculateAgeAtCutoff(student.nascimento, targetYear);
+  const fallback = getRegularClassForAgeDynamic(ageInTargetYear, classPricesList, targetYear);
+
+  if (!currentEnrollment || !currentEnrollment.turmaRegularId || currentEnrollment.turmaRegularId === 'sem_regular') {
+    return fallback;
+  }
+
+  const fromYear = currentEnrollment.ano;
+  const fromYearClasses = classPricesList.filter(c => (c.ano || 2026) === fromYear);
+  const currentClassDetails =
+    fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
+    || classPricesList.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
+    || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId));
+
+  if (!currentClassDetails) return fallback;
+
+  const targetYearClasses = classPricesList.filter(c => (c.ano || 2026) === targetYear);
+  const nextByProgression =
+    targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1)
+    || targetYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => rc.idadeRef === currentClassDetails.idadeRef + 1)?.nome || '').trim().toLowerCase());
+
+  return nextByProgression || fallback;
+}
+
 // Default prices for Somente Contraturno ("Dia no Sítio-Escola")
 const DEFAULT_SOMENTE_CONTRATURNO_TABLE: Record<number, { Parcial: number; Completo: number }> = {
   0: { Parcial: 120, Completo: 150 },

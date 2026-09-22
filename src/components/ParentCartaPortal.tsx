@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, getNextYearClass } from '../data';
 import { Sprout, CheckCircle, HelpCircle, XCircle, Send, Calendar, Clock, DollarSign, Check, Heart, ShieldCheck, Sparkles, MessageSquare, Utensils } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -40,7 +40,10 @@ export default function ParentCartaPortal({
   const age2027 = calculateAgeAtCutoff(student.nascimento, 2027);
 
   const class2026 = getRegularClassForAgeDynamic(age2026, classPrices, 2026);
-  const suggestedClass2027 = getRegularClassForAgeDynamic(age2027, classPrices, 2027);
+  // Prioriza avançar 1 série a partir da turma atual (2026) do aluno — só
+  // cai pra cálculo puro por idade se ele for realmente novo ou a série
+  // seguinte não existir na tabela de 2027.
+  const suggestedClass2027 = getNextYearClass(student, enrollment, classPrices, 2027);
 
   // Sem nenhuma matrícula anterior registrada, é um aluno novo — a carta
   // então é de "Intenção de Matrícula", não de "Rematrícula".
