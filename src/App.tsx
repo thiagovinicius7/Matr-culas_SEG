@@ -1446,10 +1446,29 @@ export default function App() {
 
         // Get previous year enrollment
         const prevEnrollment = updatedEnrollments.find(e => e.alunoId === st.id && e.ano === fromYear);
-        
-        // Calculate next regular class based on age cutoff for targetYear
+
+        // Calcular a próxima turma: prioriza avançar EXATAMENTE 1 série a
+        // partir da turma atual do aluno (fromYear), em vez de recalcular do
+        // zero pela idade — recalcular do zero pode divergir da progressão
+        // real quando o aniversário do aluno não bate certinho com o corte
+        // padrão de idade (foi isso que fez um aluno do 1º ano "pular" pro
+        // 3º ano em vez de ir pro 2º ano esperado). Só cai pra idade quando
+        // não há turma anterior pra basear (aluno novo) ou a série seguinte
+        // não existe na tabela do ano de destino.
         const ageInTargetYear = calculateAgeAtCutoff(st.nascimento, targetYear);
-        const nextClass = getRegularClassForAgeDynamic(ageInTargetYear, classPrices, targetYear);
+        let nextClass = getRegularClassForAgeDynamic(ageInTargetYear, classPrices, targetYear);
+
+        if (prevEnrollment && prevEnrollment.turmaRegularId !== 'sem_regular') {
+          const fromYearClasses = classPrices.filter(c => (c.ano || 2026) === fromYear);
+          const currentClassDetails = fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(prevEnrollment.turmaRegularId));
+          if (currentClassDetails) {
+            const targetYearClasses = classPrices.filter(c => (c.ano || 2026) === targetYear);
+            const nextByProgression = targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1);
+            if (nextByProgression) {
+              nextClass = nextByProgression;
+            }
+          }
+        }
 
         const isOnlyContraturno = prevEnrollment?.turmaRegularId === 'sem_regular';
         const baseRegularPrice = isOnlyContraturno ? 0 : nextClass.valorMensal;
