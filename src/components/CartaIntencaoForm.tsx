@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId } from '../data';
 import { FileText, Save, Printer, Share2, MessageCircle, Calendar, Clock, DollarSign, UserCheck, AlertCircle, CheckCircle, HelpCircle, XCircle, Edit3, ArrowRight, ShieldCheck, Sparkles, Check, ChevronDown, Link2, ExternalLink, Utensils } from 'lucide-react';
 
 interface CartaIntencaoFormProps {
@@ -45,8 +45,18 @@ export default function CartaIntencaoForm({
   const isNewStudent = !enrollment;
   const cartaTitulo = isNewStudent ? 'Carta de Intenção de Matrícula' : 'Carta de Intenção de Rematrícula';
 
-  // Suggested class for 2027 based on cutoff
-  const class2026 = getRegularClassForAgeDynamic(age2026, classPrices, 2026);
+  // Turma atual (2026) real do aluno — usa a matrícula de verdade dele
+  // (enrollment.turmaRegularId), NÃO recalcula pela idade. Recalcular pela
+  // idade aqui era o mesmo bug de sempre: mostrava uma turma "ideal por
+  // idade" diferente da turma em que o aluno está matriculado de fato,
+  // sempre que o aniversário dele não bate com o corte padrão. Só cai pra
+  // idade se não tiver matrícula 2026 registrada (aluno realmente novo).
+  const class2026FromEnrollment = enrollment && enrollment.turmaRegularId && enrollment.turmaRegularId !== 'sem_regular'
+    ? (classPrices.find(c => (c.ano || 2026) === 2026 && normalizeClassId(c.id) === normalizeClassId(enrollment.turmaRegularId))
+      || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(enrollment.turmaRegularId))
+      || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(enrollment.turmaRegularId)))
+    : undefined;
+  const class2026 = class2026FromEnrollment || getRegularClassForAgeDynamic(age2026, classPrices, 2026);
   // Prioriza avançar 1 série a partir da turma atual (2026) do aluno — só
   // cai pra cálculo puro por idade se ele for realmente novo (sem matrícula
   // anterior) ou a série seguinte não existir na tabela de 2027.

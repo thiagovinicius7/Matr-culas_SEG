@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, getNextYearClass } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, getNextYearClass, normalizeClassId } from '../data';
 import { Sprout, CheckCircle, HelpCircle, XCircle, Send, Calendar, Clock, DollarSign, Check, Heart, ShieldCheck, Sparkles, MessageSquare, Utensils } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -39,7 +39,13 @@ export default function ParentCartaPortal({
   const age2026 = calculateAgeAtCutoff(student.nascimento, 2026);
   const age2027 = calculateAgeAtCutoff(student.nascimento, 2027);
 
-  const class2026 = getRegularClassForAgeDynamic(age2026, classPrices, 2026);
+  // Turma atual (2026) real do aluno — usa a matrícula de verdade
+  // (enrollment.turmaRegularId), não recalcula pela idade.
+  const class2026FromEnrollment = enrollment && enrollment.turmaRegularId && enrollment.turmaRegularId !== 'sem_regular'
+    ? (classPrices.find(c => (c.ano || 2026) === 2026 && normalizeClassId(c.id) === normalizeClassId(enrollment.turmaRegularId))
+      || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(enrollment.turmaRegularId)))
+    : undefined;
+  const class2026 = class2026FromEnrollment || getRegularClassForAgeDynamic(age2026, classPrices, 2026);
   // Prioriza avançar 1 série a partir da turma atual (2026) do aluno — só
   // cai pra cálculo puro por idade se ele for realmente novo ou a série
   // seguinte não existir na tabela de 2027.

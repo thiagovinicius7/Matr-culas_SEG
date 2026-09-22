@@ -124,36 +124,16 @@ export function getNextYearClass(
   const ageInTargetYear = calculateAgeAtCutoff(student.nascimento, targetYear);
   const fallback = getRegularClassForAgeDynamic(ageInTargetYear, classPricesList, targetYear);
 
-  // DIAGNÓSTICO TEMPORÁRIO nº2 — remover depois de resolver de vez.
-  // eslint-disable-next-line no-console
-  console.warn('[getNextYearClass v2]', {
-    aluno: student.nome,
-    currentEnrollmentAno: currentEnrollment?.ano,
-    currentEnrollmentId: currentEnrollment?.id,
-    currentEnrollmentTurmaRegularId: currentEnrollment?.turmaRegularId,
-    targetYear,
-    ageInTargetYear,
-  });
-
   if (!currentEnrollment || !currentEnrollment.turmaRegularId || currentEnrollment.turmaRegularId === 'sem_regular') {
-    console.warn('[getNextYearClass v2] sem currentEnrollment válido, usando fallback por idade:', fallback.nome);
     return fallback;
   }
 
   const fromYear = currentEnrollment.ano;
   const fromYearClasses = classPricesList.filter(c => (c.ano || 2026) === fromYear);
-  const matchNoAnoCerto = fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId));
-  const matchEmQualquerAno = classPricesList.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId));
-  const currentClassDetails = matchNoAnoCerto || matchEmQualquerAno
+  const currentClassDetails =
+    fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
+    || classPricesList.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
     || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId));
-
-  console.warn('[getNextYearClass v2] busca da turma atual:', {
-    turmaRegularIdBuscado: currentEnrollment.turmaRegularId,
-    turmaRegularIdNormalizado: normalizeClassId(currentEnrollment.turmaRegularId),
-    fromYearTodasAsTurmas: fromYearClasses.map(c => `${c.nome} — id: ${c.id} (norm: ${normalizeClassId(c.id)}, idadeRef: ${c.idadeRef})`),
-    achouNoAnoCerto: matchNoAnoCerto ? `${matchNoAnoCerto.nome} (idadeRef ${matchNoAnoCerto.idadeRef}, ano ${matchNoAnoCerto.ano})` : 'NÃO ACHOU no ano certo',
-    achouEmQualquerAno: matchEmQualquerAno ? `${matchEmQualquerAno.nome} (idadeRef ${matchEmQualquerAno.idadeRef}, ano ${matchEmQualquerAno.ano})` : 'não achou em nenhum ano',
-  });
 
   if (!currentClassDetails) return fallback;
 
@@ -161,8 +141,6 @@ export function getNextYearClass(
   const nextByProgression =
     targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1)
     || targetYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => rc.idadeRef === currentClassDetails.idadeRef + 1)?.nome || '').trim().toLowerCase());
-
-  console.warn('[getNextYearClass v2] resultado final:', nextByProgression ? nextByProgression.nome : `fallback (${fallback.nome})`);
 
   return nextByProgression || fallback;
 }
