@@ -316,7 +316,7 @@ export default function ParentCartaPortal({
                     </span>
                   </div>
 
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {(['01', '05', '10', '15', '20'] as const).map(dia => {
                       const isSelected = diaVencimento === dia;
                       return (

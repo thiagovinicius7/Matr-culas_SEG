@@ -245,7 +245,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                 className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-green-light focus:outline-none"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-500">Data de nascimento</label>
                 <input
@@ -303,7 +303,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                   value={r.nome} onChange={(e) => updateResponsavel(idx, 'nome', e.target.value)}
                   className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                 />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <select
                     value={r.parentesco} onChange={(e) => updateResponsavel(idx, 'parentesco', e.target.value)}
                     className="text-xs px-2 py-1.5 rounded-md border border-slate-200 bg-white"
@@ -331,7 +331,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                     className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
                   />
                 )}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
                     type="email" placeholder="E-mail" required value={r.email}
                     onChange={(e) => updateResponsavel(idx, 'email', e.target.value)}
@@ -351,7 +351,7 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                     <option value="Outro">Outro</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="space-y-0.5">
                     <label className="text-[9px] font-bold text-slate-400 block">CPF</label>
                     <input

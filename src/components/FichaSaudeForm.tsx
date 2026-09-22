@@ -316,7 +316,7 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
                 <div key={tipo} className="bg-slate-50 rounded-md p-2.5 space-y-1.5">
                   <CheckboxRow label={tipo} checked={acompAtivos.includes(tipo)} onChange={() => toggleAcomp(tipo)} />
                   {acompAtivos.includes(tipo) && (
-                    <div className="grid grid-cols-2 gap-2 pl-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
                       {tipo === 'Outros' && (
                         <input type="text" placeholder="Qual?" value={acompDados[tipo]?.qual || ''} onChange={(e) => updateAcompDado(tipo, 'qual', e.target.value)}
                           className="col-span-2 text-xs px-2 py-1.5 rounded-md border border-slate-200" />
@@ -349,7 +349,7 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
               <input type="text" placeholder="Outros" value={condicoesOutras} onChange={(e) => setCondicoesOutras(e.target.value)}
                 className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-500">Lateralidade</label>
                 <select value={lateralidade} onChange={(e) => setLateralidade(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200">
@@ -368,11 +368,11 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
               </div>
             </div>
             <p className="text-[11px] font-bold text-slate-500 pt-1">Informações da gestação e desenvolvimento</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <TextField label="Gestação (nº de semanas)" value={gestacaoSemanas} onChange={setGestacaoSemanas} />
               <TextField label="Idade da 1ª dentição" value={idade1aDenticao} onChange={setIdade1aDenticao} />
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <TextField label="Idade que sentou" value={idadeSentou} onChange={setIdadeSentou} />
               <TextField label="Idade que engatinhou" value={idadeEngatinhou} onChange={setIdadeEngatinhou} />
               <TextField label="Idade que andou" value={idadeAndou} onChange={setIdadeAndou} />
@@ -389,32 +389,32 @@ export default function FichaSaudeForm({ student, existingFicha, onSubmit }: Fic
             <p className="text-[11px] text-slate-500">Em caso de emergência, não localizando os pais, contatar:</p>
             <div className="bg-slate-50 rounded-md p-3 space-y-2">
               <p className="text-[10px] font-bold text-slate-500 uppercase">Contato de emergência 1</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <TextField label="Nome" value={ce1Nome} onChange={setCe1Nome} />
                 <TextField label="RG" value={ce1RG} onChange={setCe1RG} />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <TextField label="Telefone" value={ce1Telefone} onChange={setCe1Telefone} />
                 <TextField label="Parentesco" value={ce1Parentesco} onChange={setCe1Parentesco} />
               </div>
             </div>
             <div className="bg-slate-50 rounded-md p-3 space-y-2">
               <p className="text-[10px] font-bold text-slate-500 uppercase">Contato de emergência 2 (opcional)</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <TextField label="Nome" value={ce2Nome} onChange={setCe2Nome} />
                 <TextField label="RG" value={ce2RG} onChange={setCe2RG} />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <TextField label="Telefone" value={ce2Telefone} onChange={setCe2Telefone} />
                 <TextField label="Parentesco" value={ce2Parentesco} onChange={setCe2Parentesco} />
               </div>
             </div>
             <p className="text-[11px] text-slate-500 pt-1">Em caso de necessidade, remover para:</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <TextField label="Hospital / Clínica — telefone" value={hospitalTelefone} onChange={setHospitalTelefone} />
               <TextField label="Endereço" value={hospitalEndereco} onChange={setHospitalEndereco} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-500">Médico do aluno</label>
                 <select value={medicoTipo} onChange={(e) => setMedicoTipo(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200">
