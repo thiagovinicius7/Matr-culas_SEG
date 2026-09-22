@@ -67,8 +67,6 @@ export default function Dashboard({
   } | null>(null);
   const [modalSearch, setModalSearch] = useState('');
   const [selectedFaseForModal, setSelectedFaseForModal] = useState<{ label: string; emoji: string; alunoIds: string[] } | null>(null);
-  const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
-  const [targetRolloverYear, setTargetRolloverYear] = useState<number>(activeYear === 2026 ? 2027 : activeYear + 1);
   const [isProcessingRollover, setIsProcessingRollover] = useState(false);
 
   // Helper to accurately resolve effective regular class for any student in activeYear
@@ -243,19 +241,6 @@ export default function Dashboard({
 
   const contraturnoOnlyCount = studentCountByClassId['sem_regular'] || 0;
 
-  const handleConfirmRollover = async () => {
-    if (!onAdvanceSchoolYear) return;
-    try {
-      setIsProcessingRollover(true);
-      await onAdvanceSchoolYear(activeYear, targetRolloverYear);
-      setIsRolloverModalOpen(false);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsProcessingRollover(false);
-    }
-  };
-
   return (
     <div className="space-y-6" id="dashboard-container">
       {/* Top Banner: Ano Letivo Ativo & Ação de Virada de Ano */}
@@ -267,19 +252,34 @@ export default function Dashboard({
               Ano Letivo Ativo: {activeYear}
             </span>
 
-            {/* Quick selector of available years */}
+            {/* Quick selector of available years — trocar de ano já garante
+                (por trás dos panos, sem perguntar nada) que todo aluno ativo
+                tenha uma matrícula criada nesse ano, controlando as vagas */}
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200">
               {availableYears.map(yr => (
                 <button
                   key={yr}
-                  onClick={() => onSelectActiveYear?.(yr)}
-                  className={`px-2.5 py-0.5 text-xs font-bold rounded cursor-pointer transition-all ${
+                  disabled={isProcessingRollover}
+                  onClick={async () => {
+                    if (yr > activeYear && onAdvanceSchoolYear) {
+                      setIsProcessingRollover(true);
+                      try {
+                        await onAdvanceSchoolYear(activeYear, yr);
+                      } catch (err) {
+                        console.error(err);
+                      } finally {
+                        setIsProcessingRollover(false);
+                      }
+                    }
+                    onSelectActiveYear?.(yr);
+                  }}
+                  className={`px-2.5 py-0.5 text-xs font-bold rounded cursor-pointer transition-all disabled:opacity-50 disabled:cursor-wait ${
                     activeYear === yr 
                       ? 'bg-brand-green-dark text-white shadow-2xs' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                   }`}
                 >
-                  {yr}
+                  {isProcessingRollover && yr !== activeYear ? '...' : yr}
                 </button>
               ))}
             </div>
@@ -287,21 +287,6 @@ export default function Dashboard({
           <p className="text-xs text-slate-500 font-sans">
             Todos os cálculos, status de rematrícula, progressão de turmas e faturamento refletem o ciclo <strong>{activeYear}</strong>.
           </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            onClick={() => {
-              setTargetRolloverYear(activeYear === 2026 ? 2027 : activeYear + 1);
-              setIsRolloverModalOpen(true);
-            }}
-            className="px-4 py-2 bg-gradient-to-r from-amber-500 to-brand-orange hover:from-amber-600 hover:to-brand-orange-hover text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer font-display"
-            title="Mudar o ano letivo para iniciar o ciclo de rematrículas para o próximo ano"
-          >
-            <Sparkles size={15} className="animate-spin-slow" />
-            <span>Virar Ano Letivo / Iniciar Ciclo {activeYear === 2026 ? 2027 : activeYear + 1}</span>
-            <ArrowRightCircle size={15} />
-          </button>
         </div>
       </div>
 
@@ -1068,121 +1053,6 @@ export default function Dashboard({
                     </button>
                   );
                 })}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* MODAL DE VIRADA DE ANO LETIVO / REMATRÍCULA */}
-      <AnimatePresence>
-        {isRolloverModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white rounded-xl shadow-2xl max-w-xl w-full flex flex-col overflow-hidden border border-slate-200"
-            >
-              {/* Modal Header */}
-              <div className="p-5 bg-gradient-to-r from-brand-green-dark to-emerald-900 text-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-brand-orange text-white rounded-xl shadow-xs">
-                    <Sparkles size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-white">
-                      Virada do Ano Letivo • Iniciar Ciclo {targetRolloverYear}
-                    </h3>
-                    <p className="text-xs text-emerald-200">
-                      Preparação em massa para a campanha de rematrículas {targetRolloverYear}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsRolloverModalOpen(false)}
-                  disabled={isProcessingRollover}
-                  className="p-1.5 text-emerald-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Modal Content */}
-              <div className="p-6 space-y-4 text-xs text-slate-700 font-sans">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 space-y-1.5 text-amber-900">
-                  <h4 className="font-bold text-sm flex items-center gap-2 text-amber-950 font-display">
-                    <AlertTriangle size={16} className="text-amber-600 shrink-0" />
-                    Como funciona a transição para {targetRolloverYear}:
-                  </h4>
-                  <ul className="space-y-1.5 list-disc pl-4 text-xs leading-relaxed text-amber-900/90">
-                    <li>
-                      <strong>Status Reiniciado:</strong> Todas as matrículas migrarão para o ano <strong>{targetRolloverYear}</strong> com status <strong>"Pendente"</strong>.
-                    </li>
-                    <li>
-                      <strong>Progressão Automática de Turmas:</strong> As turmas regulares dos alunos avançam automaticamente para a colmeia seguinte com base na idade de corte (31/03/{targetRolloverYear}).
-                    </li>
-                    <li>
-                      <strong>Preservação de Acordos e Descontos:</strong> Os descontos em reais/%, opções de lanche/almoço e dia de vencimento são preservados como base para que a gestão possa renegociar.
-                    </li>
-                    <li>
-                      <strong>Escala de Contraturno em Amarelo:</strong> Na escala semanal e na matriz geral, as crianças serão destacadas em amarelo com selo <em>"Rematrícula {targetRolloverYear} Pendente"</em> até que o acordo seja confirmado.
-                    </li>
-                    <li>
-                      <strong>Histórico Preservado:</strong> Todos os dados de {activeYear} permanecem guardados e você poderá alternar entre os anos a qualquer momento.
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <label className="font-bold text-slate-800 block text-xs">
-                    Confirmar Ano de Destino:
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <select
-                      value={targetRolloverYear}
-                      onChange={(e) => setTargetRolloverYear(parseInt(e.target.value, 10))}
-                      disabled={isProcessingRollover}
-                      className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-brand-orange"
-                    >
-                      <option value={2027}>Ano Letivo 2027</option>
-                      <option value={2028}>Ano Letivo 2028</option>
-                    </select>
-                    <span className="text-slate-500 text-[11px]">
-                      {activeStudentsCount} alunos ativos serão processados.
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsRolloverModalOpen(false)}
-                  disabled={isProcessingRollover}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmRollover}
-                  disabled={isProcessingRollover}
-                  className="px-5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer font-display disabled:opacity-50"
-                >
-                  {isProcessingRollover ? (
-                    <>
-                      <RotateCw size={14} className="animate-spin" />
-                      <span>Processando Rematrículas...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={14} />
-                      <span>Iniciar Ciclo {targetRolloverYear}</span>
-                    </>
-                  )}
-                </button>
               </div>
             </motion.div>
           </div>
