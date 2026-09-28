@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, getNextYearClass, normalizeClassId } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO } from '../data';
 import { Sprout, CheckCircle, HelpCircle, XCircle, Send, Calendar, Clock, DollarSign, Check, Heart, ShieldCheck, Sparkles, MessageSquare, Utensils } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -11,7 +11,7 @@ interface ParentCartaPortalProps {
   activeContraturno?: ContraturnoSegment;
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
-  onSaveResponse: (updatedEnrollment: Enrollment) => void;
+  onSaveResponse: (updatedEnrollment: Enrollment) => void | Promise<void>;
   onBackToAdmin?: () => void;
 }
 
@@ -152,9 +152,12 @@ export default function ParentCartaPortal({
 
   const totalCalculado = Number(valorRegularProposto) + valorContraturno + lancheVal + almocoVal;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [enviando, setEnviando] = useState(false);
+  const [erroEnvio, setErroEnvio] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!enrollment) return;
+    if (!enrollment || enviando) return;
 
     let mappedStatus: Enrollment['statusNegociacao'] = 'Confirmada';
     if (statusIntencao === 'Em Análise') mappedStatus = 'Em Negociação';
@@ -183,8 +186,17 @@ export default function ParentCartaPortal({
       dataIntencao2027: new Date().toISOString().split('T')[0]
     };
 
-    onSaveResponse(updated);
-    setSubmitted(true);
+    setErroEnvio('');
+    setEnviando(true);
+    try {
+      // Só mostra "enviado" depois que o banco confirmar a gravação
+      await onSaveResponse(updated);
+      setSubmitted(true);
+    } catch {
+      setErroEnvio('Não conseguimos registrar sua resposta agora. Verifique sua internet e toque em "Enviar Resposta da Família" novamente. Se continuar, avise a escola.');
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -332,11 +344,27 @@ export default function ParentCartaPortal({
                           }`}
                         >
                           Dia {dia}
+                          {dia === DIA_VENCIMENTO_PADRAO && (
+                            <span className={`ml-1 text-[9px] font-bold ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>padrão</span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 </div>
+
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  O <strong>dia {DIA_VENCIMENTO_PADRAO}</strong> é o vencimento padrão da escola. Mantê-lo ajuda a escola a organizar seus compromissos financeiros.
+                </p>
+
+                {enrollment?.descontoPontualidadeAtivo2027 && (
+                  <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2 leading-snug flex items-start gap-1.5">
+                    <Sparkles size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Desconto por pontualidade:</strong> o desconto de 3% é concedido para pagamentos realizados até <strong>5 dias antes do vencimento</strong>.
+                    </span>
+                  </p>
+                )}
 
               </div>
 
@@ -430,7 +458,7 @@ export default function ParentCartaPortal({
                   <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-extrabold text-emerald-950">Desconto por Pontualidade: </span>
-                    Pagando a mensalidade regular até o <strong>dia {diaVencimento}</strong> de cada mês, vocês têm <strong>3% de desconto</strong> nela — de R$ {Number(valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para R$ {(Number(valorRegularProposto) * 0.97).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês.
+                    Pagando a mensalidade regular até <strong>5 dias antes do vencimento</strong> (dia {diaVencimento}), vocês têm <strong>3% de desconto</strong> nela — de R$ {Number(valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} para R$ {valorComPontualidade(Number(valorRegularProposto)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês.
                   </div>
                 </div>
               )}
@@ -451,7 +479,7 @@ export default function ParentCartaPortal({
                         R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
                       </span>
                       <span className="text-xl font-black text-brand-orange font-display">
-                        R$ {(totalCalculado - Number(valorRegularProposto) * 0.03).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs font-semibold text-emerald-200">com pontualidade</span>
+                        R$ {(totalCalculado - (Number(valorRegularProposto) - valorComPontualidade(Number(valorRegularProposto)))).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-semibold text-emerald-200">com pontualidade</span>
                       </span>
                     </div>
                   ) : (
@@ -560,12 +588,16 @@ export default function ParentCartaPortal({
 
             {/* Submit Button */}
             <div className="pt-2 print:hidden">
+              {erroEnvio && (
+                <p className="mb-2 p-2.5 text-xs font-semibold text-rose-800 bg-rose-50 border border-rose-200 rounded-lg">{erroEnvio}</p>
+              )}
               <button
                 type="submit"
-                className="w-full py-3.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-sm font-bold font-display uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                disabled={enviando}
+                className="w-full py-3.5 bg-brand-orange hover:bg-brand-orange-hover disabled:opacity-60 disabled:cursor-wait text-white text-sm font-bold font-display uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Send size={18} />
-                Enviar Resposta da Família
+                {enviando ? 'Enviando…' : 'Enviar Resposta da Família'}
               </button>
             </div>
 

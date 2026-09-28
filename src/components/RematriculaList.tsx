@@ -17,7 +17,7 @@ interface RematriculaListProps {
   onUpdateEnrollmentStatus: (alunoId: string, status: Enrollment['statusNegociacao']) => void;
   onUpdateEnrollmentNotes: (alunoId: string, notes: string) => void;
   onUpdateEnrollmentDiscounts: (alunoId: string, discountRegular: number, discountContraturno: number) => void;
-  onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void;
+  onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void | Promise<void>;
 }
 
 export default function RematriculaList({
@@ -589,11 +589,7 @@ export default function RematriculaList({
                   activeContraturno={ct}
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
-                  onSave={(updatedEn, logMov) => {
-                    if (onSaveEnrollment) {
-                      onSaveEnrollment(updatedEn, logMov);
-                    }
-                  }}
+                  onSave={(updatedEn, logMov) => (onSaveEnrollment ? onSaveEnrollment(updatedEn, logMov) : undefined)}
                   onClose={() => setActiveCartaStudentId(null)}
                 />
               </div>

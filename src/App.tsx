@@ -1294,7 +1294,7 @@ export default function App() {
   };
 
   // Handler: Save or update full enrollment record (e.g. Carta de Intenção 2027 data)
-  const handleSaveEnrollment = (updatedEnrollment: Enrollment, logMovement: boolean = false) => {
+  const handleSaveEnrollment = (updatedEnrollment: Enrollment, logMovement: boolean = false): Promise<void> => {
     setEnrollments(prev => {
       const exists = prev.some(e => e.id === updatedEnrollment.id);
       if (exists) {
@@ -1303,7 +1303,20 @@ export default function App() {
       return [...prev, updatedEnrollment];
     });
 
-    saveDocument('enrollments', updatedEnrollment);
+    // A gravação no banco leva um instante (e pode falhar: internet, limite de uso
+    // do Firestore etc.). Guardamos a promessa pra quem chamou poder ESPERAR a
+    // confirmação (ex.: abrir a visão dos pais só depois de gravado) e avisamos
+    // "salvo" apenas quando o banco realmente confirmou — antes o aviso vinha na
+    // hora, mesmo se a gravação falhasse sem ninguém saber.
+    const gravacao = saveDocument('enrollments', updatedEnrollment);
+    gravacao
+      .then(() => showToast('Intenção Salva!', 'A Carta de Intenção de Rematrícula 2027 foi gravada no banco de dados.', 'success'))
+      .catch(() => showToast(
+        'NÃO foi gravado no banco',
+        'A alteração aparece só nesta tela e some ao recarregar. Confira a internet e o limite de uso do Firestore e salve de novo.',
+        'error',
+        10000
+      ));
 
     // Assim que a Carta de Intenção de Rematrícula é respondida (qualquer
     // resposta — Confirmada, Em Análise ou Não Renovará), cria automaticamente
@@ -1376,7 +1389,7 @@ export default function App() {
       saveDocument('movements', movement);
     }
 
-    showToast('Intenção Salva!', 'A Carta de Intenção de Rematrícula 2027 foi gravada com sucesso no Firebase.', 'success');
+    return gravacao;
   };
 
   // Handler: Save global pricing configurations

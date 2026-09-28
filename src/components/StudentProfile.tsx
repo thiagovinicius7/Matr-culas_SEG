@@ -31,7 +31,7 @@ interface StudentProfileProps {
   onUpdateEnrollmentClass: (alunoId: string, turmaRegularId: string) => void;
   onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
   onUpdateContraturnoDays?: (alunoId: string, segmentId: string, newDays: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[]) => void;
-  onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void;
+  onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void | Promise<void>;
   onConfirmNegotiation?: (
     alunoId: string,
     enrollmentData: Omit<Enrollment, 'id' | 'alunoId'>,
@@ -2688,10 +2688,9 @@ export default function StudentProfile({
                 classPrices={classPrices}
                 contraturnoPrices={contraturnoPrices}
                 onSave={(updatedEn, logMov, manterAberto) => {
-                  if (onSaveEnrollment) {
-                    onSaveEnrollment(updatedEn, logMov);
-                  }
+                  const gravacao = onSaveEnrollment ? onSaveEnrollment(updatedEn, logMov) : undefined;
                   if (!manterAberto) setShowCartaModal(false);
+                  return gravacao;
                 }}
                 onClose={() => setShowCartaModal(false)}
               />

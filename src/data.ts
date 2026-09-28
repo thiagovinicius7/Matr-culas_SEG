@@ -617,3 +617,14 @@ export function getEnrollmentBaseDaCarta(
   const pool = comDados.length > 0 ? comDados : candidatos;
   return [...pool].sort((a, b) => b.ano - a.ano)[0];
 }
+
+/** Vencimento padrão da escola (dia do mês) — ajuda nos compromissos financeiros da escola. */
+export const DIA_VENCIMENTO_PADRAO = '05' as const;
+
+/** Desconto de pontualidade: 3% na mensalidade REGULAR, para pagamento até 5 dias antes do vencimento. */
+export const DESCONTO_PONTUALIDADE_PERCENTUAL = 3;
+
+/** Valor da regular já com o desconto de pontualidade, arredondado em centavos (ex.: 1906,50 -> 1849,31). */
+export function valorComPontualidade(valorRegular: number): number {
+  return Math.round(Number(valorRegular || 0) * (100 - DESCONTO_PONTUALIDADE_PERCENTUAL)) / 100;
+}

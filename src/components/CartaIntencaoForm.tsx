@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO } from '../data';
 import { FileText, Save, Printer, Share2, MessageCircle, Calendar, Clock, DollarSign, UserCheck, AlertCircle, CheckCircle, HelpCircle, XCircle, Edit3, ArrowRight, ShieldCheck, Sparkles, Check, ChevronDown, Link2, ExternalLink, Utensils } from 'lucide-react';
 
 interface CartaIntencaoFormProps {
@@ -10,7 +10,7 @@ interface CartaIntencaoFormProps {
   activeContraturno?: ContraturnoSegment;
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
-  onSave: (updatedEnrollment: Enrollment, logMovement?: boolean, manterAberto?: boolean) => void;
+  onSave: (updatedEnrollment: Enrollment, logMovement?: boolean, manterAberto?: boolean) => void | Promise<void>;
   onClose?: () => void;
   onOpenParentPortal?: (studentId: string) => void;
 }
@@ -233,8 +233,8 @@ export default function CartaIntencaoForm({
 
   // Salva a carta. novoEnvio: undefined = mantém o controle de envio como está;
   // string = registra novo envio; null = desmarca o envio.
-  const salvar = (novoEnvio?: string | null, logMovimento: boolean = true, manterAberto: boolean = false) => {
-    if (!enrollment) return;
+  const salvar = (novoEnvio?: string | null, logMovimento: boolean = true, manterAberto: boolean = false): Promise<void> => {
+    if (!enrollment) return Promise.resolve();
     const enviadaEm = novoEnvio === undefined ? cartaEnviadaEm : (novoEnvio || undefined);
 
     // Sync negotiation status
@@ -265,41 +265,53 @@ export default function CartaIntencaoForm({
       dataIntencao2027: new Date().toISOString().split('T')[0]
     };
 
-    onSave(updated, logMovimento, manterAberto);
+    const gravacao = onSave(updated, logMovimento, manterAberto);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
+    // Devolve a promessa da gravação: quem precisa da confirmação do banco
+    // (ex.: abrir a visão dos pais) espera por ela.
+    return Promise.resolve(gravacao);
   };
 
   // Botão "Salvar Intenção no Sistema": salva sem mexer no controle de envio
-  const handleSaveForm = () => salvar();
+  const handleSaveForm = () => { void salvar().catch(() => {}); };
 
-  // Testar a visão dos pais: a tela deles lê do BANCO, então salva antes de
-  // abrir (senão eles veem o valor antigo / o padrão, e não o que a equipe
-  // acabou de definir — ex.: lanche com desconto). Mantém a carta aberta pra
-  // dar pra ajustar e testar de novo, e não gera lançamento financeiro.
-  const abrirVisaoDosPais = () => {
-    salvar(undefined, false, true);
+  // Testar a visão dos pais: a tela deles lê do BANCO, então salva antes de abrir
+  // e ESPERA o banco confirmar a gravação (antes abria após um tempo fixo e, se a
+  // gravação demorasse mais, os pais viam o valor antigo/cheio). Mantém a carta
+  // aberta pra dar pra ajustar e testar de novo, e não gera lançamento financeiro.
+  const abrirVisaoDosPais = async () => {
     if (onOpenParentPortal) {
+      // Navegação dentro do próprio app: usa os dados em memória, já atualizados
+      await salvar(undefined, false, true).catch(() => {});
       onOpenParentPortal(student.id);
       return;
     }
     // Abre a aba na hora (evita bloqueio de pop-up) e só carrega a página dos
-    // pais um instante depois, com o dado já gravado.
+    // pais depois que o banco confirmar a gravação.
     const aba = window.open('', '_blank');
+    const escreverNaAba = (html: string) => {
+      try {
+        aba?.document.open();
+        aba?.document.write(`<p style="font-family:sans-serif;padding:24px;color:#334155;line-height:1.5">${html}</p>`);
+        aba?.document.close();
+      } catch { /* ignora */ }
+    };
+    escreverNaAba('Salvando a carta e abrindo a visão dos pais…');
     try {
-      aba?.document.write('<p style="font-family:sans-serif;padding:24px;color:#334155">Salvando a carta e abrindo a visão dos pais…</p>');
-    } catch { /* ignora */ }
-    setTimeout(() => {
+      await salvar(undefined, false, true);
       if (aba && !aba.closed) aba.location.href = parentUrl;
       else window.open(parentUrl, '_blank');
-    }, 1500);
+    } catch {
+      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados.</strong><br/>Feche esta aba, confira a internet e tente de novo. Enquanto não gravar, a família não vê as alterações.');
+    }
   };
 
   // Copiar link / enviar no WhatsApp: salva e registra o envio na hora
   const marcarEnvioESalvar = () => {
     const agora = new Date().toISOString();
     setCartaEnviadaEm(agora);
-    salvar(agora);
+    salvar(agora).catch(() => {});
   };
 
   // Marcar/desmarcar à mão (ex.: cartas que já tinham sido mandadas antes
@@ -307,11 +319,11 @@ export default function CartaIntencaoForm({
   const alternarEnvioManual = () => {
     if (cartaEnviadaEm) {
       setCartaEnviadaEm(undefined);
-      salvar(null, false);
+      salvar(null, false).catch(() => {});
     } else {
       const agora = new Date().toISOString();
       setCartaEnviadaEm(agora);
-      salvar(agora, false);
+      salvar(agora, false).catch(() => {});
     }
   };
 
@@ -636,6 +648,9 @@ export default function CartaIntencaoForm({
                       </button>
                     ))}
                   </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Dia {DIA_VENCIMENTO_PADRAO} é o vencimento padrão da escola — manter essa data ajuda nos compromissos financeiros da escola.
+                  </p>
                 </div>
 
                 {/* Desconto por Pontualidade — 3% fixo, só regular, só a equipe decide */}
@@ -654,7 +669,7 @@ export default function CartaIntencaoForm({
                   </label>
                   <p className="text-[10px] text-slate-400 mt-1">
                     Essa opção é só da equipe — se você não marcar aqui, a família não vê nem pode escolher isso na carta dela.
-                    {descontoPontualidadeAtivo && ` Com 3% de desconto: R$ ${(valorProposto2027 * 0.97).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês na regular, pagando até o dia ${diaVencimento}.`}
+                    {descontoPontualidadeAtivo && ` Com 3% de desconto: R$ ${valorComPontualidade(valorProposto2027).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês na regular, para pagamento até 5 dias antes do vencimento (dia ${diaVencimento}).`}
                   </p>
                 </div>
 
