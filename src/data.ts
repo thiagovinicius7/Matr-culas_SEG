@@ -628,3 +628,20 @@ export const DESCONTO_PONTUALIDADE_PERCENTUAL = 3;
 export function valorComPontualidade(valorRegular: number): number {
   return Math.round(Number(valorRegular || 0) * (100 - DESCONTO_PONTUALIDADE_PERCENTUAL)) / 100;
 }
+
+/**
+ * Roda uma promessa com um limite de tempo. Gravações no Firestore normalmente
+ * resolvem (sucesso) ou rejeitam (erro) rápido, mas numa rede ruim ou com
+ * alguma extensão de navegador bloqueando a conexão, a promessa pode ficar
+ * PENDURADA — nunca resolve nem rejeita — e sem isso a tela fica travada em
+ * "Salvando…" pra sempre, sem nenhum aviso. Com o limite, o erro aparece.
+ */
+export function comLimiteDeTempo<T>(promessa: Promise<T>, ms: number, mensagem: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(mensagem)), ms);
+    promessa.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO, comLimiteDeTempo } from '../data';
 import { FileText, Save, Printer, Share2, MessageCircle, Calendar, Clock, DollarSign, UserCheck, AlertCircle, CheckCircle, HelpCircle, XCircle, Edit3, ArrowRight, ShieldCheck, Sparkles, Check, ChevronDown, Link2, ExternalLink, Utensils } from 'lucide-react';
 
 interface CartaIntencaoFormProps {
@@ -196,6 +196,7 @@ export default function CartaIntencaoForm({
   const [isCopied, setIsCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   // Controle de envio: guarda quando a equipe copiou o link / enviou no WhatsApp,
   // pra saber (no Painel, na Lista de Trabalho e na Ficha) quem já recebeu a carta.
@@ -266,11 +267,21 @@ export default function CartaIntencaoForm({
     };
 
     const gravacao = onSave(updated, logMovimento, manterAberto);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
     // Devolve a promessa da gravação: quem precisa da confirmação do banco
-    // (ex.: abrir a visão dos pais) espera por ela.
-    return Promise.resolve(gravacao);
+    // (ex.: abrir a visão dos pais) espera por ela. O indicador "salvo" só
+    // acende depois que o banco confirmar — antes acendia na hora, mesmo se
+    // a gravação estivesse demorando ou tivesse falhado. Limite de 8s: numa
+    // rede ruim a gravação pode nunca resolver nem falhar sozinha.
+    const promessa = comLimiteDeTempo(Promise.resolve(gravacao), 8000, 'Tempo esgotado gravando no banco de dados.');
+    setSaveError(false);
+    promessa.then(() => {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    }).catch(() => {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 6000);
+    });
+    return promessa;
   };
 
   // Botão "Salvar Intenção no Sistema": salva sem mexer no controle de envio
@@ -299,11 +310,13 @@ export default function CartaIntencaoForm({
     };
     escreverNaAba('Salvando a carta e abrindo a visão dos pais…');
     try {
+      // salvar() já tem limite de tempo embutido — sem isso, numa rede ruim a
+      // gravação podia nunca resolver nem falhar, travando a aba em "Salvando…".
       await salvar(undefined, false, true);
       if (aba && !aba.closed) aba.location.href = parentUrl;
       else window.open(parentUrl, '_blank');
     } catch {
-      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados.</strong><br/>Feche esta aba, confira a internet e tente de novo. Enquanto não gravar, a família não vê as alterações.');
+      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados</strong> (a gravação demorou demais ou falhou).<br/>Feche esta aba, confira sua internet e tente de novo clicando no botão da carta. Enquanto não gravar, a família não vê as alterações.');
     }
   };
 
@@ -1026,6 +1039,11 @@ export default function CartaIntencaoForm({
             {saveSuccess && (
               <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                 <CheckCircle size={16} /> Salvo no sistema!
+              </span>
+            )}
+            {saveError && (
+              <span className="text-xs font-bold text-rose-600 flex items-center gap-1">
+                <XCircle size={16} /> Não foi gravado no banco — tente de novo
               </span>
             )}
             <button
