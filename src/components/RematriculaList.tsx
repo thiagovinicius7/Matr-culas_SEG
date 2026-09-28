@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId } from '../data';
+import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CartaIntencaoForm from './CartaIntencaoForm';
@@ -514,8 +514,28 @@ export default function RematriculaList({
                           title="Abrir e Preencher Carta de Intenção de Rematrícula 2027"
                         >
                           <FileText size={12} />
-                          Carta de Intenção 2027
+                          Carta de Intenção {ANO_CARTA_INTENCAO}
                         </button>
+                        {(() => {
+                          // Mesmo estado usado no Painel e na Ficha do Aluno
+                          const carta = getCartaIntencaoInfo(student.id, enrollments);
+                          const dataEnvio = carta.enviadaEm
+                            ? new Date(carta.enviadaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                            : '';
+                          const chip: Record<string, { txt: string; cls: string }> = {
+                            nao_enviada: { txt: 'não enviada', cls: 'bg-slate-100 text-slate-500' },
+                            aguardando: { txt: `enviada ${dataEnvio} · aguardando`, cls: 'bg-sky-50 text-sky-700' },
+                            confirmada: { txt: 'família confirmou', cls: 'bg-emerald-50 text-emerald-700' },
+                            em_analise: { txt: 'em análise', cls: 'bg-amber-50 text-amber-700' },
+                            nao_renova: { txt: 'não renova', cls: 'bg-rose-50 text-rose-700' },
+                          };
+                          const c = chip[carta.estado];
+                          return (
+                            <span className={`mt-1 inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${c.cls}`}>
+                              {c.txt}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>

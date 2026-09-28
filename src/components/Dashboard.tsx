@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Student, Enrollment, ContraturnoSegment, RegularClass, PackDocument, CoordenacaoSugestao } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso } from '../data';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
+import type { CartaEstado } from '../data';
 import { 
   Users, 
   CheckCircle, 
@@ -156,11 +157,22 @@ export default function Dashboard({
   const pending = activeStudentsCount - confirmed - negotiating;
 
   // 2027 Carta de Intenção Metrics (or next year intent)
-  const nextYear = activeYear + 1;
-  const cartasRegistradasNextYear = enrollments.filter(e => e.contraturnoDesejado2027 || e.valorProposto2027 || e.statusIntencao2027).length;
-  const confirmadosNextYear = enrollments.filter(e => e.statusIntencao2027 === 'Confirmada').length;
-  const emAnaliseNextYear = enrollments.filter(e => e.statusIntencao2027 === 'Em Análise').length;
-  const naoRenovaraNextYear = enrollments.filter(e => e.statusIntencao2027 === 'Não Renovará').length;
+  // Carta de Intenção: o ano-alvo é FIXO (ANO_CARTA_INTENCAO), não "ano ativo + 1" —
+  // os campos da carta são todos *2027, então o rótulo tem que dizer 2027 mesmo
+  // quando o ano ativo do Painel estiver em 2027. Conta só alunos ativos, um por
+  // aluno, pela mesma regra usada na Lista de Trabalho e na Ficha do Aluno.
+  const anoCarta = ANO_CARTA_INTENCAO;
+  const cartaPorAluno = activeStudents.map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
+  const idsCarta = (estados: CartaEstado[]) => cartaPorAluno.filter(c => estados.includes(c.estado)).map(c => c.id);
+  const cartaIds = {
+    faltaEnviar: idsCarta(['nao_enviada']),
+    enviadas: idsCarta(['aguardando', 'confirmada', 'em_analise', 'nao_renova']),
+    aguardando: idsCarta(['aguardando']),
+    confirmam: idsCarta(['confirmada']),
+    emAnalise: idsCarta(['em_analise']),
+    naoRenova: idsCarta(['nao_renova']),
+  };
+  const respondidasCarta = cartaIds.confirmam.length + cartaIds.emAnalise.length + cartaIds.naoRenova.length;
 
   const confirmedPct = totalStudentsCount > 0 ? Math.min(100, Math.round((confirmed / totalStudentsCount) * 100)) : 0;
   const negotiatingPct = totalStudentsCount > 0 ? Math.round((negotiating / totalStudentsCount) * 100) : 0;
@@ -692,25 +704,51 @@ export default function Dashboard({
               <div className="flex items-center justify-between text-amber-900 text-xs font-bold font-display uppercase tracking-wider">
                 <span className="flex items-center gap-1.5">
                   <FileText size={14} className="text-amber-600" />
-                  Cartas de Intenção {nextYear}
+                  Cartas de Intenção {anoCarta}
                 </span>
                 <span className="bg-amber-200/80 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-mono">
-                  {cartasRegistradasNextYear} / {totalStudentsCount} Preenchidas
+                  {respondidasCarta} / {activeStudentsCount} Responderam
                 </span>
               </div>
+
+              {/* Envio: quem falta mandar, quem já recebeu e quem ainda não respondeu */}
               <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
-                <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
-                  <span className="block text-[9px] text-slate-500 uppercase font-bold">Confirmam</span>
-                  <span className="text-emerald-700 font-extrabold font-mono text-xs">{confirmadosNextYear}</span>
-                </div>
-                <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
-                  <span className="block text-[9px] text-slate-500 uppercase font-bold">Em Análise</span>
-                  <span className="text-amber-800 font-extrabold font-mono text-xs">{emAnaliseNextYear}</span>
-                </div>
-                <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
-                  <span className="block text-[9px] text-slate-500 uppercase font-bold">Não Renovar</span>
-                  <span className="text-rose-700 font-extrabold font-mono text-xs">{naoRenovaraNextYear}</span>
-                </div>
+                {([
+                  { label: 'Falta enviar', emoji: '📤', ids: cartaIds.faltaEnviar, cor: 'text-slate-700' },
+                  { label: 'Enviadas', emoji: '✉️', ids: cartaIds.enviadas, cor: 'text-sky-700' },
+                  { label: 'Aguardando retorno', emoji: '⏳', ids: cartaIds.aguardando, cor: 'text-amber-800' },
+                ] as const).map(box => (
+                  <button
+                    key={box.label}
+                    type="button"
+                    onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — ${box.label}`, emoji: box.emoji, alunoIds: box.ids })}
+                    className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs cursor-pointer hover:border-brand-orange transition-colors"
+                    title={`Ver os alunos — ${box.label}`}
+                  >
+                    <span className="block text-[9px] text-slate-500 uppercase font-bold leading-tight">{box.label}</span>
+                    <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Respostas da família */}
+              <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
+                {([
+                  { label: 'Confirmam', emoji: '✅', ids: cartaIds.confirmam, cor: 'text-emerald-700' },
+                  { label: 'Em Análise', emoji: '🤔', ids: cartaIds.emAnalise, cor: 'text-amber-800' },
+                  { label: 'Não Renovar', emoji: '👋', ids: cartaIds.naoRenova, cor: 'text-rose-700' },
+                ] as const).map(box => (
+                  <button
+                    key={box.label}
+                    type="button"
+                    onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — ${box.label}`, emoji: box.emoji, alunoIds: box.ids })}
+                    className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs cursor-pointer hover:border-brand-orange transition-colors"
+                    title={`Ver os alunos — ${box.label}`}
+                  >
+                    <span className="block text-[9px] text-slate-500 uppercase font-bold">{box.label}</span>
+                    <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1065,7 +1103,7 @@ export default function Dashboard({
                   <h3 className="font-display font-bold text-sm text-brand-green-dark">
                     {selectedFaseForModal.emoji} {selectedFaseForModal.label}
                   </h3>
-                  <p className="text-[11px] text-slate-500">{selectedFaseForModal.alunoIds.length} alunos nesta fase</p>
+                  <p className="text-[11px] text-slate-500">{selectedFaseForModal.alunoIds.length} aluno(s)</p>
                 </div>
                 <button
                   onClick={() => setSelectedFaseForModal(null)}
@@ -1075,7 +1113,9 @@ export default function Dashboard({
                 </button>
               </div>
               <div className="overflow-y-auto divide-y divide-slate-100">
-                {selectedFaseForModal.alunoIds.map(id => {
+                {[...selectedFaseForModal.alunoIds]
+                  .sort((a, b) => (students.find(x => x.id === a)?.nome || '').localeCompare(students.find(x => x.id === b)?.nome || '', 'pt-BR'))
+                  .map(id => {
                   const st = students.find(s => s.id === id);
                   if (!st) return null;
                   return (

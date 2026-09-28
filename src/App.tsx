@@ -12,6 +12,7 @@ import {
   REGULAR_CLASSES,
   normalizeClassId,
   getNextYearClass,
+  ANO_CARTA_INTENCAO,
   getFaseProcesso
 } from './data';
 import {
@@ -1305,9 +1306,11 @@ export default function App() {
     // pré-matrícula ainda estiver em Preparo da Terra (equipe não mexeu
     // nela ainda), atualiza; se a equipe já avançou a fase, não mexe mais —
     // respeita o trabalho manual já feito.
-    const nextYear = updatedEnrollment.ano + 1;
+    // Ano-alvo FIXO da carta (os campos são todos *2027) — e só a partir de um
+    // registro de ano anterior, pra nunca gerar uma "pré-matrícula 2028" torta.
+    const nextYear = ANO_CARTA_INTENCAO;
     const respostaCarta = updatedEnrollment.statusIntencao2027;
-    if (respostaCarta && respostaCarta !== 'Pendente') {
+    if (respostaCarta && respostaCarta !== 'Pendente' && updatedEnrollment.ano < nextYear) {
       const turmaId = updatedEnrollment.turmaPropostaId2027;
       const turmaDetails = turmaId
         ? (classPrices.find(c => c.id === turmaId && (c.ano || 2026) === nextYear) || classPrices.find(c => c.id === turmaId))
@@ -1557,7 +1560,7 @@ export default function App() {
         'valorProposto2027', 'turmaPropostaId2027', 'contraturnoDesejado2027',
         'diasContraturno2027', 'horarioSaida2027', 'periodoContraturno2027',
         'adicionarLanche2027', 'valorLanche2027', 'adicionarAlmoco2027', 'valorAlmoco2027',
-        'valorContraturnoProposto2027', 'diaVencimento2027', 'descontoPontualidadeAtivo2027',
+        'valorContraturnoProposto2027', 'diaVencimento2027', 'descontoPontualidadeAtivo2027', 'cartaEnviadaEm2027',
         'statusIntencao2027', 'observacoesFamilia2027', 'dataIntencao2027'
       ];
       const baseYearEnrollments = enrollments.filter(e => e.ano === targetYear - 1);

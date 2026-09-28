@@ -197,10 +197,17 @@ export default function CartaIntencaoForm({
   const [linkCopied, setLinkCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Controle de envio: guarda quando a equipe copiou o link / enviou no WhatsApp,
+  // pra saber (no Painel, na Lista de Trabalho e na Ficha) quem já recebeu a carta.
+  const [cartaEnviadaEm, setCartaEnviadaEm] = useState<string | undefined>(enrollment?.cartaEnviadaEm2027);
+
+  const formatarEnvio = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+
   const parentUrl = `${window.location.origin}${window.location.pathname}?alunoId=${student.id}`;
 
   const handleCopyLink = () => {
-    handleSaveForm();
+    marcarEnvioESalvar();
     navigator.clipboard.writeText(parentUrl);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2500);
@@ -224,9 +231,11 @@ export default function CartaIntencaoForm({
   // Total 2027 Estimated
   const total2027 = Number(valorProposto2027 || 0) + Number(valorContraturnoProposto2027 || 0) + lanchePrice2027 + almocoPrice2027;
 
-  // Handle Save
-  const handleSaveForm = () => {
+  // Salva a carta. novoEnvio: undefined = mantém o controle de envio como está;
+  // string = registra novo envio; null = desmarca o envio.
+  const salvar = (novoEnvio?: string | null, logMovimento: boolean = true) => {
     if (!enrollment) return;
+    const enviadaEm = novoEnvio === undefined ? cartaEnviadaEm : (novoEnvio || undefined);
 
     // Sync negotiation status
     let mappedStatus: Enrollment['statusNegociacao'] = enrollment.statusNegociacao;
@@ -251,13 +260,37 @@ export default function CartaIntencaoForm({
       diaVencimento2027: diaVencimento,
       descontoPontualidadeAtivo2027: descontoPontualidadeAtivo,
       statusIntencao2027: statusIntencao,
+      cartaEnviadaEm2027: enviadaEm,
       observacoesFamilia2027: observacoesFamilia,
       dataIntencao2027: new Date().toISOString().split('T')[0]
     };
 
-    onSave(updated, true);
+    onSave(updated, logMovimento);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
+  };
+
+  // Botão "Salvar Intenção no Sistema": salva sem mexer no controle de envio
+  const handleSaveForm = () => salvar();
+
+  // Copiar link / enviar no WhatsApp: salva e registra o envio na hora
+  const marcarEnvioESalvar = () => {
+    const agora = new Date().toISOString();
+    setCartaEnviadaEm(agora);
+    salvar(agora);
+  };
+
+  // Marcar/desmarcar à mão (ex.: cartas que já tinham sido mandadas antes
+  // desse controle existir). Não gera lançamento no histórico financeiro.
+  const alternarEnvioManual = () => {
+    if (cartaEnviadaEm) {
+      setCartaEnviadaEm(undefined);
+      salvar(null, false);
+    } else {
+      const agora = new Date().toISOString();
+      setCartaEnviadaEm(agora);
+      salvar(agora, false);
+    }
   };
 
   // WhatsApp Message Generator
@@ -276,7 +309,7 @@ export default function CartaIntencaoForm({
   };
 
   const handleCopyWhatsApp = () => {
-    handleSaveForm();
+    marcarEnvioESalvar();
     const msg = generateWhatsAppMessage();
     navigator.clipboard.writeText(msg);
     setIsCopied(true);
@@ -874,7 +907,7 @@ export default function CartaIntencaoForm({
                 <span className="font-bold text-xs">Aguardando Retorno</span>
                 <Clock size={16} className={statusIntencao === 'Pendente' ? 'text-white' : 'text-slate-400'} />
               </div>
-              <span className="text-[10px] opacity-80">Ainda não enviou a carta de intenção</span>
+              <span className="text-[10px] opacity-80">Sem resposta da família ainda</span>
             </button>
           </div>
 
@@ -890,6 +923,23 @@ export default function CartaIntencaoForm({
               className="w-full p-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
             />
           </div>
+        </div>
+
+        {/* CONTROLE DE ENVIO DA CARTA */}
+        <div className={`print:hidden flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg border ${cartaEnviadaEm ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+          <div className="text-xs font-bold text-slate-800">
+            {cartaEnviadaEm ? `✅ Carta enviada em ${formatarEnvio(cartaEnviadaEm)}` : '⚪ Carta ainda não enviada'}
+            <span className="block text-[10px] font-normal text-slate-500">
+              Marca sozinho ao copiar o link ou enviar no WhatsApp.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={alternarEnvioManual}
+            className="text-[11px] font-bold text-slate-500 hover:text-slate-800 underline decoration-dotted cursor-pointer"
+          >
+            {cartaEnviadaEm ? 'Desmarcar' : 'Marcar como enviada'}
+          </button>
         </div>
 
         {/* ACTION BUTTONS FOOTER */}

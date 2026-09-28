@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry, FichaSaude, FichaAnamnese } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso } from '../data';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
@@ -218,7 +218,9 @@ export default function StudentProfile({
   // (colheita) uma matrícula alguma vez, ou já tem resposta registrada — um
   // aluno novo ainda em processo de matrícula não deveria ver "rematrícula".
   const jaTeveMatriculaCompleta = activeEnrollments.some(e => getFaseProcesso(e) === 'colheita');
-  const enrollmentComResposta = activeEnrollments.find(e => e.statusIntencao2027 !== undefined);
+  const enrollmentComResposta = activeEnrollments.find(e => e.statusIntencao2027 !== undefined || !!e.cartaEnviadaEm2027);
+  // Estado da carta (enviada? respondida?) — mesma regra do Painel e da Lista de Trabalho
+  const cartaInfo = getCartaIntencaoInfo(activeStudent.id, activeEnrollments);
   const cartaDeIntencaoAplicavel = !!enrollmentComResposta || jaTeveMatriculaCompleta;
   const enrollmentParaIntencao = enrollmentComResposta
     || [...activeEnrollments].sort((a, b) => b.ano - a.ano)[0];
@@ -2274,18 +2276,22 @@ export default function StudentProfile({
                       {cartaDeIntencaoAplicavel && enrollmentParaIntencao && (
                       <li className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-md">
                         <div>
-                          <p className="text-xs font-semibold text-slate-800">Carta de Intenção de Rematrícula {enrollmentParaIntencao.ano + 1}</p>
-                          <p className="text-[10px] text-slate-400">Confirmação de renovação — não cria matrícula nova, só sinaliza intenção até a virada do ano letivo</p>
+                          <p className="text-xs font-semibold text-slate-800">Carta de Intenção de Rematrícula {ANO_CARTA_INTENCAO}</p>
+                          <p className="text-[10px] text-slate-400">Confirmação de renovação — ao ser respondida, a pré-matrícula do ano seguinte é criada automaticamente</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {enrollmentParaIntencao.statusIntencao2027 === 'Confirmada' ? (
+                          {cartaInfo.estado === 'confirmada' ? (
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">confirmada</span>
-                          ) : enrollmentParaIntencao.statusIntencao2027 === 'Não Renovará' ? (
+                          ) : cartaInfo.estado === 'nao_renova' ? (
                             <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">não renovará</span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                              {enrollmentParaIntencao.statusIntencao2027 === 'Em Análise' ? 'em análise' : 'aguardando resposta'}
+                          ) : cartaInfo.estado === 'em_analise' ? (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">em análise</span>
+                          ) : cartaInfo.estado === 'aguardando' ? (
+                            <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full">
+                              enviada {cartaInfo.enviadaEm ? new Date(cartaInfo.enviadaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : ''} · aguardando
                             </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">não enviada</span>
                           )}
                           <button
                             type="button"
@@ -2519,7 +2525,7 @@ export default function StudentProfile({
                     <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-2">
                       <div className="flex items-center justify-between">
                         <h4 className="font-sans font-bold text-slate-800 text-xs uppercase tracking-wider">
-                          📋 Intenção de Rematrícula {enrollmentParaIntencao.ano + 1}
+                          📋 Intenção de Rematrícula {ANO_CARTA_INTENCAO}
                         </h4>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           enrollmentParaIntencao.statusIntencao2027 === 'Confirmada' ? 'text-emerald-700 bg-emerald-50'
@@ -2556,7 +2562,7 @@ export default function StudentProfile({
                         )}
                         {enrollmentParaIntencao.contraturnoDesejado2027 !== undefined && (
                           <div>
-                            <p className="text-[10px] text-slate-400">Contraturno {enrollmentParaIntencao.ano + 1}</p>
+                            <p className="text-[10px] text-slate-400">Contraturno {ANO_CARTA_INTENCAO}</p>
                             <p className="font-semibold text-slate-800">{enrollmentParaIntencao.contraturnoDesejado2027 ? 'Sim' : 'Não'}</p>
                           </div>
                         )}

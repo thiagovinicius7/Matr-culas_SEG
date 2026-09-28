@@ -548,3 +548,48 @@ export function getFaseProcesso(enrollment: Enrollment): NonNullable<Enrollment[
   if (enrollment.faseProcesso) return enrollment.faseProcesso;
   return enrollment.statusNegociacao === 'Confirmada' ? 'colheita' : 'preparo_terra';
 }
+
+/**
+ * Ano-alvo da Carta de Intenção em andamento. Os campos da carta são todos
+ * sufixados "2027" (statusIntencao2027 etc.), então o ano exibido nos rótulos
+ * é este valor FIXO — nunca "ano ativo + 1", que virava 2028 ao navegar em 2027.
+ */
+export const ANO_CARTA_INTENCAO = 2027;
+
+export type CartaEstado = 'nao_enviada' | 'aguardando' | 'confirmada' | 'em_analise' | 'nao_renova';
+
+/**
+ * Estado da Carta de Intenção de um aluno — fonte ÚNICA usada pelo Painel,
+ * pela Lista de Trabalho e pela Ficha do Aluno, pra nunca divergirem.
+ *  - confirmada / em_analise / nao_renova: a família (ou a equipe) já respondeu
+ *  - aguardando: a carta foi enviada, ainda sem resposta
+ *  - nao_enviada: nada enviado nem respondido ainda
+ * Os campos da carta ficam no Enrollment do ano-base, por isso a busca olha
+ * todas as matrículas do aluno, independente do ano ativo.
+ */
+export function getCartaIntencaoInfo(
+  alunoId: string,
+  allEnrollments: Enrollment[]
+): { estado: CartaEstado; enviadaEm?: string; enrollment?: Enrollment } {
+  const comDados = allEnrollments.filter(
+    e => e.alunoId === alunoId && (e.statusIntencao2027 !== undefined || !!e.cartaEnviadaEm2027)
+  );
+  const respondida = comDados.find(e => e.statusIntencao2027 && e.statusIntencao2027 !== 'Pendente');
+  const enviadaEm = comDados
+    .map(e => e.cartaEnviadaEm2027)
+    .filter((d): d is string => !!d)
+    .sort()
+    .pop();
+
+  if (respondida) {
+    const estado: CartaEstado =
+      respondida.statusIntencao2027 === 'Confirmada' ? 'confirmada'
+      : respondida.statusIntencao2027 === 'Em Análise' ? 'em_analise'
+      : 'nao_renova';
+    return { estado, enviadaEm, enrollment: respondida };
+  }
+  if (enviadaEm) {
+    return { estado: 'aguardando', enviadaEm, enrollment: comDados.find(e => !!e.cartaEnviadaEm2027) };
+  }
+  return { estado: 'nao_enviada', enrollment: comDados[0] };
+}
