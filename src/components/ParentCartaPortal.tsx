@@ -98,7 +98,8 @@ export default function ParentCartaPortal({
   });
 
   const [valorLanche, setValorLanche] = useState<number>(() => {
-    return enrollment?.valorLanche2027 || enrollment?.valorLanche || 250;
+    // ?? (e não ||): lanche com valor 0 (cortesia) é um valor válido definido pela equipe
+    return enrollment?.valorLanche2027 ?? enrollment?.valorLanche ?? 250;
   });
 
   const [adicionarAlmoco, setAdicionarAlmoco] = useState<boolean>(() => {
@@ -107,7 +108,7 @@ export default function ParentCartaPortal({
   });
 
   const [valorAlmoco, setValorAlmoco] = useState<number>(() => {
-    return enrollment?.valorAlmoco2027 || enrollment?.valorAlmoco || 500;
+    return enrollment?.valorAlmoco2027 ?? enrollment?.valorAlmoco ?? 500;
   });
 
   const [diaVencimento, setDiaVencimento] = useState<'01' | '05' | '10' | '15' | '20'>(() => {

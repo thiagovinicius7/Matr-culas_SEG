@@ -2687,11 +2687,11 @@ export default function StudentProfile({
                 activeContraturno={activeContraturno}
                 classPrices={classPrices}
                 contraturnoPrices={contraturnoPrices}
-                onSave={(updatedEn, logMov) => {
+                onSave={(updatedEn, logMov, manterAberto) => {
                   if (onSaveEnrollment) {
                     onSaveEnrollment(updatedEn, logMov);
                   }
-                  setShowCartaModal(false);
+                  if (!manterAberto) setShowCartaModal(false);
                 }}
                 onClose={() => setShowCartaModal(false)}
               />

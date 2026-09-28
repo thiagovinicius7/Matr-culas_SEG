@@ -10,7 +10,7 @@ interface CartaIntencaoFormProps {
   activeContraturno?: ContraturnoSegment;
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
-  onSave: (updatedEnrollment: Enrollment, logMovement?: boolean) => void;
+  onSave: (updatedEnrollment: Enrollment, logMovement?: boolean, manterAberto?: boolean) => void;
   onClose?: () => void;
   onOpenParentPortal?: (studentId: string) => void;
 }
@@ -233,7 +233,7 @@ export default function CartaIntencaoForm({
 
   // Salva a carta. novoEnvio: undefined = mantém o controle de envio como está;
   // string = registra novo envio; null = desmarca o envio.
-  const salvar = (novoEnvio?: string | null, logMovimento: boolean = true) => {
+  const salvar = (novoEnvio?: string | null, logMovimento: boolean = true, manterAberto: boolean = false) => {
     if (!enrollment) return;
     const enviadaEm = novoEnvio === undefined ? cartaEnviadaEm : (novoEnvio || undefined);
 
@@ -265,13 +265,35 @@ export default function CartaIntencaoForm({
       dataIntencao2027: new Date().toISOString().split('T')[0]
     };
 
-    onSave(updated, logMovimento);
+    onSave(updated, logMovimento, manterAberto);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
   };
 
   // Botão "Salvar Intenção no Sistema": salva sem mexer no controle de envio
   const handleSaveForm = () => salvar();
+
+  // Testar a visão dos pais: a tela deles lê do BANCO, então salva antes de
+  // abrir (senão eles veem o valor antigo / o padrão, e não o que a equipe
+  // acabou de definir — ex.: lanche com desconto). Mantém a carta aberta pra
+  // dar pra ajustar e testar de novo, e não gera lançamento financeiro.
+  const abrirVisaoDosPais = () => {
+    salvar(undefined, false, true);
+    if (onOpenParentPortal) {
+      onOpenParentPortal(student.id);
+      return;
+    }
+    // Abre a aba na hora (evita bloqueio de pop-up) e só carrega a página dos
+    // pais um instante depois, com o dado já gravado.
+    const aba = window.open('', '_blank');
+    try {
+      aba?.document.write('<p style="font-family:sans-serif;padding:24px;color:#334155">Salvando a carta e abrindo a visão dos pais…</p>');
+    } catch { /* ignora */ }
+    setTimeout(() => {
+      if (aba && !aba.closed) aba.location.href = parentUrl;
+      else window.open(parentUrl, '_blank');
+    }, 1500);
+  };
 
   // Copiar link / enviar no WhatsApp: salva e registra o envio na hora
   const marcarEnvioESalvar = () => {
@@ -967,13 +989,7 @@ export default function CartaIntencaoForm({
 
             <button
               type="button"
-              onClick={() => {
-                if (onOpenParentPortal) {
-                  onOpenParentPortal(student.id);
-                } else {
-                  window.open(parentUrl, '_blank');
-                }
-              }}
+              onClick={abrirVisaoDosPais}
               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
               title="Abrir a visão pública dos pais para testar a experiência no navegador"
             >
