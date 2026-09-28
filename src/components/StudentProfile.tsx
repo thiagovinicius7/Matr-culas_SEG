@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry, FichaSaude, FichaAnamnese } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
@@ -231,7 +231,7 @@ export default function StudentProfile({
   // alguém estivesse testando com o ano ativo em 2027: a carta acabava
   // pegando o registro de 2027 (às vezes já com dado errado de teste
   // anterior) como se fosse a base, piorando o erro a cada tentativa.
-  const enrollmentBaseParaCarta = activeEnrollments.find(e => e.ano === 2026) || activeEnrollment;
+  const enrollmentBaseParaCarta = getEnrollmentBaseDaCarta(activeStudent.id, activeEnrollments) || activeEnrollment;
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
   const activeContraturno = activeContraturnos.find(c => c.dataFim === null) || activeContraturnos[0];
   const activeMovements = movements.filter(m => m.alunoId === selectedStudentId).sort((a,b) => b.data.localeCompare(a.data));

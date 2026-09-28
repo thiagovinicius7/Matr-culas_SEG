@@ -593,3 +593,27 @@ export function getCartaIntencaoInfo(
   }
   return { estado: 'nao_enviada', enrollment: comDados[0] };
 }
+
+/**
+ * Matrícula onde a Carta de Intenção é gravada e lida — regra ÚNICA usada pela
+ * Ficha do Aluno, pela Lista de Trabalho e pela página dos pais, pra equipe
+ * e a família sempre enxergarem o MESMO registro.
+ *  1) considera só matrículas de anos anteriores ao ano-alvo (normalmente 2026);
+ *     se o aluno só tem matrícula do ano-alvo (aluno novo), usa ela
+ *  2) se houver mais de uma, prefere a que já guarda dados da carta
+ *  3) em empate, o ano mais recente
+ */
+export function getEnrollmentBaseDaCarta(
+  alunoId: string,
+  allEnrollments: Enrollment[]
+): Enrollment | undefined {
+  const doAluno = allEnrollments.filter(e => e.alunoId === alunoId);
+  if (doAluno.length === 0) return undefined;
+  const temDadosDaCarta = (e: Enrollment) =>
+    e.statusIntencao2027 !== undefined || !!e.cartaEnviadaEm2027 || e.valorProposto2027 !== undefined;
+  const anosBase = doAluno.filter(e => e.ano < ANO_CARTA_INTENCAO);
+  const candidatos = anosBase.length > 0 ? anosBase : doAluno;
+  const comDados = candidatos.filter(temDadosDaCarta);
+  const pool = comDados.length > 0 ? comDados : candidatos;
+  return [...pool].sort((a, b) => b.ano - a.ano)[0];
+}

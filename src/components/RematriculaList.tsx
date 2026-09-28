@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
+import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CartaIntencaoForm from './CartaIntencaoForm';
@@ -570,7 +570,8 @@ export default function RematriculaList({
           const st = students.find(s => s.id === activeCartaStudentId);
           if (!st) return null;
           const gd = guardians.find(g => g.alunoId === st.id && g.financeiro);
-          const en = enrollments.find(e => e.alunoId === st.id);
+          // Mesma matrícula-base que a Ficha do Aluno e a página dos pais usam
+          const en = getEnrollmentBaseDaCarta(st.id, enrollments);
           const ct = contraturnos.find(c => c.alunoId === st.id && c.dataFim === null);
 
           return (

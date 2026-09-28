@@ -13,6 +13,7 @@ import {
   normalizeClassId,
   getNextYearClass,
   ANO_CARTA_INTENCAO,
+  getEnrollmentBaseDaCarta,
   getFaseProcesso
 } from './data';
 import {
@@ -49,6 +50,12 @@ import FichaAnamneseForm from './components/FichaAnamneseForm';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+// Data/hora em que esta versão foi publicada (vem do vite.config.ts). O typeof evita
+// erro se, por algum motivo, o valor não tiver sido injetado no build.
+const VERSAO_PUBLICADA = typeof __BUILD_TIME__ !== 'undefined'
+  ? new Date(__BUILD_TIME__).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  : 'não identificada';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -2026,7 +2033,7 @@ export default function App() {
       // A Carta de Intenção 2027 é sempre baseada no ano 2026, independente
       // do "ano ativo" global do sistema — ver mesma correção em
       // StudentProfile.tsx (enrollmentBaseParaCarta).
-      const parentEnrollment = enrollments.find(e => e.alunoId === parentStudent.id && e.ano === 2026) || enrollments.find(e => e.alunoId === parentStudent.id);
+      const parentEnrollment = getEnrollmentBaseDaCarta(parentStudent.id, enrollments);
       const parentContraturno = contraturnos.find(c => c.alunoId === parentStudent.id && c.dataFim === null);
 
       return (
@@ -2120,6 +2127,9 @@ export default function App() {
               <Download size={14} className="text-brand-orange shrink-0" />
               <span>Baixar Backup JSON</span>
             </button>
+            <p className="mt-2 px-1 text-[9px] text-emerald-300/60" title="Data e hora em que esta versão do sistema foi publicada">
+              Versão publicada: {VERSAO_PUBLICADA}
+            </p>
           </div>
         </nav>
 
@@ -2212,6 +2222,9 @@ export default function App() {
                 <Download size={14} className="text-brand-orange" />
                 Baixar Backup JSON
               </button>
+              <p className="px-3 py-1 text-[9px] text-emerald-300/60">
+                Versão publicada: {VERSAO_PUBLICADA}
+              </p>
               <button
                 onClick={() => {
                   handleLogout();
