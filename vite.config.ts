@@ -6,6 +6,8 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     base: './',
+    // Data/hora em que este build foi gerado — aparece no menu do app pra dar pra conferir se a atualização entrou no ar
+    define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
