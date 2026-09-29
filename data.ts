@@ -86,16 +86,63 @@ export function getRegularClassForAgeDynamic(
   const listToUse = filtered.length > 0 ? filtered : classPricesList;
   
   const sorted = [...listToUse].sort((a, b) => a.idadeRef - b.idadeRef);
-  
-  if (age <= 2) return sorted[0];
-  if (age === 3) return sorted[1] || sorted[0];
-  if (age === 4) return sorted[2] || sorted[0];
-  if (age === 5) return sorted[3] || sorted[sorted.length - 1];
-  if (age === 6) return sorted[4] || sorted[sorted.length - 1];
-  if (age === 7) return sorted[5] || sorted[sorted.length - 1];
-  if (age === 8) return sorted[6] || sorted[sorted.length - 1];
-  if (age === 9) return sorted[7] || sorted[sorted.length - 1];
-  return sorted[8] || sorted[sorted.length - 1];
+
+  // Busca a turma cuja idadeRef bate exatamente com a idade calculada — não
+  // confia na POSIÇÃO da turma dentro da lista. O jeito antigo (sorted[0],
+  // sorted[1]...) quebrava silenciosamente e empurrava alunos pra turma
+  // errada sempre que a configuração de mensalidades de um ano tivesse uma
+  // turma faltando, duplicada ou fora de ordem — foi exatamente isso que
+  // fez o Radeck "pular" do 1º pro 3º ano na virada pra 2027.
+  const exactMatch = sorted.find(c => c.idadeRef === age);
+  if (exactMatch) return exactMatch;
+
+  // Sem correspondência exata: usa a turma mais nova pra idade abaixo da
+  // mínima configurada, ou a mais velha pra idade acima da máxima
+  if (sorted.length === 0) return getRegularClassForAge(age);
+  if (age < sorted[0].idadeRef) return sorted[0];
+  return sorted[sorted.length - 1];
+}
+
+/**
+ * Turma seguinte de um aluno pra um ano-alvo — usada em QUALQUER lugar que
+ * precise saber "pra qual turma esse aluno vai" (Carta de Intenção, virada
+ * de ano, pré-matrícula automática). Sempre PRIORIZA avançar exatamente 1
+ * série a partir da turma que o aluno JÁ está matriculado (respeitando
+ * retenção/avanço reais), e só cai pra cálculo puro por idade quando não há
+ * matrícula anterior pra basear (aluno realmente novo) ou a série seguinte
+ * não existe na tabela do ano de destino. Nunca ignorar o histórico do
+ * aluno em favor da idade sozinha — foi exatamente isso que causou alunos
+ * "pulando" ou indo pra série errada quando cada tela calculava do seu
+ * jeito, só pela idade.
+ */
+export function getNextYearClass(
+  student: Student,
+  currentEnrollment: Enrollment | undefined,
+  classPricesList: RegularClass[],
+  targetYear: number
+): RegularClass {
+  const ageInTargetYear = calculateAgeAtCutoff(student.nascimento, targetYear);
+  const fallback = getRegularClassForAgeDynamic(ageInTargetYear, classPricesList, targetYear);
+
+  if (!currentEnrollment || !currentEnrollment.turmaRegularId || currentEnrollment.turmaRegularId === 'sem_regular') {
+    return fallback;
+  }
+
+  const fromYear = currentEnrollment.ano;
+  const fromYearClasses = classPricesList.filter(c => (c.ano || 2026) === fromYear);
+  const currentClassDetails =
+    fromYearClasses.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
+    || classPricesList.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
+    || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId));
+
+  if (!currentClassDetails) return fallback;
+
+  const targetYearClasses = classPricesList.filter(c => (c.ano || 2026) === targetYear);
+  const nextByProgression =
+    targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1)
+    || targetYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => rc.idadeRef === currentClassDetails.idadeRef + 1)?.nome || '').trim().toLowerCase());
+
+  return nextByProgression || fallback;
 }
 
 // Default prices for Somente Contraturno ("Dia no Sítio-Escola")
@@ -482,3 +529,102 @@ export const PACK_DOCUMENT_DEFINITIONS: { id: string; nome: string; fase: 'semea
   { id: 'anamnese_infantil', nome: 'Ficha de Anamnese — Infantil', fase: 'florescer' },
   { id: 'anamnese_fundamental', nome: 'Ficha de Anamnese — Fundamental', fase: 'florescer' },
 ];
+
+/**
+ * Retorna a fase do ciclo de matrícula de um Enrollment, nunca undefined —
+ * mesmo para registros antigos (de antes dessa funcionalidade existir), que
+ * não têm o campo `faseProcesso` gravado no Firestore.
+ *
+ * Regra de inferência para dado antigo sem o campo:
+ * - Se já estava com negociação Confirmada → trata como 'colheita' (já
+ *   concluído; não faz sentido jogar um aluno já matriculado de volta para
+ *   o início do ciclo).
+ * - Caso contrário → trata como 'preparo_terra' (ainda precisa negociar).
+ *
+ * Usar esta função em vez de ler `enrollment.faseProcesso` diretamente evita
+ * telas em branco (crash) quando o app encontra dado sem esse campo.
+ */
+export function getFaseProcesso(enrollment: Enrollment): NonNullable<Enrollment['faseProcesso']> {
+  if (enrollment.faseProcesso) return enrollment.faseProcesso;
+  return enrollment.statusNegociacao === 'Confirmada' ? 'colheita' : 'preparo_terra';
+}
+
+/**
+ * Ano-alvo da Carta de Intenção em andamento. Os campos da carta são todos
+ * sufixados "2027" (statusIntencao2027 etc.), então o ano exibido nos rótulos
+ * é este valor FIXO — nunca "ano ativo + 1", que virava 2028 ao navegar em 2027.
+ */
+export const ANO_CARTA_INTENCAO = 2027;
+
+export type CartaEstado = 'nao_enviada' | 'aguardando' | 'confirmada' | 'em_analise' | 'nao_renova';
+
+/**
+ * Estado da Carta de Intenção de um aluno — fonte ÚNICA usada pelo Painel,
+ * pela Lista de Trabalho e pela Ficha do Aluno, pra nunca divergirem.
+ *  - confirmada / em_analise / nao_renova: a família (ou a equipe) já respondeu
+ *  - aguardando: a carta foi enviada, ainda sem resposta
+ *  - nao_enviada: nada enviado nem respondido ainda
+ * Os campos da carta ficam no Enrollment do ano-base, por isso a busca olha
+ * todas as matrículas do aluno, independente do ano ativo.
+ */
+export function getCartaIntencaoInfo(
+  alunoId: string,
+  allEnrollments: Enrollment[]
+): { estado: CartaEstado; enviadaEm?: string; enrollment?: Enrollment } {
+  const comDados = allEnrollments.filter(
+    e => e.alunoId === alunoId && (e.statusIntencao2027 !== undefined || !!e.cartaEnviadaEm2027)
+  );
+  const respondida = comDados.find(e => e.statusIntencao2027 && e.statusIntencao2027 !== 'Pendente');
+  const enviadaEm = comDados
+    .map(e => e.cartaEnviadaEm2027)
+    .filter((d): d is string => !!d)
+    .sort()
+    .pop();
+
+  if (respondida) {
+    const estado: CartaEstado =
+      respondida.statusIntencao2027 === 'Confirmada' ? 'confirmada'
+      : respondida.statusIntencao2027 === 'Em Análise' ? 'em_analise'
+      : 'nao_renova';
+    return { estado, enviadaEm, enrollment: respondida };
+  }
+  if (enviadaEm) {
+    return { estado: 'aguardando', enviadaEm, enrollment: comDados.find(e => !!e.cartaEnviadaEm2027) };
+  }
+  return { estado: 'nao_enviada', enrollment: comDados[0] };
+}
+
+/**
+ * Matrícula onde a Carta de Intenção é gravada e lida — regra ÚNICA usada pela
+ * Ficha do Aluno, pela Lista de Trabalho e pela página dos pais, pra equipe
+ * e a família sempre enxergarem o MESMO registro.
+ *  1) considera só matrículas de anos anteriores ao ano-alvo (normalmente 2026);
+ *     se o aluno só tem matrícula do ano-alvo (aluno novo), usa ela
+ *  2) se houver mais de uma, prefere a que já guarda dados da carta
+ *  3) em empate, o ano mais recente
+ */
+export function getEnrollmentBaseDaCarta(
+  alunoId: string,
+  allEnrollments: Enrollment[]
+): Enrollment | undefined {
+  const doAluno = allEnrollments.filter(e => e.alunoId === alunoId);
+  if (doAluno.length === 0) return undefined;
+  const temDadosDaCarta = (e: Enrollment) =>
+    e.statusIntencao2027 !== undefined || !!e.cartaEnviadaEm2027 || e.valorProposto2027 !== undefined;
+  const anosBase = doAluno.filter(e => e.ano < ANO_CARTA_INTENCAO);
+  const candidatos = anosBase.length > 0 ? anosBase : doAluno;
+  const comDados = candidatos.filter(temDadosDaCarta);
+  const pool = comDados.length > 0 ? comDados : candidatos;
+  return [...pool].sort((a, b) => b.ano - a.ano)[0];
+}
+
+/** Vencimento padrão da escola (dia do mês) — ajuda nos compromissos financeiros da escola. */
+export const DIA_VENCIMENTO_PADRAO = '05' as const;
+
+/** Desconto de pontualidade: 3% na mensalidade REGULAR, para pagamento até 5 dias antes do vencimento. */
+export const DESCONTO_PONTUALIDADE_PERCENTUAL = 3;
+
+/** Valor da regular já com o desconto de pontualidade, arredondado em centavos (ex.: 1906,50 -> 1849,31). */
+export function valorComPontualidade(valorRegular: number): number {
+  return Math.round(Number(valorRegular || 0) * (100 - DESCONTO_PONTUALIDADE_PERCENTUAL)) / 100;
+}
