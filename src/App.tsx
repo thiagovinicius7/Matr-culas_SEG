@@ -1311,12 +1311,16 @@ export default function App() {
     const gravacao = saveDocument('enrollments', updatedEnrollment);
     gravacao
       .then(() => showToast('Intenção Salva!', 'A Carta de Intenção de Rematrícula 2027 foi gravada no banco de dados.', 'success'))
-      .catch(() => showToast(
-        'NÃO foi gravado no banco',
-        'A alteração aparece só nesta tela e some ao recarregar. Confira a internet e o limite de uso do Firestore e salve de novo.',
-        'error',
-        10000
-      ));
+      .catch((erro) => {
+        // eslint-disable-next-line no-console
+        console.error('[handleSaveEnrollment] Erro ao gravar no Firestore:', erro);
+        showToast(
+          'NÃO foi gravado no banco',
+          'Abra o Console do navegador (F12) e procure a mensagem "Firestore Error" pra ver a causa exata.',
+          'error',
+          10000
+        );
+      });
 
     // Assim que a Carta de Intenção de Rematrícula é respondida (qualquer
     // resposta — Confirmada, Em Análise ou Não Renovará), cria automaticamente

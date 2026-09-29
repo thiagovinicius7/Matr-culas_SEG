@@ -155,14 +155,16 @@ export interface FirestoreErrorInfo {
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    // error.code (ex.: "permission-denied", "unavailable") é o dado mais
+    // diagnóstico que existe — diz exatamente por que o Firestore recusou.
+    error: `${(error as any)?.code ? `[${(error as any).code}] ` : ''}${error instanceof Error ? error.message : String(error)}`,
     authInfo: {
-      userId: null,
-      email: null,
-      emailVerified: null,
-      isAnonymous: null,
-      tenantId: null,
-      providerInfo: []
+      userId: auth.currentUser?.uid ?? null,
+      email: auth.currentUser?.email ?? null,
+      emailVerified: auth.currentUser?.emailVerified ?? null,
+      isAnonymous: auth.currentUser?.isAnonymous ?? null,
+      tenantId: auth.currentUser?.tenantId ?? null,
+      providerInfo: auth.currentUser?.providerData?.map(p => ({ providerId: p.providerId, email: p.email })) ?? []
     },
     operationType,
     path

@@ -306,7 +306,6 @@ export default function CartaIntencaoForm({
   // aberta pra dar pra ajustar e testar de novo, e não gera lançamento financeiro.
   const abrirVisaoDosPais = async () => {
     if (onOpenParentPortal) {
-      // Navegação dentro do próprio app: usa os dados em memória, já atualizados
       await salvar(undefined, false, true).catch(() => {});
       onOpenParentPortal(student.id);
       return;
@@ -322,27 +321,29 @@ export default function CartaIntencaoForm({
       } catch { /* ignora */ }
     };
     escreverNaAba('Salvando a carta e abrindo a visão dos pais…');
-    // Nunca desiste sozinho: espera a resposta DE VERDADE do banco (pode
-    // demorar mais numa internet mais lenta, e terminar dando certo mesmo
-    // assim — dizer "falhou" nessa hora seria mentira). Só avisa que está
-    // demorando, sem afirmar que deu errado; só mostra erro se o banco
-    // realmente responder com um erro.
-    const avisoDemora = setTimeout(() => {
-      escreverNaAba('Ainda salvando… sua internet pode estar mais lenta agora. Não feche esta aba — assim que terminar, a página da família abre sozinha aqui.');
-    }, 6000);
-    const avisoDemoraLonga = setTimeout(() => {
-      escreverNaAba('Isso está demorando bem mais que o normal. Pode continuar esperando (ainda pode terminar), ou fechar esta aba, conferir sua internet e tentar de novo pelo botão da carta.');
-    }, 30000);
+    // Nunca fica travado pra sempre: se em 20s não tiver uma resposta (nem
+    // sucesso, nem erro) do banco, mostra um aviso técnico honesto — sem
+    // adivinhar a causa (não afirma "internet lenta") — e pede pra abrir o
+    // Console do navegador (F12), onde o erro real do Firestore aparece.
+    let jaResolveu = false;
+    const avisoTravado = setTimeout(() => {
+      if (jaResolveu) return;
+      // eslint-disable-next-line no-console
+      console.error('[Carta de Intenção] Gravação no Firestore não respondeu em 20s (nem sucesso, nem erro). Abra o Console (F12) e procure por uma mensagem em vermelho começando com "Firestore Error" — ela mostra a causa exata.');
+      escreverNaAba('<strong>A gravação não respondeu em 20 segundos</strong> — nem confirmou, nem deu erro.<br/>Isso normalmente é um problema técnico específico (ex.: permissão do banco de dados), não a internet.<br/>Abra o Console do navegador (tecla F12 → aba "Console") nesta aba do sistema e procure uma linha em vermelho começando com "Firestore Error" — ela mostra a causa exata. Copie e envie essa mensagem.');
+    }, 20000);
     try {
       await salvar(undefined, false, true);
-      clearTimeout(avisoDemora);
-      clearTimeout(avisoDemoraLonga);
+      jaResolveu = true;
+      clearTimeout(avisoTravado);
       if (aba && !aba.closed) aba.location.href = parentUrl;
       else window.open(parentUrl, '_blank');
-    } catch {
-      clearTimeout(avisoDemora);
-      clearTimeout(avisoDemoraLonga);
-      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados.</strong><br/>Feche esta aba, confira sua internet e tente de novo clicando no botão da carta. Enquanto não gravar, a família não vê as alterações.');
+    } catch (erro) {
+      jaResolveu = true;
+      clearTimeout(avisoTravado);
+      // eslint-disable-next-line no-console
+      console.error('[Carta de Intenção] Erro ao gravar no Firestore:', erro);
+      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados.</strong><br/>Abra o Console do navegador (tecla F12 → aba "Console") e procure a mensagem em vermelho começando com "Firestore Error" — ela mostra a causa exata. Copie e envie essa mensagem.<br/>Feche esta aba e tente de novo pelo botão da carta.');
     }
   };
 
