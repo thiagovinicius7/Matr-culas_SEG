@@ -154,6 +154,7 @@ export default function ParentCartaPortal({
 
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState('');
+  const [demorandoEnvio, setDemorandoEnvio] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,6 +166,16 @@ export default function ParentCartaPortal({
 
     const updated: Enrollment = {
       ...enrollment,
+      // Mesma garantia do lado da equipe: as regras do Firestore exigem esses
+      // 4 campos sempre presentes; sem valor, a gravação inteira é rejeitada
+      // silenciosamente (o campo undefined nem chega a existir no documento).
+      id: enrollment.id,
+      alunoId: enrollment.alunoId,
+      ano: enrollment.ano,
+      turmaRegularId: enrollment.turmaRegularId || 'sem_regular',
+      valorRegularOriginal: Number(enrollment.valorRegularOriginal ?? enrollment.valorFinalRegular ?? 0),
+      descontoMensal: Number(enrollment.descontoMensal ?? 0),
+      valorFinalRegular: Number(enrollment.valorFinalRegular ?? enrollment.valorRegularOriginal ?? 0),
       statusNegociacao: mappedStatus,
       valorProposto2027: Number(valorRegularProposto),
       valorContraturnoProposto2027: contraturnoDesejado ? Number(valorContraturno) : undefined,
@@ -188,6 +199,12 @@ export default function ParentCartaPortal({
 
     setErroEnvio('');
     setEnviando(true);
+    setDemorandoEnvio(false);
+    // Nunca desiste sozinho: espera a resposta DE VERDADE do banco. Numa
+    // internet mais lenta, enviar pode legitimamente demorar mais e terminar
+    // dando certo mesmo assim — só avisa que está demorando, sem afirmar que
+    // falhou; só mostra erro se o banco realmente responder com um erro.
+    const avisoTimer = setTimeout(() => setDemorandoEnvio(true), 6000);
     try {
       // Só mostra "enviado" depois que o banco confirmar a gravação
       await onSaveResponse(updated);
@@ -195,7 +212,9 @@ export default function ParentCartaPortal({
     } catch {
       setErroEnvio('Não conseguimos registrar sua resposta agora. Verifique sua internet e toque em "Enviar Resposta da Família" novamente. Se continuar, avise a escola.');
     } finally {
+      clearTimeout(avisoTimer);
       setEnviando(false);
+      setDemorandoEnvio(false);
     }
   };
 
@@ -458,7 +477,7 @@ export default function ParentCartaPortal({
                   <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-extrabold text-emerald-950">Desconto por Pontualidade: </span>
-                    Pagando a mensalidade regular até <strong>5 dias antes do vencimento</strong> (dia {diaVencimento}), vocês têm <strong>3% de desconto</strong> nela — de R$ {Number(valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} para R$ {valorComPontualidade(Number(valorRegularProposto)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês.
+                    Pagando a mensalidade regular até <strong>5 dias antes do vencimento</strong> (dia {diaVencimento}), vocês têm <strong>3% de desconto</strong> nela — de R$ {Number(valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} para R$ {valorComPontualidade(Number(valorRegularProposto), Number(selectedClassDetails.valorMensal)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês.
                   </div>
                 </div>
               )}
@@ -479,7 +498,7 @@ export default function ParentCartaPortal({
                         R$ {totalCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês
                       </span>
                       <span className="text-xl font-black text-brand-orange font-display">
-                        R$ {(totalCalculado - (Number(valorRegularProposto) - valorComPontualidade(Number(valorRegularProposto)))).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-semibold text-emerald-200">com pontualidade</span>
+                        R$ {(totalCalculado - (Number(valorRegularProposto) - valorComPontualidade(Number(valorRegularProposto), Number(selectedClassDetails.valorMensal)))).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-semibold text-emerald-200">com pontualidade</span>
                       </span>
                     </div>
                   ) : (
@@ -590,6 +609,11 @@ export default function ParentCartaPortal({
             <div className="pt-2 print:hidden">
               {erroEnvio && (
                 <p className="mb-2 p-2.5 text-xs font-semibold text-rose-800 bg-rose-50 border border-rose-200 rounded-lg">{erroEnvio}</p>
+              )}
+              {demorandoEnvio && !erroEnvio && (
+                <p className="mb-2 p-2.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg">
+                  Ainda enviando… sua internet pode estar mais lenta agora. Não feche esta página.
+                </p>
               )}
               <button
                 type="submit"

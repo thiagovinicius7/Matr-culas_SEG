@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO, comLimiteDeTempo } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO } from '../data';
 import { FileText, Save, Printer, Share2, MessageCircle, Calendar, Clock, DollarSign, UserCheck, AlertCircle, CheckCircle, HelpCircle, XCircle, Edit3, ArrowRight, ShieldCheck, Sparkles, Check, ChevronDown, Link2, ExternalLink, Utensils } from 'lucide-react';
 
 interface CartaIntencaoFormProps {
@@ -246,6 +246,19 @@ export default function CartaIntencaoForm({
 
     const updated: Enrollment = {
       ...enrollment,
+      // As regras de segurança do Firestore EXIGEM que esses 4 campos estejam
+      // sempre presentes e com o tipo certo. Se algum vier undefined (comum em
+      // matrícula antiga/importada, que pode não ter todos preenchidos), o
+      // Firestore ignora silenciosamente esse campo undefined na gravação — e
+      // a gravação inteira é REJEITADA sem nenhum aviso claro no app, porque
+      // deixa de ter esse campo. Garantir um valor aqui evita essa rejeição.
+      id: enrollment.id,
+      alunoId: enrollment.alunoId,
+      ano: enrollment.ano,
+      turmaRegularId: enrollment.turmaRegularId || 'sem_regular',
+      valorRegularOriginal: Number(enrollment.valorRegularOriginal ?? enrollment.valorFinalRegular ?? 0),
+      descontoMensal: Number(enrollment.descontoMensal ?? 0),
+      valorFinalRegular: Number(enrollment.valorFinalRegular ?? enrollment.valorRegularOriginal ?? 0),
       statusNegociacao: mappedStatus,
       valorProposto2027: Number(valorProposto2027),
       valorContraturnoProposto2027: contraturnoDesejado ? Number(valorContraturnoProposto2027) : undefined,
@@ -267,12 +280,12 @@ export default function CartaIntencaoForm({
     };
 
     const gravacao = onSave(updated, logMovimento, manterAberto);
-    // Devolve a promessa da gravação: quem precisa da confirmação do banco
-    // (ex.: abrir a visão dos pais) espera por ela. O indicador "salvo" só
-    // acende depois que o banco confirmar — antes acendia na hora, mesmo se
-    // a gravação estivesse demorando ou tivesse falhado. Limite de 8s: numa
-    // rede ruim a gravação pode nunca resolver nem falhar sozinha.
-    const promessa = comLimiteDeTempo(Promise.resolve(gravacao), 8000, 'Tempo esgotado gravando no banco de dados.');
+    // Espera o resultado DE VERDADE do banco — nunca declara "falhou" só
+    // porque está demorando (numa internet mais lenta, salvar pode legitimamente
+    // levar mais tempo, e a gravação pode terminar dando certo mesmo assim).
+    // O indicador "salvo" só acende quando o banco confirma de verdade, e o
+    // de erro só quando o banco realmente responde com um erro.
+    const promessa = Promise.resolve(gravacao);
     setSaveError(false);
     promessa.then(() => {
       setSaveSuccess(true);
@@ -309,14 +322,27 @@ export default function CartaIntencaoForm({
       } catch { /* ignora */ }
     };
     escreverNaAba('Salvando a carta e abrindo a visão dos pais…');
+    // Nunca desiste sozinho: espera a resposta DE VERDADE do banco (pode
+    // demorar mais numa internet mais lenta, e terminar dando certo mesmo
+    // assim — dizer "falhou" nessa hora seria mentira). Só avisa que está
+    // demorando, sem afirmar que deu errado; só mostra erro se o banco
+    // realmente responder com um erro.
+    const avisoDemora = setTimeout(() => {
+      escreverNaAba('Ainda salvando… sua internet pode estar mais lenta agora. Não feche esta aba — assim que terminar, a página da família abre sozinha aqui.');
+    }, 6000);
+    const avisoDemoraLonga = setTimeout(() => {
+      escreverNaAba('Isso está demorando bem mais que o normal. Pode continuar esperando (ainda pode terminar), ou fechar esta aba, conferir sua internet e tentar de novo pelo botão da carta.');
+    }, 30000);
     try {
-      // salvar() já tem limite de tempo embutido — sem isso, numa rede ruim a
-      // gravação podia nunca resolver nem falhar, travando a aba em "Salvando…".
       await salvar(undefined, false, true);
+      clearTimeout(avisoDemora);
+      clearTimeout(avisoDemoraLonga);
       if (aba && !aba.closed) aba.location.href = parentUrl;
       else window.open(parentUrl, '_blank');
     } catch {
-      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados</strong> (a gravação demorou demais ou falhou).<br/>Feche esta aba, confira sua internet e tente de novo clicando no botão da carta. Enquanto não gravar, a família não vê as alterações.');
+      clearTimeout(avisoDemora);
+      clearTimeout(avisoDemoraLonga);
+      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados.</strong><br/>Feche esta aba, confira sua internet e tente de novo clicando no botão da carta. Enquanto não gravar, a família não vê as alterações.');
     }
   };
 
@@ -682,7 +708,7 @@ export default function CartaIntencaoForm({
                   </label>
                   <p className="text-[10px] text-slate-400 mt-1">
                     Essa opção é só da equipe — se você não marcar aqui, a família não vê nem pode escolher isso na carta dela.
-                    {descontoPontualidadeAtivo && ` Com 3% de desconto: R$ ${valorComPontualidade(valorProposto2027).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês na regular, para pagamento até 5 dias antes do vencimento (dia ${diaVencimento}).`}
+                    {descontoPontualidadeAtivo && ` Com 3% de desconto: R$ ${valorComPontualidade(valorProposto2027, valorTabelaRegular2027).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês na regular, para pagamento até 5 dias antes do vencimento (dia ${diaVencimento}).`}
                   </p>
                 </div>
 
