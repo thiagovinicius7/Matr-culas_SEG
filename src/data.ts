@@ -624,24 +624,15 @@ export const DIA_VENCIMENTO_PADRAO = '05' as const;
 /** Desconto de pontualidade: 3% na mensalidade REGULAR, para pagamento até 5 dias antes do vencimento. */
 export const DESCONTO_PONTUALIDADE_PERCENTUAL = 3;
 
-/** Valor da regular já com o desconto de pontualidade, arredondado em centavos (ex.: 1906,50 -> 1849,31). */
-export function valorComPontualidade(valorRegular: number): number {
-  return Math.round(Number(valorRegular || 0) * (100 - DESCONTO_PONTUALIDADE_PERCENTUAL)) / 100;
-}
-
 /**
- * Roda uma promessa com um limite de tempo. Gravações no Firestore normalmente
- * resolvem (sucesso) ou rejeitam (erro) rápido, mas numa rede ruim ou com
- * alguma extensão de navegador bloqueando a conexão, a promessa pode ficar
- * PENDURADA — nunca resolve nem rejeita — e sem isso a tela fica travada em
- * "Salvando…" pra sempre, sem nenhum aviso. Com o limite, o erro aparece.
+ * Valor da regular já com o desconto de pontualidade — os 3% são sempre
+ * calculados sobre a TABELA cheia (nunca sobre o valor que já tem outro
+ * desconto aplicado), e o resultado é a SOMA dos dois descontos sobre a
+ * mensalidade total. Ex.: tabela R$ 2.050, desconto de negociação 10%
+ * (R$ 1.845) + pontualidade 3% da tabela (R$ 61,50) = R$ 1.783,50 — e não
+ * 3% em cima dos R$ 1.845 (o que daria um desconto total menor que 13%).
  */
-export function comLimiteDeTempo<T>(promessa: Promise<T>, ms: number, mensagem: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(mensagem)), ms);
-    promessa.then(
-      (v) => { clearTimeout(timer); resolve(v); },
-      (e) => { clearTimeout(timer); reject(e); }
-    );
-  });
+export function valorComPontualidade(valorRegularProposto: number, valorTabela: number): number {
+  const descontoPontualidadeReais = Math.round(Number(valorTabela || 0) * DESCONTO_PONTUALIDADE_PERCENTUAL) / 100;
+  return Math.round((Number(valorRegularProposto || 0) - descontoPontualidadeReais) * 100) / 100;
 }
