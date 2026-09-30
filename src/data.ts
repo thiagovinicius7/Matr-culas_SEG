@@ -636,3 +636,34 @@ export function valorComPontualidade(valorRegularProposto: number, valorTabela: 
   const descontoPontualidadeReais = Math.round(Number(valorTabela || 0) * DESCONTO_PONTUALIDADE_PERCENTUAL) / 100;
   return Math.round((Number(valorRegularProposto || 0) - descontoPontualidadeReais) * 100) / 100;
 }
+
+/** Taxa de material 2027 — vale para toda turma regular (Infantil e Fundamental), parcelável. */
+export const TAXA_MATERIAL_2027 = { valor: 800, parcelas: 10 };
+
+/**
+ * Novidades de 2027 específicas da turma proposta — usadas no recado da
+ * Carta de Intenção (equipe e família) e na mensagem de WhatsApp. Varia por
+ * turma: Fundamental tem um pacote; dentro do Infantil, Mandaçaia (1 e 2)
+ * tem aulas extras diferentes de Mirim (1 e 2).
+ */
+export function getNovidades2027(turma: RegularClass): string[] {
+  const taxaTexto = `Taxa de material: R$ ${TAXA_MATERIAL_2027.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (pode ser parcelada em até ${TAXA_MATERIAL_2027.parcelas}x)`;
+
+  if (turma.natureza === 'Fundamental') {
+    return [
+      'Lanche continua opcional, com valor diferenciado para quem já é aluno da escola',
+      'Aulas extras em horário regular: Educação Ambiental, Circo, Inglês e Yoga',
+      'Horário e organização da escola permanecem os mesmos',
+      taxaTexto,
+      'A família precisa adquirir o material didático FTD Trilhas e o livro de Inglês',
+    ];
+  }
+
+  // Infantil — Musicalização é de todo o Infantil (Mandaçaia e Mirim);
+  // Inglês é exclusivo de Mandaçaia (Mirim não tem)
+  const ehMandacaia = turma.nome.includes('Mandaçaia');
+  const aulasExtras = ehMandacaia
+    ? 'Aulas extras: Educação Ambiental, Circo, Yoga, Musicalização e Inglês'
+    : 'Aulas extras: Educação Ambiental, Circo, Yoga e Musicalização';
+  return [taxaTexto, aulasExtras];
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO, getNovidades2027 } from '../data';
+import { auth } from '../firebase';
 import { FileText, Save, Printer, Share2, MessageCircle, Calendar, Clock, DollarSign, UserCheck, AlertCircle, CheckCircle, HelpCircle, XCircle, Edit3, ArrowRight, ShieldCheck, Sparkles, Check, ChevronDown, Link2, ExternalLink, Utensils } from 'lucide-react';
 
 interface CartaIntencaoFormProps {
@@ -321,21 +322,26 @@ export default function CartaIntencaoForm({
       } catch { /* ignora */ }
     };
     escreverNaAba('Salvando a carta e abrindo a visão dos pais…');
-    // Nunca fica travado pra sempre: se em 20s não tiver uma resposta (nem
-    // sucesso, nem erro) do banco, mostra um aviso técnico honesto — sem
-    // adivinhar a causa (não afirma "internet lenta") — e pede pra abrir o
-    // Console do navegador (F12), onde o erro real do Firestore aparece.
+    // Loga JÁ, no instante do clique — não só depois de 20s — pra confirmar
+    // que o código rodou e a gravação começou. O console.error abaixo aparece
+    // SEMPRE na aba de onde você clicou (a da Ficha do Aluno/Lista de
+    // Trabalho) — NUNCA nesta aba nova que só tem esse texto na tela, porque
+    // essa aba não roda nenhum código.
+    // eslint-disable-next-line no-console
+    console.log('[Carta de Intenção] Iniciando gravação no Firestore para', student.nome, '— aguardando resposta...');
     let jaResolveu = false;
     const avisoTravado = setTimeout(() => {
       if (jaResolveu) return;
       // eslint-disable-next-line no-console
-      console.error('[Carta de Intenção] Gravação no Firestore não respondeu em 20s (nem sucesso, nem erro). Abra o Console (F12) e procure por uma mensagem em vermelho começando com "Firestore Error" — ela mostra a causa exata.');
-      escreverNaAba('<strong>A gravação não respondeu em 20 segundos</strong> — nem confirmou, nem deu erro.<br/>Isso normalmente é um problema técnico específico (ex.: permissão do banco de dados), não a internet.<br/>Abra o Console do navegador (tecla F12 → aba "Console") nesta aba do sistema e procure uma linha em vermelho começando com "Firestore Error" — ela mostra a causa exata. Copie e envie essa mensagem.');
+      console.error('[Carta de Intenção] Gravação no Firestore não respondeu em 20s (nem sucesso, nem erro).');
+      escreverNaAba('<strong>A gravação não respondeu em 20 segundos</strong> — nem confirmou, nem deu erro.<br/><br/><strong>Feche esta aba</strong> e volte pra aba de onde você clicou (a da Ficha do Aluno). Abra o Console do navegador lá (tecla F12 → aba "Console") — é lá, NÃO nesta aba em branco, que aparece a mensagem técnica. Procure uma linha em vermelho começando com "Firestore Error" ou "[Carta de Intenção]" e me envie o que aparecer.');
     }, 20000);
     try {
       await salvar(undefined, false, true);
       jaResolveu = true;
       clearTimeout(avisoTravado);
+      // eslint-disable-next-line no-console
+      console.log('[Carta de Intenção] Gravação confirmada pelo Firestore — abrindo visão dos pais.');
       if (aba && !aba.closed) aba.location.href = parentUrl;
       else window.open(parentUrl, '_blank');
     } catch (erro) {
@@ -343,7 +349,7 @@ export default function CartaIntencaoForm({
       clearTimeout(avisoTravado);
       // eslint-disable-next-line no-console
       console.error('[Carta de Intenção] Erro ao gravar no Firestore:', erro);
-      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados.</strong><br/>Abra o Console do navegador (tecla F12 → aba "Console") e procure a mensagem em vermelho começando com "Firestore Error" — ela mostra a causa exata. Copie e envie essa mensagem.<br/>Feche esta aba e tente de novo pelo botão da carta.');
+      escreverNaAba('<strong>Não foi possível gravar a carta no banco de dados.</strong><br/><br/><strong>Feche esta aba</strong> e volte pra aba de onde você clicou (a da Ficha do Aluno). Abra o Console do navegador lá (tecla F12 → aba "Console") — é lá, NÃO nesta aba em branco, que aparece a mensagem técnica. Procure uma linha em vermelho começando com "Firestore Error" ou "[Carta de Intenção]" e me envie o que aparecer. Depois tente de novo pelo botão da carta.');
     }
   };
 
@@ -369,6 +375,10 @@ export default function CartaIntencaoForm({
 
   // WhatsApp Message Generator
   const generateWhatsAppMessage = () => {
+    const novidades = getNovidades2027(selectedClass2027Details);
+    const novidadesTexto = novidades.length > 0
+      ? `*Novidades para 2027:*\n${novidades.map(n => `• ${n}`).join('\n')}\n\n`
+      : '';
     return (
       `*Sítio-Escola Geranium*\n` +
       `*${cartaTitulo} — Ano Letivo 2027*\n\n` +
@@ -376,6 +386,7 @@ export default function CartaIntencaoForm({
       `Já estamos organizando o ano letivo de 2027 com muito carinho. Convidamos vocês a acessarem o link abaixo para conferir a proposta do próximo ano e confirmar a intenção de rematrícula:\n\n` +
       `${parentUrl}\n\n` +
       `No link vocês poderão conferir a turma prevista, selecionar opções de Contraturno e registrar a decisão da família.\n\n` +
+      novidadesTexto +
       `Ficamos à disposição para qualquer dúvida!\n` +
       `Atenciosamente,\n` +
       `*Sítio-Escola Geranium*`
@@ -565,6 +576,15 @@ export default function CartaIntencaoForm({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Novidades 2027 — varia por turma (Fundamental x Mandaçaia x Mirim).
+                    Vai junto no WhatsApp e é mostrado pra família na própria carta. */}
+                <div className="mt-2 p-2.5 bg-sky-50 border border-sky-200 rounded-lg text-[11px] text-sky-900">
+                  <p className="font-bold mb-1">📌 Novidades 2027 para {selectedClass2027Details.nome}:</p>
+                  <ul className="space-y-0.5 list-disc list-inside">
+                    {getNovidades2027(selectedClass2027Details).map((n, i) => <li key={i}>{n}</li>)}
+                  </ul>
                 </div>
               </div>
 

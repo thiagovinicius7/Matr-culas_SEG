@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO, getNovidades2027 } from '../data';
 import { Sprout, CheckCircle, HelpCircle, XCircle, Send, Calendar, Clock, DollarSign, Check, Heart, ShieldCheck, Sparkles, MessageSquare, Utensils } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -333,6 +333,14 @@ export default function ParentCartaPortal({
                   )}
                   <span className="block text-[10px] text-slate-500 mt-1">Acordo/Proposta exclusiva da escola</span>
                 </div>
+              </div>
+
+              {/* Novidades 2027 — varia por turma (Fundamental x Mandaçaia x Mirim) */}
+              <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg text-xs text-sky-900">
+                <p className="font-bold mb-1.5">📌 Novidades para 2027:</p>
+                <ul className="space-y-1 list-disc list-inside">
+                  {getNovidades2027(selectedClassDetails).map((n, i) => <li key={i}>{n}</li>)}
+                </ul>
               </div>
 
               {/* Escolha do Dia de Vencimento e Desconto por Pontualidade */}
