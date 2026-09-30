@@ -329,6 +329,7 @@ export default function ParentCartaPortal({
                   {valorRegularProposto < selectedClassDetails.valorMensal && (
                     <span className="block text-[11px] font-bold text-emerald-700 mt-1">
                       Desconto especial concedido: − R$ {(selectedClassDetails.valorMensal - valorRegularProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      {' '}({((1 - valorRegularProposto / selectedClassDetails.valorMensal) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)
                     </span>
                   )}
                   <span className="block text-[10px] text-slate-500 mt-1">Acordo/Proposta exclusiva da escola</span>

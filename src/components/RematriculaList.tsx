@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO } from '../data';
+import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO, getNextYearClass, calculateAgeAtCutoff } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CartaIntencaoForm from './CartaIntencaoForm';
@@ -37,6 +37,15 @@ export default function RematriculaList({
   const [filterStatus, setFilterStatus] = useState<'Todas' | 'Pendente' | 'Em Negociação' | 'Confirmada'>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedYear, setSelectedYear] = useState<number>(2026);
+
+  // Filtros novos: turma que o aluno vai estar no ano seguinte, faixa de
+  // idade, se já enviou a carta e o que a família respondeu.
+  const [filterTurmaProposta, setFilterTurmaProposta] = useState<string>('Todas');
+  const [filterIdadeMin, setFilterIdadeMin] = useState<string>('');
+  const [filterIdadeMax, setFilterIdadeMax] = useState<string>('');
+  const [filterEnvio, setFilterEnvio] = useState<'Todas' | 'Enviada' | 'Não enviada'>('Todas');
+  const [filterResposta, setFilterResposta] = useState<'Todas' | 'Confirmada' | 'Em Análise' | 'Não Renovará' | 'Aguardando'>('Todas');
+  const [agruparPorTurma, setAgruparPorTurma] = useState(true);
 
   const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
   const [tempDiscountRegular, setTempDiscountRegular] = useState<number>(0);
@@ -93,6 +102,15 @@ export default function RematriculaList({
     const discContPont = (hasContPont && activeCont) ? Number((contSubtotal * 0.03).toFixed(2)) : 0;
     const totalPontDiscount = discRegPont + discContPont;
 
+    // Turma que o aluno vai estar no ano seguinte (o que já foi proposto na
+    // carta, ou — se ainda não tem proposta — a próxima série a partir de
+    // onde ele já está, mesma conta usada na Carta de Intenção)
+    const turmaPropostaObj = e.turmaPropostaId2027
+      ? (classPrices.find(c => c.id === e.turmaPropostaId2027) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaPropostaId2027!)))
+      : (student ? getNextYearClass(student, e, classPrices, ANO_CARTA_INTENCAO) : undefined);
+    const idadeProxAno = student ? calculateAgeAtCutoff(student.nascimento, ANO_CARTA_INTENCAO) : 0;
+    const cartaInfo = student ? getCartaIntencaoInfo(student.id, enrollments) : undefined;
+
     return {
       enrollment: e,
       student,
@@ -104,7 +122,10 @@ export default function RematriculaList({
       hasContPont,
       discRegPont,
       discContPont,
-      totalPontDiscount
+      totalPontDiscount,
+      turmaPropostaObj,
+      idadeProxAno,
+      cartaInfo
     };
   });
 
@@ -117,9 +138,44 @@ export default function RematriculaList({
       (item.guardian?.nome || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = filterStatus === 'Todas' || item.enrollment.statusNegociacao === filterStatus;
+
+    const matchesTurmaProposta = filterTurmaProposta === 'Todas' || item.turmaPropostaObj?.id === filterTurmaProposta;
+
+    const idadeMin = filterIdadeMin === '' ? -Infinity : Number(filterIdadeMin);
+    const idadeMax = filterIdadeMax === '' ? Infinity : Number(filterIdadeMax);
+    const matchesIdade = item.idadeProxAno >= idadeMin && item.idadeProxAno <= idadeMax;
+
+    const jaEnviou = item.cartaInfo && item.cartaInfo.estado !== 'nao_enviada';
+    const matchesEnvio = filterEnvio === 'Todas'
+      || (filterEnvio === 'Enviada' && jaEnviou)
+      || (filterEnvio === 'Não enviada' && !jaEnviou);
+
+    const respostaMap: Record<string, string> = {
+      confirmada: 'Confirmada', em_analise: 'Em Análise', nao_renova: 'Não Renovará', aguardando: 'Aguardando', nao_enviada: 'Aguardando'
+    };
+    const respostaAluno = item.cartaInfo ? respostaMap[item.cartaInfo.estado] : 'Aguardando';
+    const matchesResposta = filterResposta === 'Todas' || respostaAluno === filterResposta;
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesTurmaProposta && matchesIdade && matchesEnvio && matchesResposta;
   });
+
+  // Turmas propostas em uso nesta lista — pra montar o filtro e os grupos,
+  // ordenadas por idade de referência (mesma ordem das séries)
+  const turmasPropostasEmUso = Array.from(
+    new Map(
+      rematriculaData
+        .filter(item => item.turmaPropostaObj)
+        .map(item => [item.turmaPropostaObj!.id, item.turmaPropostaObj!])
+    ).values()
+  ).sort((a, b) => a.idadeRef - b.idadeRef);
+
+  // Agrupa os resultados filtrados por turma proposta (quando ativado)
+  const gruposPorTurma: { turma: RegularClass | undefined; itens: typeof filteredData }[] = agruparPorTurma
+    ? turmasPropostasEmUso
+        .map(turma => ({ turma, itens: filteredData.filter(item => item.turmaPropostaObj?.id === turma.id) }))
+        .filter(g => g.itens.length > 0)
+        .concat([{ turma: undefined, itens: filteredData.filter(item => !item.turmaPropostaObj) }].filter(g => g.itens.length > 0))
+    : [{ turma: undefined, itens: filteredData }];
 
   const handleStartEditingNotes = (alunoId: string, currentNotes: string) => {
     setEditingNotesStudentId(alunoId);
@@ -233,6 +289,80 @@ export default function RematriculaList({
         </div>
       </div>
 
+      {/* Filtros da Carta de Intenção — turma no ano seguinte, idade, envio e resposta */}
+      <div className="flex flex-wrap items-end gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-xs text-xs">
+        <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase">Turma em {ANO_CARTA_INTENCAO}</label>
+          <select
+            value={filterTurmaProposta}
+            onChange={(e) => setFilterTurmaProposta(e.target.value)}
+            className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-50 font-semibold focus:outline-none cursor-pointer"
+          >
+            <option value="Todas">Todas as turmas</option>
+            {turmasPropostasEmUso.map(t => (
+              <option key={t.id} value={t.id}>{t.nome}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase">Idade em {ANO_CARTA_INTENCAO}</label>
+          <div className="flex items-center gap-1">
+            <input
+              type="number" min="0" placeholder="Min"
+              value={filterIdadeMin}
+              onChange={(e) => setFilterIdadeMin(e.target.value)}
+              className="w-16 px-2 py-1.5 rounded-md border border-slate-200 bg-slate-50 focus:outline-none"
+            />
+            <span className="text-slate-400">–</span>
+            <input
+              type="number" min="0" placeholder="Máx"
+              value={filterIdadeMax}
+              onChange={(e) => setFilterIdadeMax(e.target.value)}
+              className="w-16 px-2 py-1.5 rounded-md border border-slate-200 bg-slate-50 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase">Carta enviada?</label>
+          <select
+            value={filterEnvio}
+            onChange={(e) => setFilterEnvio(e.target.value as any)}
+            className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-50 font-semibold focus:outline-none cursor-pointer"
+          >
+            <option value="Todas">Todas</option>
+            <option value="Enviada">Já enviei</option>
+            <option value="Não enviada">Ainda não enviei</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase">Resposta da família</label>
+          <select
+            value={filterResposta}
+            onChange={(e) => setFilterResposta(e.target.value as any)}
+            className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-50 font-semibold focus:outline-none cursor-pointer"
+          >
+            <option value="Todas">Todas</option>
+            <option value="Confirmada">Confirmaram</option>
+            <option value="Em Análise">Em análise</option>
+            <option value="Não Renovará">Não renovam</option>
+            <option value="Aguardando">Aguardando resposta</option>
+          </select>
+        </div>
+
+        <label className="flex items-center gap-1.5 cursor-pointer select-none pb-1.5 ml-auto">
+          <input
+            type="checkbox"
+            checked={agruparPorTurma}
+            onChange={(e) => setAgruparPorTurma(e.target.checked)}
+            className="w-3.5 h-3.5 cursor-pointer"
+          />
+          <span className="text-[11px] font-bold text-slate-600">Agrupar por turma de {ANO_CARTA_INTENCAO}</span>
+        </label>
+      </div>
+
       {/* Worklist Table */}
       <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden" id="rematricula-table-container">
         <div className="overflow-x-auto">
@@ -247,9 +377,20 @@ export default function RematriculaList({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-150 text-xs text-slate-700">
-              {filteredData.map(({ enrollment, student, guardian, regularClass, activeContraturno, totalNegotiatedMonthly, hasRegPont, hasContPont, discRegPont, discContPont, totalPontDiscount }) => {
+              {gruposPorTurma.map((grupo) => (
+                <React.Fragment key={grupo.turma?.id || 'sem-turma'}>
+                  {agruparPorTurma && (
+                    <tr className="bg-brand-green-dark/5">
+                      <td colSpan={5} className="px-3 py-1.5 text-[11px] font-extrabold text-brand-green-dark uppercase tracking-wide">
+                        {grupo.turma ? `${grupo.turma.nome} (${grupo.turma.natureza})` : 'Turma futura não definida'}
+                        <span className="ml-2 font-mono font-bold text-slate-400">{grupo.itens.length} aluno(s)</span>
+                      </td>
+                    </tr>
+                  )}
+              {grupo.itens.map(({ enrollment, student, guardian, regularClass, activeContraturno, totalNegotiatedMonthly, hasRegPont, hasContPont, discRegPont, discContPont, totalPontDiscount, cartaInfo }) => {
                 if (!student) return null;
                 const isEditingThisNotes = editingNotesStudentId === student.id;
+                const cartaJaEnviada = cartaInfo && cartaInfo.estado !== 'nao_enviada';
 
                 return (
                   <tr key={enrollment.id} className="hover:bg-slate-50/50 transition-colors">
@@ -257,6 +398,9 @@ export default function RematriculaList({
                     <td className="p-3">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
+                          {cartaJaEnviada && (
+                            <span className="text-emerald-600 shrink-0" title="Carta de Intenção já enviada">✔️</span>
+                          )}
                           <span className="font-bold text-slate-800 text-xs">{student.nome}</span>
                           {student.status === 'trancado' && (
                             <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 uppercase">
@@ -518,7 +662,7 @@ export default function RematriculaList({
                         </button>
                         {(() => {
                           // Mesmo estado usado no Painel e na Ficha do Aluno
-                          const carta = getCartaIntencaoInfo(student.id, enrollments);
+                          const carta = cartaInfo!;
                           const dataEnvio = carta.enviadaEm
                             ? new Date(carta.enviadaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                             : '';
@@ -541,6 +685,8 @@ export default function RematriculaList({
                   </tr>
                 );
               })}
+                </React.Fragment>
+              ))}
               {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={5} className="text-center py-8 text-slate-400 font-semibold">
