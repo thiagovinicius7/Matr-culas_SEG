@@ -1654,7 +1654,17 @@ export default function App() {
   const totalMelacoCount = activeContraturnosForHeader.filter(c => c.natureza === 'Melaço').length;
   const totalMarmeladaCount = activeContraturnosForHeader.filter(c => c.natureza === 'Marmelada').length;
 
-  if (loading) {
+  // Só mostra a tela "Carregando do Firebase" quando existe alguém logado
+  // (equipe) ou é um link público que está fazendo login anônimo automático.
+  // Sem isso, um navegador que NUNCA logou nesse domínio (ex.: projeto
+  // Firebase novo) ficava preso aqui pra sempre — a busca de dados só roda
+  // depois de ter usuário logado, mas a tela de loading não deixava chegar
+  // na Tela de Login pra fazer login em primeiro lugar.
+  const aguardandoLoginAutomaticoPublico = !!(
+    publicStudentId || isPublicFichaForm || isCoordenacaoView ||
+    fichaSaudeStudentId || dadosGeraisStudentId || anamneseStudentId
+  );
+  if (loading && (currentUser || aguardandoLoginAutomaticoPublico)) {
     return (
       <div className="h-screen w-screen bg-brand-cream flex flex-col items-center justify-center font-sans text-slate-800" id="app-loading-viewport">
         <div className="flex flex-col items-center gap-4 text-center p-8 bg-white rounded-2xl border border-slate-100 shadow-xl max-w-sm">
