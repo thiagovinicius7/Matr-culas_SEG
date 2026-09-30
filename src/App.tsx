@@ -2072,13 +2072,6 @@ export default function App() {
           classPrices={classPrices}
           contraturnoPrices={contraturnoPrices}
           onSaveResponse={(updatedEnrollment) => handleSaveEnrollment(updatedEnrollment, true)}
-          onBackToAdmin={isLoggedIn ? () => {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('alunoId');
-            url.searchParams.delete('carta');
-            window.history.pushState({}, '', url.toString());
-            window.location.reload();
-          } : undefined}
         />
       );
     }

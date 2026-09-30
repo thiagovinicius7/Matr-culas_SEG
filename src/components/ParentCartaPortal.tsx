@@ -12,7 +12,6 @@ interface ParentCartaPortalProps {
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
   onSaveResponse: (updatedEnrollment: Enrollment) => void | Promise<void>;
-  onBackToAdmin?: () => void;
 }
 
 const WEEKDAYS: Array<{ id: 'Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex'; label: string; full: string }> = [
@@ -32,8 +31,7 @@ export default function ParentCartaPortal({
   activeContraturno,
   classPrices,
   contraturnoPrices,
-  onSaveResponse,
-  onBackToAdmin
+  onSaveResponse
 }: ParentCartaPortalProps) {
   // Ages & classes
   const age2026 = calculateAgeAtCutoff(student.nascimento, 2026);
@@ -224,15 +222,6 @@ export default function ParentCartaPortal({
         
         {/* Header */}
         <div className="bg-brand-green-dark text-white p-6 sm:p-8 text-center relative print:p-4">
-          {onBackToAdmin && (
-            <button
-              onClick={onBackToAdmin}
-              className="absolute top-4 left-4 text-xs font-bold text-emerald-200 hover:text-white bg-white/10 px-3 py-1.5 rounded-lg transition-colors cursor-pointer print:hidden"
-            >
-              ← Painel da Escola
-            </button>
-          )}
-
           <div className="mx-auto mb-3 flex items-center justify-center p-2.5 bg-white/95 rounded-2xl shadow-md max-w-[200px]">
             <img 
               src="https://sitioescolageranium.com.br/imagens/logo-sitio-escola-geranium.png" 
