@@ -85,7 +85,16 @@ export default function App() {
   // mais uma "senha única do sistema".
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  // isLoggedIn = tem QUALQUER sessão (inclusive anônima, usada só nos links
+  // públicos da família). isStaffLoggedIn = sessão de verdade da equipe
+  // (e-mail+senha) — é esse que deve proteger o sistema completo. Sem essa
+  // distinção, uma sessão anônima salva no navegador (comum: a família abre
+  // um link, o Firebase guarda essa sessão) fazia cair direto no painel
+  // inteiro se, por qualquer motivo, a pessoa chegasse numa URL sem um dos
+  // parâmetros públicos reconhecidos (link digitado errado, aluno não
+  // encontrado, etc.) — dado sensível exposto sem querer.
   const isLoggedIn = !!currentUser;
+  const isStaffLoggedIn = !!currentUser && !currentUser.isAnonymous;
 
   // Detecta cedo se a página foi aberta via link público da Carta de Intenção
   // (?alunoId=... ou ?carta=...), para saber se precisa de login anônimo.
@@ -2085,7 +2094,7 @@ export default function App() {
     );
   }
 
-  if (!isLoggedIn) {
+  if (!isStaffLoggedIn) {
     return (
       <LoginScreen 
         onLoginSuccess={() => { /* onAuthStateChanged já atualiza currentUser automaticamente */ }} 
