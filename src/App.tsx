@@ -1584,15 +1584,22 @@ export default function App() {
       setMovements(prev => [...prev, ...newMovementsToSave]);
       setActiveYear(targetYear);
 
-      showToast(
-        `Virada para o Ano Letivo ${targetYear} Concluída!`,
-        `${newEnrollmentsToSave.length} alunos avançaram de turma e suas rematrículas foram iniciadas como Pendentes no ciclo ${targetYear}.` +
-          (alunosFormandos.length > 0
-            ? ` ${alunosFormandos.length} aluno(s) concluíram o Fundamental (${alunosFormandos.map(s => s.nome).join(', ')}) e não receberam matrícula em ${targetYear}.`
-            : ''),
-        'success',
-        10000
-      );
+      // Trocar de ano chama essa função toda vez (pra garantir que todo
+      // aluno novo tenha matrícula no ano certo), mas na maioria das vezes
+      // não há nada novo pra fazer — já rodou antes. Só avisa quando algo
+      // de fato mudou (matrícula nova ou formando identificado); senão a
+      // troca de ano fica silenciosa, sem repetir a mesma notificação.
+      if (newEnrollmentsToSave.length > 0 || alunosFormandos.length > 0) {
+        showToast(
+          `Virada para o Ano Letivo ${targetYear} Concluída!`,
+          `${newEnrollmentsToSave.length} alunos avançaram de turma e suas rematrículas foram iniciadas como Pendentes no ciclo ${targetYear}.` +
+            (alunosFormandos.length > 0
+              ? ` ${alunosFormandos.length} aluno(s) concluíram o Fundamental (${alunosFormandos.map(s => s.nome).join(', ')}) e não receberam matrícula em ${targetYear}.`
+              : ''),
+          'success',
+          10000
+        );
+      }
     } catch (error) {
       console.error('Error during school year rollover:', error);
       showToast('Erro na Virada de Ano', 'Ocorreu um problema ao processar a virada de ano letivo.', 'error');

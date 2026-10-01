@@ -17,7 +17,6 @@ import {
   Sparkles,
   ArrowRightCircle,
   AlertTriangle,
-  RotateCw,
   ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -333,23 +332,6 @@ export default function Dashboard({
         )}
       </div>
 
-      {/* Notice if viewing a new cycle (e.g. 2027) with pending enrollments */}
-      {activeYear >= 2027 && (
-        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3 shadow-2xs">
-          <div className="p-2 bg-amber-200 text-amber-900 rounded-lg shrink-0 mt-0.5">
-            <RotateCw size={18} className="animate-spin-slow" />
-          </div>
-          <div className="space-y-1 text-xs text-amber-950 flex-1">
-            <h4 className="font-bold text-sm font-display text-amber-900">
-              Ciclo de Rematrículas {activeYear} em Andamento
-            </h4>
-            <p className="text-amber-900/90 leading-relaxed">
-              O sistema migrou os alunos para o ano {activeYear}: as turmas regulares avançaram automaticamente para a faixa etária correspondente, todos os acordos financeiros foram transferidos como proposta inicial e o status foi reiniciado para <strong>"Pendente"</strong>. Conforme você fechar os acordos na <strong>Lista de Trabalho</strong>, o funil e os valores se consolidarão como confirmados.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Header compacto + Busca Rápida flutuante (resultado aparece só enquanto digita) */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -510,8 +492,7 @@ export default function Dashboard({
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total de Alunos</p>
-            <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{totalStudentsCount}</h3>
-            <p className="text-[10px] text-slate-400 mt-0.5">{activeStudentsCount} ativos no ciclo {activeYear}</p>
+            <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{activeStudentsCount}</h3>
           </div>
         </motion.div>
 

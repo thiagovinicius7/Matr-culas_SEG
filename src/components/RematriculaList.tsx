@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO, getNextYearClass, calculateAgeAtCutoff } from '../data';
+import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO, getNextYearClass, calculateAgeAtCutoff, getFaseProcesso } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CartaIntencaoForm from './CartaIntencaoForm';
@@ -116,6 +116,13 @@ export default function RematriculaList({
     const idadeProxAno = student ? calculateAgeAtCutoff(student.nascimento, ANO_CARTA_INTENCAO) : 0;
     const cartaInfo = student ? getCartaIntencaoInfo(student.id, enrollments) : undefined;
 
+    // Aluno novo = entrou na escola NESTE ano letivo (pelo dataEntrada real
+    // do cadastro, não pela profundidade do histórico de matrículas — isso
+    // continua certo mesmo se o sistema só tiver registros a partir de um
+    // certo ano) — e a matrícula ainda não chegou na Colheita (em andamento).
+    const anoEntrada = student?.dataEntrada ? Number(student.dataEntrada.slice(0, 4)) : undefined;
+    const isAlunoNovo = anoEntrada === e.ano && getFaseProcesso(e) !== 'colheita';
+
     return {
       enrollment: e,
       student,
@@ -131,7 +138,8 @@ export default function RematriculaList({
       turmaPropostaObj,
       semTurmaPorConclusao,
       idadeProxAno,
-      cartaInfo
+      cartaInfo,
+      isAlunoNovo
     };
   });
 
@@ -397,7 +405,7 @@ export default function RematriculaList({
                       </td>
                     </tr>
                   )}
-              {grupo.itens.map(({ enrollment, student, guardian, regularClass, activeContraturno, totalNegotiatedMonthly, hasRegPont, hasContPont, discRegPont, discContPont, totalPontDiscount, cartaInfo }) => {
+              {grupo.itens.map(({ enrollment, student, guardian, regularClass, activeContraturno, totalNegotiatedMonthly, hasRegPont, hasContPont, discRegPont, discContPont, totalPontDiscount, cartaInfo, isAlunoNovo }) => {
                 if (!student) return null;
                 const isEditingThisNotes = editingNotesStudentId === student.id;
                 const cartaJaEnviada = cartaInfo && cartaInfo.estado !== 'nao_enviada';
@@ -412,6 +420,11 @@ export default function RematriculaList({
                             <span className="text-emerald-600 shrink-0" title="Carta de Intenção já enviada">✔️</span>
                           )}
                           <span className="font-bold text-slate-800 text-xs">{student.nome}</span>
+                          {isAlunoNovo && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-100 text-sky-800 border border-sky-300 uppercase">
+                              Novo(a)
+                            </span>
+                          )}
                           {student.status === 'trancado' && (
                             <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 uppercase">
                               Trancado
