@@ -1470,6 +1470,9 @@ export default function App() {
       const newMovementsToSave: FinancialMovement[] = [];
       const updatedEnrollments = [...enrollments];
       const today = new Date().toISOString().split('T')[0];
+      // Alunos que já estavam na última turma (Benjoí) e concluem o
+      // Fundamental neste ano-alvo — não recebem matrícula nova.
+      const alunosFormandos: Student[] = [];
 
       // Filter active students
       const activeStudentsList = students.filter(s => s.status === 'ativo');
@@ -1484,12 +1487,30 @@ export default function App() {
         // Get previous year enrollment
         const prevEnrollment = updatedEnrollments.find(e => e.alunoId === st.id && e.ano === fromYear);
 
+        // Matrícula do ano anterior foi Cancelada (família não renovou) —
+        // não cria matrícula nova automática. Cancelar é por matrícula/ano,
+        // não apaga o Student (status continua "ativo"), então sem esse
+        // check o aluno voltava a aparecer sozinho no ano seguinte mesmo
+        // tendo sido cancelado explicitamente pela equipe.
+        if (prevEnrollment?.statusNegociacao === 'Cancelada') {
+          continue;
+        }
+
         // Calcular a próxima turma usando a função central getNextYearClass
         // (data.ts) — prioriza avançar 1 série a partir da turma atual do
         // aluno, só cai pra idade pura se ele for novo ou a série seguinte
         // não existir. A mesma função é usada na Carta de Intenção, pra não
         // ter duas contas diferentes divergindo entre si.
         const nextClass = getNextYearClass(st, prevEnrollment, classPrices, targetYear);
+
+        // null = aluno já estava na última turma (Benjoí) e conclui o
+        // Fundamental neste ano-alvo — não tem próxima série. Sem isso, o
+        // sistema recriava a matrícula do aluno em Benjoí de novo todo ano,
+        // "repetindo" quem já devia ter saído da escola.
+        if (nextClass === null) {
+          alunosFormandos.push(st);
+          continue;
+        }
 
         const isOnlyContraturno = prevEnrollment?.turmaRegularId === 'sem_regular';
         const baseRegularPrice = isOnlyContraturno ? 0 : nextClass.valorMensal;
@@ -1565,9 +1586,12 @@ export default function App() {
 
       showToast(
         `Virada para o Ano Letivo ${targetYear} Concluída!`,
-        `${newEnrollmentsToSave.length} alunos avançaram de turma e suas rematrículas foram iniciadas como Pendentes no ciclo ${targetYear}.`,
+        `${newEnrollmentsToSave.length} alunos avançaram de turma e suas rematrículas foram iniciadas como Pendentes no ciclo ${targetYear}.` +
+          (alunosFormandos.length > 0
+            ? ` ${alunosFormandos.length} aluno(s) concluíram o Fundamental (${alunosFormandos.map(s => s.nome).join(', ')}) e não receberam matrícula em ${targetYear}.`
+            : ''),
         'success',
-        7000
+        10000
       );
     } catch (error) {
       console.error('Error during school year rollover:', error);

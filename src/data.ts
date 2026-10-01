@@ -115,17 +115,47 @@ export function getRegularClassForAgeDynamic(
  * "pulando" ou indo pra série errada quando cada tela calculava do seu
  * jeito, só pela idade.
  */
+// Idade de referência da última turma (Benjoí, hoje 10 anos) — não existe
+// 6º ano do Fundamental na escola. Calculada a partir do catálogo em vez de
+// fixa, pra continuar certa se a grade de turmas mudar no futuro.
+const IDADE_REF_ULTIMA_TURMA = Math.max(...REGULAR_CLASSES.map(c => c.idadeRef));
+
+/**
+ * `null` quer dizer "conclui o Fundamental" — não existe próxima turma, o
+ * aluno sai da escola nesse ano-alvo. Quem chama precisa tratar esse caso
+ * (não criar matrícula nova, mostrar aviso em vez de seletor de turma etc.),
+ * nunca cair de volta pra Benjoí.
+ */
+// Turma sintética pra quem não tem Ensino Regular, só Contraturno ("Dia no
+// Sítio-Escola"). Reaproveitar sempre esse mesmo objeto em vez de recriar
+// um literal diferente em cada tela evita o id/nome divergirem.
+export const SOMENTE_CONTRATURNO_CLASS: RegularClass = {
+  id: 'sem_regular', nome: 'Somente Contraturno', natureza: 'Isento' as any, idadeRef: 0, valorMensal: 0
+};
+
 export function getNextYearClass(
   student: Student,
   currentEnrollment: Enrollment | undefined,
   classPricesList: RegularClass[],
   targetYear: number
-): RegularClass {
+): RegularClass | null {
   const ageInTargetYear = calculateAgeAtCutoff(student.nascimento, targetYear);
-  const fallback = getRegularClassForAgeDynamic(ageInTargetYear, classPricesList, targetYear);
+  // Idade já passou da última turma e não tem matrícula prévia pra basear o
+  // cálculo (aluno realmente novo, nunca vai ser matriculado) — conclui.
+  const fallback = (): RegularClass | null =>
+    ageInTargetYear > IDADE_REF_ULTIMA_TURMA ? null : getRegularClassForAgeDynamic(ageInTargetYear, classPricesList, targetYear);
 
-  if (!currentEnrollment || !currentEnrollment.turmaRegularId || currentEnrollment.turmaRegularId === 'sem_regular') {
-    return fallback;
+  // Já estava matriculado como Somente Contraturno — continua assim no ano
+  // seguinte. Nunca empurra pra uma turma regular só porque a idade bateu
+  // com alguma: migrar pro Ensino Regular é decisão da família/equipe, não
+  // algo automático. Sem esse check, caía no cálculo por idade puro (mesmo
+  // "fallback" de aluno novo) e o aluno aparecia errado numa turma regular.
+  if (currentEnrollment?.turmaRegularId === 'sem_regular') {
+    return SOMENTE_CONTRATURNO_CLASS;
+  }
+
+  if (!currentEnrollment || !currentEnrollment.turmaRegularId) {
+    return fallback();
   }
 
   const fromYear = currentEnrollment.ano;
@@ -135,14 +165,22 @@ export function getNextYearClass(
     || classPricesList.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
     || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId));
 
-  if (!currentClassDetails) return fallback;
+  if (!currentClassDetails) return fallback();
+
+  // Já estava na última turma (Benjoí) — não tem pra onde avançar, conclui
+  // o Fundamental. Sem isso, o cálculo por idade "grudava" o aluno de volta
+  // em Benjoí pra sempre (idade acima da máxima configurada = turma mais
+  // velha), fazendo o sistema repetir o aluno ano após ano.
+  if (currentClassDetails.idadeRef >= IDADE_REF_ULTIMA_TURMA) {
+    return null;
+  }
 
   const targetYearClasses = classPricesList.filter(c => (c.ano || 2026) === targetYear);
   const nextByProgression =
     targetYearClasses.find(c => c.idadeRef === currentClassDetails.idadeRef + 1)
     || targetYearClasses.find(c => c.nome.trim().toLowerCase() === (REGULAR_CLASSES.find(rc => rc.idadeRef === currentClassDetails.idadeRef + 1)?.nome || '').trim().toLowerCase());
 
-  return nextByProgression || fallback;
+  return nextByProgression || fallback();
 }
 
 // Default prices for Somente Contraturno ("Dia no Sítio-Escola")

@@ -71,6 +71,7 @@ export default function Dashboard({
   const [modalSearch, setModalSearch] = useState('');
   const [selectedFaseForModal, setSelectedFaseForModal] = useState<{ label: string; emoji: string; alunoIds: string[] } | null>(null);
   const [isProcessingRollover, setIsProcessingRollover] = useState(false);
+  const [activeTab, setActiveTab] = useState<'turmas' | 'fases' | 'docs'>('turmas');
 
   // Helper to accurately resolve effective regular class for any student in activeYear
   const getStudentClassInfo = (student: Student) => {
@@ -349,204 +350,151 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Header with quick stats */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-150 pb-2">
+      {/* Header compacto + Busca Rápida flutuante (resultado aparece só enquanto digita) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-display font-extrabold tracking-tight text-brand-green-dark">
             Painel Principal
           </h2>
           <p className="text-xs text-slate-500 font-sans mt-0.5">
-            Visão geral da comunidade Sítio-escola: alunos, rematrículas e receitas vigentes em {activeYear}.
+            {students.length} alunos cadastrados • ciclo {activeYear}
           </p>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
-          <span className="px-2.5 py-1.5 bg-emerald-50 text-emerald-800 text-[10px] font-bold uppercase rounded-md border border-emerald-200/60 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            Base Firebase: {students.length} Alunos Cadastrados
-          </span>
-        </div>
-      </div>
 
-      {/* Busca Rápida de Alunos e Acesso Direto */}
-      <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-xs p-5 space-y-4" id="quick-student-search-panel">
-        <div className="flex items-center gap-2 text-brand-green-dark">
-          <Search size={18} className="text-brand-orange stroke-[2.5]" />
-          <h3 className="font-display font-bold text-sm uppercase tracking-wider">
-            Busca Rápida de Alunos • Acesso Direto
-          </h3>
-        </div>
-        <p className="text-xs text-slate-500">
-          Pesquise por qualquer aluno para visualizar ou editar diretamente sua Ficha, calcular seu Acordo de Rematrícula ou gerenciar seus Contatos na Lista de Trabalho.
-        </p>
-
-        <div className="relative">
+        <div className="relative w-full sm:w-80" id="quick-student-search-panel">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Digite o nome do aluno..."
+            placeholder="Buscar aluno ou responsável…"
             value={quickSearch}
             onChange={(e) => setQuickSearch(e.target.value)}
-            className="w-full text-xs px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-green-light focus:ring-1 focus:ring-brand-green-light focus:outline-none bg-slate-50/50"
+            className="w-full text-xs pl-8 pr-3 py-2.5 rounded-lg border border-slate-200 focus:border-brand-green-light focus:ring-1 focus:ring-brand-green-light focus:outline-none bg-white"
           />
-        </div>
 
-        {quickSearch.trim().length > 0 && (
-          <div className="border border-slate-150 rounded-lg overflow-hidden divide-y divide-slate-100 bg-white">
-            {students
-              .filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase()))
-              .slice(0, 5)
-              .map(student => {
-                const age = calculateAgeAtCutoff(student.nascimento, activeYear);
-                const regularClass = getRegularClassForAgeDynamic(age, classPrices, activeYear);
-                return (
-                  <div key={student.id} className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/50 transition-colors">
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-slate-800">{student.nome}</h4>
-                      <p className="text-[10px] text-slate-500">
-                        Idade ({activeYear}): {age} anos • Turma Regular: <span className="font-semibold text-brand-green-dark">{regularClass.nome}</span>
-                      </p>
+          {quickSearch.trim().length > 0 && (
+            <div className="absolute z-30 top-full left-0 right-0 mt-1.5 border border-slate-200 rounded-lg shadow-lg overflow-hidden divide-y divide-slate-100 bg-white max-h-96 overflow-y-auto">
+              {students
+                .filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase()))
+                .slice(0, 5)
+                .map(student => {
+                  const age = calculateAgeAtCutoff(student.nascimento, activeYear);
+                  const regularClass = getRegularClassForAgeDynamic(age, classPrices, activeYear);
+                  return (
+                    <div key={student.id} className="p-3 space-y-1.5 hover:bg-slate-50/50 transition-colors">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800">{student.nome}</h4>
+                        <p className="text-[10px] text-slate-500">
+                          {age} anos • Turma: <span className="font-semibold text-brand-green-dark">{regularClass.nome}</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          onClick={() => { onNavigateWithStudent?.('students', student.id); setQuickSearch(''); }}
+                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <FileText size={11} />
+                          Ficha
+                        </button>
+                        <button
+                          onClick={() => { onNavigateWithStudent?.('negotiation', student.id); setQuickSearch(''); }}
+                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Calculator size={11} />
+                          Calculadora
+                        </button>
+                        <button
+                          onClick={() => { onNavigateWithStudent?.('rematricula', student.id); setQuickSearch(''); }}
+                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <ClipboardList size={11} />
+                          Lista de Trabalho
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <button
-                        onClick={() => onNavigateWithStudent?.('students', student.id)}
-                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <FileText size={12} />
-                        Ficha do Aluno
-                      </button>
-                      <button
-                        onClick={() => onNavigateWithStudent?.('negotiation', student.id)}
-                        className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <Calculator size={12} />
-                        Calculadora
-                      </button>
-                      <button
-                        onClick={() => onNavigateWithStudent?.('rematricula', student.id)}
-                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <ClipboardList size={12} />
-                        Lista de Trabalho
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            {students.filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase())).length === 0 && (
-              <div className="p-4 text-center text-xs text-slate-400 italic">
-                Nenhum aluno encontrado com "{quickSearch}".
-              </div>
-            )}
-          </div>
-        )}
+                  );
+                })}
+              {students.filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase())).length === 0 && (
+                <div className="p-4 text-center text-xs text-slate-400 italic">
+                  Nenhum aluno encontrado com "{quickSearch}".
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Aviso: novos alunos que se auto-cadastraram pela Ficha de Dados Gerais */}
-      {novosAutoCadastrados.length > 0 && (
-        <div className="bg-amber-50 border-2 border-brand-orange rounded-xl p-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🌱</span>
-            <div>
-              <p className="text-sm font-bold text-brand-clay">
-                {novosAutoCadastrados.length} nov{novosAutoCadastrados.length === 1 ? 'a família preencheu' : 'as famílias preencheram'} a Ficha de Dados Gerais
-              </p>
-              <p className="text-[11px] text-slate-600">
-                {novosAutoCadastrados.slice(0, 3).map(s => s.nome).join(', ')}
-                {novosAutoCadastrados.length > 3 ? ` e mais ${novosAutoCadastrados.length - 3}` : ''} — aguardando primeiro contato (Preparo da Terra)
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              const primeiro = novosAutoCadastrados[0];
-              if (primeiro && onNavigateWithStudent) {
-                onNavigateWithStudent('students', primeiro.id);
-              } else {
-                onNavigate('students');
-              }
-            }}
-            className="shrink-0 px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-md cursor-pointer"
-          >
-            Ver {novosAutoCadastrados.length === 1 ? 'aluno' : 'alunos'}
-          </button>
-        </div>
-      )}
+      {/* O que precisa de você agora — junta num feed só os cadastros novos,
+          as sugestões da Coordenação e quem ainda falta enviar a carta */}
+      {(novosAutoCadastrados.length > 0 || coordenacaoSugestoes.filter(s => !s.resolvida).length > 0 || cartaIds.faltaEnviar.length > 0) && (
+        <div className="bg-white border-l-4 border-brand-orange border-y border-r border-slate-200/80 rounded-xl shadow-xs p-5">
+          <h3 className="font-display font-bold text-sm text-brand-green-dark mb-1">
+            O que precisa de você agora
+          </h3>
+          <div className="divide-y divide-slate-100">
+            {novosAutoCadastrados.length > 0 && (
+              <div className="flex items-center gap-3 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-brand-orange flex items-center justify-center shrink-0 text-base">🌱</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-800">
+                    {novosAutoCadastrados.length} nov{novosAutoCadastrados.length === 1 ? 'a família preencheu' : 'as famílias preencheram'} a Ficha de Dados Gerais
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {novosAutoCadastrados.slice(0, 3).map(s => s.nome).join(', ')}
+                    {novosAutoCadastrados.length > 3 ? ` e mais ${novosAutoCadastrados.length - 3}` : ''} — aguardando Preparo da Terra
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const primeiro = novosAutoCadastrados[0];
+                    if (primeiro && onNavigateWithStudent) {
+                      onNavigateWithStudent('students', primeiro.id);
+                    } else {
+                      onNavigate('students');
+                    }
+                  }}
+                  className="shrink-0 px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[11px] font-bold rounded-md cursor-pointer"
+                >
+                  Ver {novosAutoCadastrados.length === 1 ? 'aluno' : 'alunos'}
+                </button>
+              </div>
+            )}
 
-      {/* Aviso: sugestões enviadas pela tela da Coordenação */}
-      {coordenacaoSugestoes.filter(s => !s.resolvida).length > 0 && (
-        <div className="bg-white border-2 border-brand-green-dark rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">💬</span>
-            <p className="text-sm font-bold text-brand-green-dark">
-              {coordenacaoSugestoes.filter(s => !s.resolvida).length} sugestão(ões) da Coordenação do Contraturno
-            </p>
-          </div>
-          <div className="space-y-1.5">
             {coordenacaoSugestoes.filter(s => !s.resolvida).map(s => (
-              <div key={s.id} className="flex items-start justify-between gap-3 bg-slate-50 rounded-lg px-3 py-2">
-                <div>
-                  <p className="text-xs text-slate-700">{s.texto}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{s.criadoEm}</p>
+              <div key={s.id} className="flex items-center gap-3 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-brand-green-light flex items-center justify-center shrink-0 text-base">💬</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-800 truncate">{s.texto}</p>
+                  <p className="text-[11px] text-slate-500">Sugestão da Coordenação • {s.criadoEm}</p>
                 </div>
                 <button
                   onClick={() => onResolveSugestao?.(s.id)}
-                  className="shrink-0 text-[10px] font-bold text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 px-2 py-1 rounded-md cursor-pointer"
+                  className="shrink-0 px-3 py-1.5 bg-white border border-slate-200 hover:border-emerald-300 hover:text-emerald-700 text-slate-600 text-[11px] font-bold rounded-md cursor-pointer"
                 >
                   ✓ Resolvida
                 </button>
               </div>
             ))}
+
+            {cartaIds.faltaEnviar.length > 0 && (
+              <div className="flex items-center gap-3 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-brand-orange flex items-center justify-center shrink-0 text-base">📤</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-800">
+                    {cartaIds.faltaEnviar.length} famílias ainda sem a Carta de Intenção {anoCarta}
+                  </p>
+                  <p className="text-[11px] text-slate-500">De {activeStudentsCount} alunos ativos</p>
+                </div>
+                <button
+                  onClick={() => onNavigate('rematricula')}
+                  className="shrink-0 px-3 py-1.5 bg-white border border-slate-200 hover:border-brand-orange hover:text-brand-orange text-slate-600 text-[11px] font-bold rounded-md cursor-pointer"
+                >
+                  Ir para a lista
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
-
-      {/* Matrículas por Fase — ciclo Preparo da Terra → Semeadura → Enraizamento → Florescer → Colheita */}
-      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs p-5 space-y-4">
-        <div>
-          <h3 className="font-display font-bold text-sm uppercase tracking-wider text-brand-green-dark">
-            Matrículas por Fase • {activeYear}
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {emProcessoCount} em processo • {colheitaCount} já colhidas neste ciclo
-          </p>
-        </div>
-        <div className="flex items-stretch justify-between gap-1 sm:gap-2">
-          {faseCounts.map((f, idx) => (
-            <React.Fragment key={f.key}>
-              <button
-                onClick={() => {
-                  if (f.alunoIds.length === 1 && onNavigateWithStudent) {
-                    onNavigateWithStudent('students', f.alunoIds[0]);
-                  } else if (f.alunoIds.length > 1) {
-                    setSelectedFaseForModal({ label: f.label, emoji: f.emoji, alunoIds: f.alunoIds });
-                  }
-                }}
-                disabled={f.alunoIds.length === 0}
-                className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer disabled:cursor-default"
-                title={`Ver alunos em ${f.label}`}
-              >
-                <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-bold font-mono border-2 transition-all ${
-                    f.key === 'colheita'
-                      ? 'bg-emerald-50 border-emerald-200 text-brand-green-dark'
-                      : f.count > 0
-                        ? 'bg-amber-50 border-brand-orange text-brand-clay group-hover:bg-amber-100'
-                        : 'bg-slate-50 border-slate-200 text-slate-400'
-                  }`}
-                >
-                  {f.count}
-                </div>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-600 text-center leading-tight">
-                  {f.emoji} {f.label}
-                </span>
-              </button>
-              {idx < faseCounts.length - 1 && (
-                <div className="w-3 sm:w-6 h-px bg-slate-200 self-center mt-[-14px]" />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="stats-grid font-display">
@@ -643,299 +591,326 @@ export default function Dashboard({
         </motion.div>
       </div>
 
-      {/* Main Sections: Rematrícula funnel + Hive Classes list */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="dashboard-details">
-        {/* Left Side: Rematrícula pipeline */}
-        <div className="lg:col-span-5 bg-white p-5 rounded-lg border border-slate-200 shadow-xs space-y-4 flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">
-              Funil de Rematrícula {activeYear}
-            </h3>
-            <p className="text-xs text-slate-500">
-              Progresso atual de renovação de contratos e matrículas regulares da escola no ano letivo {activeYear}.
-            </p>
-          </div>
-
-          {/* Visual Bars */}
-          <div className="space-y-4 my-auto py-2">
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-emerald-700 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-                  Confirmadas ({confirmed})
-                </span>
-                <span className="text-slate-700">{confirmedPct}%</span>
-              </div>
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${confirmedPct}%` }}></div>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-orange-600 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span>
-                  Em Negociação ({negotiating})
-                </span>
-                <span className="text-slate-700">{negotiatingPct}%</span>
-              </div>
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${negotiatingPct}%` }}></div>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-600 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span>
-                  Não Iniciadas / Pendentes ({pending})
-                </span>
-                <span className="text-slate-700">{pendingPct}%</span>
-              </div>
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-400 rounded-full" style={{ width: `${pendingPct}%` }}></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-150 space-y-3">
-            {/* Intenção Carta Badge */}
-            <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg space-y-2">
-              <div className="flex items-center justify-between text-amber-900 text-xs font-bold font-display uppercase tracking-wider">
-                <span className="flex items-center gap-1.5">
-                  <FileText size={14} className="text-amber-600" />
-                  Cartas de Intenção {anoCarta}
-                </span>
-                <span className="bg-amber-200/80 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-mono">
-                  {respondidasCarta} / {activeStudentsCount} Responderam
-                </span>
-              </div>
-
-              {/* Envio: quem falta mandar, quem já recebeu e quem ainda não respondeu */}
-              <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
-                {([
-                  { label: 'Falta enviar', emoji: '📤', ids: cartaIds.faltaEnviar, cor: 'text-slate-700' },
-                  { label: 'Enviadas', emoji: '✉️', ids: cartaIds.enviadas, cor: 'text-sky-700' },
-                  { label: 'Aguardando retorno', emoji: '⏳', ids: cartaIds.aguardando, cor: 'text-amber-800' },
-                ] as const).map(box => (
-                  <button
-                    key={box.label}
-                    type="button"
-                    onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — ${box.label}`, emoji: box.emoji, alunoIds: box.ids })}
-                    className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs cursor-pointer hover:border-brand-orange transition-colors"
-                    title={`Ver os alunos — ${box.label}`}
-                  >
-                    <span className="block text-[9px] text-slate-500 uppercase font-bold leading-tight">{box.label}</span>
-                    <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Respostas da família */}
-              <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
-                {([
-                  { label: 'Confirmam', emoji: '✅', ids: cartaIds.confirmam, cor: 'text-emerald-700' },
-                  { label: 'Em Análise', emoji: '🤔', ids: cartaIds.emAnalise, cor: 'text-amber-800' },
-                  { label: 'Não Renovar', emoji: '👋', ids: cartaIds.naoRenova, cor: 'text-rose-700' },
-                ] as const).map(box => (
-                  <button
-                    key={box.label}
-                    type="button"
-                    onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — ${box.label}`, emoji: box.emoji, alunoIds: box.ids })}
-                    className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs cursor-pointer hover:border-brand-orange transition-colors"
-                    title={`Ver os alunos — ${box.label}`}
-                  >
-                    <span className="block text-[9px] text-slate-500 uppercase font-bold">{box.label}</span>
-                    <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button 
-              onClick={() => onNavigate('rematricula')}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-brand-cream to-amber-50 hover:from-brand-sand hover:to-amber-100 text-brand-green-dark border border-amber-200 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer font-display shadow-2xs"
-            >
-              <ClipboardList size={15} className="text-brand-orange" />
-              <span>Abrir Lista de Trabalho • Rematrículas</span>
-              <ArrowRight size={14} className="text-brand-orange ml-auto" />
-            </button>
-          </div>
+      {/* Abas: Turmas | Matrícula & Fases | Documentos */}
+      <div>
+        <div className="border-b border-slate-200 flex gap-6">
+          <button
+            onClick={() => setActiveTab('turmas')}
+            className={`pb-2.5 text-[13px] font-bold cursor-pointer border-b-2 transition-colors ${
+              activeTab === 'turmas' ? 'text-brand-green-dark border-brand-orange' : 'text-slate-400 border-transparent hover:text-slate-600'
+            }`}
+          >
+            Turmas
+          </button>
+          <button
+            onClick={() => setActiveTab('fases')}
+            className={`pb-2.5 text-[13px] font-bold cursor-pointer border-b-2 transition-colors ${
+              activeTab === 'fases' ? 'text-brand-green-dark border-brand-orange' : 'text-slate-400 border-transparent hover:text-slate-600'
+            }`}
+          >
+            Matrícula &amp; Fases
+          </button>
+          <button
+            onClick={() => setActiveTab('docs')}
+            className={`pb-2.5 text-[13px] font-bold cursor-pointer border-b-2 transition-colors ${
+              activeTab === 'docs' ? 'text-brand-green-dark border-brand-orange' : 'text-slate-400 border-transparent hover:text-slate-600'
+            }`}
+          >
+            Documentos
+          </button>
         </div>
 
-        {/* Right Side: Bees Classes catalog and distribution */}
-        <div className="lg:col-span-7 bg-white p-5 rounded-lg border border-slate-200 shadow-xs space-y-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">
-              Colmeias de Aprendizado ({activeYear})
-            </h3>
-            <p className="text-xs text-slate-500">
-              Distribuição de alunos nas turmas baseadas nas espécies de abelhas nativas e idade de corte (31/03/{activeYear}).
-            </p>
-          </div>
+        {/* ABA: TURMAS — Colmeias de Aprendizado */}
+        {activeTab === 'turmas' && (
+          <div className="bg-white p-5 rounded-b-lg rounded-tr-lg border border-slate-200 border-t-0 shadow-xs space-y-4 mt-[-1px]">
+            <div>
+              <h3 className="text-base font-bold text-slate-800 mb-1">
+                Colmeias de Aprendizado ({activeYear})
+              </h3>
+              <p className="text-xs text-slate-500">
+                Distribuição de alunos nas turmas baseadas nas espécies de abelhas nativas e idade de corte (31/03/{activeYear}).
+              </p>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" id="classes-grid">
-            {classDistribution.map((cls) => {
-              const isBenjoi = cls.id === 'benjoi' || cls.nome === 'Benjoi';
-              return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" id="classes-grid">
+              {classDistribution.map((cls) => {
+                const isBenjoi = cls.id === 'benjoi' || cls.nome === 'Benjoi';
+                return (
+                  <div 
+                    key={cls.id} 
+                    onClick={() => setSelectedClassForModal(cls)}
+                    className={`p-3 rounded-lg border transition-all flex items-center justify-between cursor-pointer group ${
+                      isBenjoi 
+                        ? 'border-brand-orange bg-amber-50/70 shadow-xs ring-1 ring-brand-orange/20 hover:bg-amber-100/70 hover:shadow-sm' 
+                        : 'border-slate-150 bg-slate-50 hover:bg-white hover:border-brand-green-light hover:shadow-xs'
+                    }`}
+                    title={`Clique para ver os alunos da turma ${cls.nome}`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${cls.natureza === 'Infantil' ? 'bg-brand-orange' : 'bg-brand-green-light'}`}></span>
+                        <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5 font-display group-hover:text-brand-green-dark">
+                          {cls.nome}
+                          {isBenjoi && (
+                            <span className="px-1.5 py-0.5 bg-brand-orange text-white text-[8px] font-bold uppercase rounded tracking-wider animate-pulse leading-none">
+                              Benjoi
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                        {cls.idadeRef} anos • {cls.natureza}
+                      </div>
+                      <div className={`text-[10px] mt-0.5 font-bold ${isBenjoi ? 'text-brand-clay' : 'text-brand-green-light'}`}>
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cls.valorMensal)}/mês
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-end font-display">
+                      <span className={`text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border transition-transform group-hover:scale-105 ${
+                        isBenjoi ? 'bg-white border-brand-orange text-brand-orange' : 'bg-white border-slate-200 text-slate-700'
+                      }`}>
+                        {cls.count}
+                      </span>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 mt-1 font-semibold group-hover:text-brand-orange">ver lista</span>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {contraturnoOnlyCount > 0 && (
                 <div 
-                  key={cls.id} 
-                  onClick={() => setSelectedClassForModal(cls)}
-                  className={`p-3 rounded-lg border transition-all flex items-center justify-between cursor-pointer group ${
-                    isBenjoi 
-                      ? 'border-brand-orange bg-amber-50/70 shadow-xs ring-1 ring-brand-orange/20 hover:bg-amber-100/70 hover:shadow-sm' 
-                      : 'border-slate-150 bg-slate-50 hover:bg-white hover:border-brand-green-light hover:shadow-xs'
-                  }`}
-                  title={`Clique para ver os alunos da turma ${cls.nome}`}
+                  onClick={() => setSelectedClassForModal({ id: 'sem_regular', nome: 'Somente Contraturno', natureza: 'Isento', idadeRef: 0, valorMensal: 0 })}
+                  className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 shadow-xs flex items-center justify-between cursor-pointer hover:bg-amber-100/80 hover:border-amber-300 transition-all group"
+                  title="Clique para ver os alunos somente no contraturno"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${cls.natureza === 'Infantil' ? 'bg-brand-orange' : 'bg-brand-green-light'}`}></span>
-                      <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5 font-display group-hover:text-brand-green-dark">
-                        {cls.nome}
-                        {isBenjoi && (
-                          <span className="px-1.5 py-0.5 bg-brand-orange text-white text-[8px] font-bold uppercase rounded tracking-wider animate-pulse leading-none">
-                            Benjoi
-                          </span>
-                        )}
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+                      <span className="font-bold text-xs text-amber-950 font-display">
+                        Somente Contraturno
                       </span>
                     </div>
-                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                      {cls.idadeRef} anos • {cls.natureza}
+                    <div className="text-[10px] text-amber-800 font-mono mt-0.5">
+                      Sem Ensino Regular • Isento
                     </div>
-                    <div className={`text-[10px] mt-0.5 font-bold ${isBenjoi ? 'text-brand-clay' : 'text-brand-green-light'}`}>
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cls.valorMensal)}/mês
+                    <div className="text-[10px] mt-0.5 font-bold text-amber-900">
+                      R$ 0,00/mês (Regular)
                     </div>
                   </div>
                   
                   <div className="flex flex-col items-end font-display">
-                    <span className={`text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border transition-transform group-hover:scale-105 ${
-                      isBenjoi ? 'bg-white border-brand-orange text-brand-orange' : 'bg-white border-slate-200 text-slate-700'
-                    }`}>
-                      {cls.count}
+                    <span className="text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border bg-white border-amber-300 text-amber-900 transition-transform group-hover:scale-105">
+                      {contraturnoOnlyCount}
                     </span>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 mt-1 font-semibold group-hover:text-brand-orange">ver lista</span>
+                    <span className="text-[9px] uppercase tracking-wider text-amber-800 mt-1 font-semibold group-hover:text-amber-950">ver lista</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ABA: MATRÍCULA & FASES — funil de fases + Cartas de Intenção + Lista de Trabalho */}
+        {activeTab === 'fases' && (
+          <div className="bg-white p-5 rounded-b-lg rounded-tr-lg border border-slate-200 border-t-0 shadow-xs space-y-5 mt-[-1px]">
+            <div>
+              <h3 className="font-display font-bold text-sm uppercase tracking-wider text-brand-green-dark">
+                Matrículas por Fase • {activeYear}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                {emProcessoCount} em processo • {colheitaCount} já colhidas neste ciclo
+              </p>
+              <div className="flex items-stretch justify-between gap-1 sm:gap-2">
+                {faseCounts.map((f, idx) => (
+                  <React.Fragment key={f.key}>
+                    <button
+                      onClick={() => {
+                        if (f.alunoIds.length === 1 && onNavigateWithStudent) {
+                          onNavigateWithStudent('students', f.alunoIds[0]);
+                        } else if (f.alunoIds.length > 1) {
+                          setSelectedFaseForModal({ label: f.label, emoji: f.emoji, alunoIds: f.alunoIds });
+                        }
+                      }}
+                      disabled={f.alunoIds.length === 0}
+                      className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer disabled:cursor-default"
+                      title={`Ver alunos em ${f.label}`}
+                    >
+                      <div
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-bold font-mono border-2 transition-all ${
+                          f.key === 'colheita'
+                            ? 'bg-emerald-50 border-emerald-200 text-brand-green-dark'
+                            : f.count > 0
+                              ? 'bg-amber-50 border-brand-orange text-brand-clay group-hover:bg-amber-100'
+                              : 'bg-slate-50 border-slate-200 text-slate-400'
+                        }`}
+                      >
+                        {f.count}
+                      </div>
+                      <span className="text-[9px] sm:text-[10px] font-semibold text-slate-600 text-center leading-tight">
+                        {f.emoji} {f.label}
+                      </span>
+                    </button>
+                    {idx < faseCounts.length - 1 && (
+                      <div className="w-3 sm:w-6 h-px bg-slate-200 self-center mt-[-14px]" />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-150 space-y-3">
+              {/* Intenção Carta Badge */}
+              <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg space-y-2">
+                <div className="flex items-center justify-between text-amber-900 text-xs font-bold font-display uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5">
+                    <FileText size={14} className="text-amber-600" />
+                    Cartas de Intenção {anoCarta}
+                  </span>
+                  <span className="bg-amber-200/80 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                    {respondidasCarta} / {activeStudentsCount} Responderam
+                  </span>
+                </div>
+
+                {/* Envio: quem falta mandar, quem já recebeu e quem ainda não respondeu */}
+                <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
+                  {([
+                    { label: 'Falta enviar', emoji: '📤', ids: cartaIds.faltaEnviar, cor: 'text-slate-700' },
+                    { label: 'Enviadas', emoji: '✉️', ids: cartaIds.enviadas, cor: 'text-sky-700' },
+                    { label: 'Aguardando retorno', emoji: '⏳', ids: cartaIds.aguardando, cor: 'text-amber-800' },
+                  ] as const).map(box => (
+                    <button
+                      key={box.label}
+                      type="button"
+                      onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — ${box.label}`, emoji: box.emoji, alunoIds: box.ids })}
+                      className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs cursor-pointer hover:border-brand-orange transition-colors"
+                      title={`Ver os alunos — ${box.label}`}
+                    >
+                      <span className="block text-[9px] text-slate-500 uppercase font-bold leading-tight">{box.label}</span>
+                      <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Respostas da família */}
+                <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
+                  {([
+                    { label: 'Confirmam', emoji: '✅', ids: cartaIds.confirmam, cor: 'text-emerald-700' },
+                    { label: 'Em Análise', emoji: '🤔', ids: cartaIds.emAnalise, cor: 'text-amber-800' },
+                    { label: 'Não Renovar', emoji: '👋', ids: cartaIds.naoRenova, cor: 'text-rose-700' },
+                  ] as const).map(box => (
+                    <button
+                      key={box.label}
+                      type="button"
+                      onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — ${box.label}`, emoji: box.emoji, alunoIds: box.ids })}
+                      className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs cursor-pointer hover:border-brand-orange transition-colors"
+                      title={`Ver os alunos — ${box.label}`}
+                    >
+                      <span className="block text-[9px] text-slate-500 uppercase font-bold">{box.label}</span>
+                      <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button 
+                onClick={() => onNavigate('rematricula')}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-brand-cream to-amber-50 hover:from-brand-sand hover:to-amber-100 text-brand-green-dark border border-amber-200 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer font-display shadow-2xs"
+              >
+                <ClipboardList size={15} className="text-brand-orange" />
+                <span>Abrir Lista de Trabalho • Rematrículas</span>
+                <ArrowRight size={14} className="text-brand-orange ml-auto" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ABA: DOCUMENTOS — Documentos do Pack de Matrícula */}
+        {activeTab === 'docs' && (
+          <div className="bg-white p-5 rounded-b-lg rounded-tr-lg border border-slate-200 border-t-0 shadow-xs space-y-4 mt-[-1px]">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display font-bold text-sm uppercase tracking-wider text-brand-green-dark">
+                Documentos do Pack de Matrícula
+              </h3>
+              <button
+                onClick={() => onNavigate('pricing')}
+                className="text-[11px] font-bold text-brand-orange hover:text-brand-clay flex items-center gap-1 cursor-pointer"
+              >
+                Gerenciar <ArrowRight size={12} />
+              </button>
+            </div>
+
+            {(['semeadura', 'enraizamento', 'florescer'] as const).map(fase => {
+              const faseLabels: Record<typeof fase, { titulo: string; color: string }> = {
+                semeadura: { titulo: '🌱 Semeadura', color: 'text-brand-green-light' },
+                enraizamento: { titulo: '🌿 Enraizamento', color: 'text-brand-orange' },
+                florescer: { titulo: '🌸 Florescer', color: 'text-brand-clay' },
+              };
+              const docsGrupo = PACK_DOCUMENT_DEFINITIONS.filter(d => d.fase === fase);
+              return (
+                <div key={fase}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wide mb-1.5 ${faseLabels[fase].color}`}>
+                    {faseLabels[fase].titulo}
+                  </p>
+                  <div className="border border-slate-150 rounded-lg divide-y divide-slate-100 bg-slate-50/40">
+                    {docsGrupo.map(def => {
+                      const doc = packDocuments.find(d => d.id === def.id);
+                      const isFichaDadosGerais = def.id === 'ficha_dados_gerais';
+                      const linkFormularioPublico = 'https://thiagovinicius7.github.io/Matr-culas_SEG/?novaFicha=1';
+                      return (
+                        <div key={def.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                          <span className="text-xs text-slate-700 flex items-center gap-2 min-w-0">
+                            <FileText size={13} className="text-slate-400 shrink-0" />
+                            <span className="truncate">{def.nome}</span>
+                            {!doc && !isFichaDadosGerais && (
+                              <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                não enviado
+                              </span>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isFichaDadosGerais && (
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(linkFormularioPublico);
+                                  setLinkCopiado(true);
+                                  setTimeout(() => setLinkCopiado(false), 2000);
+                                }}
+                                title="Copiar link do formulário para a família preencher"
+                                className="text-[10px] font-bold text-brand-orange hover:text-brand-clay bg-amber-50 border border-amber-200 px-2 py-1 rounded-md cursor-pointer flex items-center gap-1"
+                              >
+                                {linkCopiado ? '✓ Copiado!' : '🔗 Link do formulário'}
+                              </button>
+                            )}
+                            {doc ? (
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Baixar (atualizado em ${new Date(doc.atualizadoEm + 'T00:00:00').toLocaleDateString('pt-BR')})`}
+                                className="text-brand-green-dark hover:text-emerald-900 cursor-pointer p-1"
+                              >
+                                <ArrowRightCircle size={15} className="rotate-90" />
+                              </a>
+                            ) : (
+                              <button
+                                onClick={() => onNavigate('pricing')}
+                                title="Enviar documento em Configurações"
+                                className="text-slate-300 hover:text-brand-orange cursor-pointer p-1"
+                              >
+                                <ArrowRightCircle size={15} className="rotate-90 opacity-40" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })}
-
-            {contraturnoOnlyCount > 0 && (
-              <div 
-                onClick={() => setSelectedClassForModal({ id: 'sem_regular', nome: 'Somente Contraturno', natureza: 'Isento', idadeRef: 0, valorMensal: 0 })}
-                className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 shadow-xs flex items-center justify-between cursor-pointer hover:bg-amber-100/80 hover:border-amber-300 transition-all group"
-                title="Clique para ver os alunos somente no contraturno"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
-                    <span className="font-bold text-xs text-amber-950 font-display">
-                      Somente Contraturno
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-amber-800 font-mono mt-0.5">
-                    Sem Ensino Regular • Isento
-                  </div>
-                  <div className="text-[10px] mt-0.5 font-bold text-amber-900">
-                    R$ 0,00/mês (Regular)
-                  </div>
-                </div>
-                
-                <div className="flex flex-col items-end font-display">
-                  <span className="text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border bg-white border-amber-300 text-amber-900 transition-transform group-hover:scale-105">
-                    {contraturnoOnlyCount}
-                  </span>
-                  <span className="text-[9px] uppercase tracking-wider text-amber-800 mt-1 font-semibold group-hover:text-amber-950">ver lista</span>
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      </div>
-
-      {/* Documentos do Pack de Matrícula */}
-      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-display font-bold text-sm uppercase tracking-wider text-brand-green-dark">
-            Documentos do Pack de Matrícula
-          </h3>
-          <button
-            onClick={() => onNavigate('pricing')}
-            className="text-[11px] font-bold text-brand-orange hover:text-brand-clay flex items-center gap-1 cursor-pointer"
-          >
-            Gerenciar <ArrowRight size={12} />
-          </button>
-        </div>
-
-        {(['semeadura', 'enraizamento', 'florescer'] as const).map(fase => {
-          const faseLabels: Record<typeof fase, { titulo: string; color: string }> = {
-            semeadura: { titulo: '🌱 Semeadura', color: 'text-brand-green-light' },
-            enraizamento: { titulo: '🌿 Enraizamento', color: 'text-brand-orange' },
-            florescer: { titulo: '🌸 Florescer', color: 'text-brand-clay' },
-          };
-          const docsGrupo = PACK_DOCUMENT_DEFINITIONS.filter(d => d.fase === fase);
-          return (
-            <div key={fase}>
-              <p className={`text-[10px] font-bold uppercase tracking-wide mb-1.5 ${faseLabels[fase].color}`}>
-                {faseLabels[fase].titulo}
-              </p>
-              <div className="border border-slate-150 rounded-lg divide-y divide-slate-100 bg-slate-50/40">
-                {docsGrupo.map(def => {
-                  const doc = packDocuments.find(d => d.id === def.id);
-                  const isFichaDadosGerais = def.id === 'ficha_dados_gerais';
-                  const linkFormularioPublico = 'https://thiagovinicius7.github.io/Matr-culas_SEG/?novaFicha=1';
-                  return (
-                    <div key={def.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                      <span className="text-xs text-slate-700 flex items-center gap-2 min-w-0">
-                        <FileText size={13} className="text-slate-400 shrink-0" />
-                        <span className="truncate">{def.nome}</span>
-                        {!doc && !isFichaDadosGerais && (
-                          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase shrink-0">
-                            não enviado
-                          </span>
-                        )}
-                      </span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isFichaDadosGerais && (
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(linkFormularioPublico);
-                              setLinkCopiado(true);
-                              setTimeout(() => setLinkCopiado(false), 2000);
-                            }}
-                            title="Copiar link do formulário para a família preencher"
-                            className="text-[10px] font-bold text-brand-orange hover:text-brand-clay bg-amber-50 border border-amber-200 px-2 py-1 rounded-md cursor-pointer flex items-center gap-1"
-                          >
-                            {linkCopiado ? '✓ Copiado!' : '🔗 Link do formulário'}
-                          </button>
-                        )}
-                        {doc ? (
-                          <a
-                            href={doc.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`Baixar (atualizado em ${new Date(doc.atualizadoEm + 'T00:00:00').toLocaleDateString('pt-BR')})`}
-                            className="text-brand-green-dark hover:text-emerald-900 cursor-pointer p-1"
-                          >
-                            <ArrowRightCircle size={15} className="rotate-90" />
-                          </a>
-                        ) : (
-                          <button
-                            onClick={() => onNavigate('pricing')}
-                            title="Enviar documento em Configurações"
-                            className="text-slate-300 hover:text-brand-orange cursor-pointer p-1"
-                          >
-                            <ArrowRightCircle size={15} className="rotate-90 opacity-40" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+        )}
       </div>
 
       {/* Modal for Class Student List */}

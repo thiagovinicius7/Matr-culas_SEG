@@ -47,7 +47,12 @@ export default function ParentCartaPortal({
   // Prioriza avançar 1 série a partir da turma atual (2026) do aluno — só
   // cai pra cálculo puro por idade se ele for realmente novo ou a série
   // seguinte não existir na tabela de 2027.
-  const suggestedClass2027 = getNextYearClass(student, enrollment, classPrices, 2027);
+  // null = já estava na última turma (Benjoí) e conclui o Fundamental em
+  // 2026 — não tem pra onde avançar. Fallback só pra não quebrar os
+  // cálculos abaixo; a tela mostra um aviso de conclusão nesse caso.
+  const suggestedClass2027Raw = getNextYearClass(student, enrollment, classPrices, 2027);
+  const alunoConcluiFundamental = suggestedClass2027Raw === null;
+  const suggestedClass2027 = suggestedClass2027Raw || class2026;
 
   // Sem nenhuma matrícula anterior registrada, é um aluno novo — a carta
   // então é de "Intenção de Matrícula", não de "Rematrícula".
@@ -215,6 +220,22 @@ export default function ParentCartaPortal({
       setDemorandoEnvio(false);
     }
   };
+
+  if (alunoConcluiFundamental) {
+    return (
+      <div className="min-h-screen bg-slate-100 font-sans py-8 px-4 flex items-center justify-center">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center space-y-3">
+          <div className="text-4xl">🎓</div>
+          <h2 className="font-display font-bold text-lg text-brand-green-dark">
+            {student.nome} conclui o Ensino Fundamental em 2026
+          </h2>
+          <p className="text-sm text-slate-600">
+            Não há Carta de Intenção de Rematrícula para 2027, já que este é o último ano do Fundamental no Sítio-Escola Geranium. Qualquer dúvida, fale com a escola.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans py-8 px-4 flex flex-col items-center justify-center print:block print:min-h-0 print:h-auto print:bg-white print:p-0">

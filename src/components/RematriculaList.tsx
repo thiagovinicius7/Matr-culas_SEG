@@ -104,10 +104,15 @@ export default function RematriculaList({
 
     // Turma que o aluno vai estar no ano seguinte (o que já foi proposto na
     // carta, ou — se ainda não tem proposta — a próxima série a partir de
-    // onde ele já está, mesma conta usada na Carta de Intenção)
+    // onde ele já está, mesma conta usada na Carta de Intenção). `null` de
+    // getNextYearClass quer dizer "conclui o Fundamental" (já estava em
+    // Benjoí) — diferente de "ainda não tem turma definida".
+    const semTurmaPorConclusao = !e.turmaPropostaId2027 && student
+      ? getNextYearClass(student, e, classPrices, ANO_CARTA_INTENCAO) === null
+      : false;
     const turmaPropostaObj = e.turmaPropostaId2027
       ? (classPrices.find(c => c.id === e.turmaPropostaId2027) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaPropostaId2027!)))
-      : (student ? getNextYearClass(student, e, classPrices, ANO_CARTA_INTENCAO) : undefined);
+      : (student ? getNextYearClass(student, e, classPrices, ANO_CARTA_INTENCAO) || undefined : undefined);
     const idadeProxAno = student ? calculateAgeAtCutoff(student.nascimento, ANO_CARTA_INTENCAO) : 0;
     const cartaInfo = student ? getCartaIntencaoInfo(student.id, enrollments) : undefined;
 
@@ -124,6 +129,7 @@ export default function RematriculaList({
       discContPont,
       totalPontDiscount,
       turmaPropostaObj,
+      semTurmaPorConclusao,
       idadeProxAno,
       cartaInfo
     };
@@ -169,12 +175,16 @@ export default function RematriculaList({
     ).values()
   ).sort((a, b) => a.idadeRef - b.idadeRef);
 
-  // Agrupa os resultados filtrados por turma proposta (quando ativado)
-  const gruposPorTurma: { turma: RegularClass | undefined; itens: typeof filteredData }[] = agruparPorTurma
+  // Agrupa os resultados filtrados por turma proposta (quando ativado).
+  // "Formandos" (concluem o Fundamental, sem próxima turma) ficam num grupo
+  // próprio, separado de "turma futura não definida" (dado genuinamente em
+  // falta) — são situações bem diferentes pra equipe.
+  const gruposPorTurma: { turma: RegularClass | undefined; label?: string; itens: typeof filteredData }[] = agruparPorTurma
     ? turmasPropostasEmUso
         .map(turma => ({ turma, itens: filteredData.filter(item => item.turmaPropostaObj?.id === turma.id) }))
         .filter(g => g.itens.length > 0)
-        .concat([{ turma: undefined, itens: filteredData.filter(item => !item.turmaPropostaObj) }].filter(g => g.itens.length > 0))
+        .concat([{ turma: undefined, label: `🎓 Concluem o Fundamental em ${ANO_CARTA_INTENCAO - 1}`, itens: filteredData.filter(item => !item.turmaPropostaObj && item.semTurmaPorConclusao) }].filter(g => g.itens.length > 0))
+        .concat([{ turma: undefined, itens: filteredData.filter(item => !item.turmaPropostaObj && !item.semTurmaPorConclusao) }].filter(g => g.itens.length > 0))
     : [{ turma: undefined, itens: filteredData }];
 
   const handleStartEditingNotes = (alunoId: string, currentNotes: string) => {
@@ -378,11 +388,11 @@ export default function RematriculaList({
             </thead>
             <tbody className="divide-y divide-slate-150 text-xs text-slate-700">
               {gruposPorTurma.map((grupo) => (
-                <React.Fragment key={grupo.turma?.id || 'sem-turma'}>
+                <React.Fragment key={grupo.label || grupo.turma?.id || 'sem-turma'}>
                   {agruparPorTurma && (
                     <tr className="bg-brand-green-dark/5">
                       <td colSpan={5} className="px-3 py-1.5 text-[11px] font-extrabold text-brand-green-dark uppercase tracking-wide">
-                        {grupo.turma ? `${grupo.turma.nome} (${grupo.turma.natureza})` : 'Turma futura não definida'}
+                        {grupo.turma ? `${grupo.turma.nome} (${grupo.turma.natureza})` : (grupo.label || 'Turma futura não definida')}
                         <span className="ml-2 font-mono font-bold text-slate-400">{grupo.itens.length} aluno(s)</span>
                       </td>
                     </tr>

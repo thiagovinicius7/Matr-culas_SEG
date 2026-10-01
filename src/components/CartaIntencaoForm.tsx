@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO, getNovidades2027 } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO, getNovidades2027, SOMENTE_CONTRATURNO_CLASS } from '../data';
 import { auth } from '../firebase';
 import { FileText, Save, Printer, Share2, MessageCircle, Calendar, Clock, DollarSign, UserCheck, AlertCircle, CheckCircle, HelpCircle, XCircle, Edit3, ArrowRight, ShieldCheck, Sparkles, Check, ChevronDown, Link2, ExternalLink, Utensils } from 'lucide-react';
 
@@ -61,7 +61,14 @@ export default function CartaIntencaoForm({
   // Prioriza avançar 1 série a partir da turma atual (2026) do aluno — só
   // cai pra cálculo puro por idade se ele for realmente novo (sem matrícula
   // anterior) ou a série seguinte não existir na tabela de 2027.
-  const suggestedClass2027 = getNextYearClass(student, enrollment, classPrices, 2027);
+  // null = já estava na última turma (Benjoí) e conclui o Fundamental em
+  // 2026 — não tem Carta de Intenção pra 2027. Usa class2026 como valor de
+  // reserva só pra não quebrar os cálculos abaixo; a tela real mostra um
+  // aviso de conclusão em vez do formulário nesse caso (ver o return mais
+  // adiante), então esse valor de reserva nunca chega a aparecer pro usuário.
+  const suggestedClass2027Raw = getNextYearClass(student, enrollment, classPrices, 2027);
+  const alunoConcluiFundamental = suggestedClass2027Raw === null;
+  const suggestedClass2027 = suggestedClass2027Raw || class2026;
 
   // 2026 Current Financial State
   const currentRegularVal = enrollment?.valorFinalRegular || class2026.valorMensal;
@@ -74,10 +81,15 @@ export default function CartaIntencaoForm({
     return enrollment?.turmaPropostaId2027 || suggestedClass2027.id;
   });
 
-  // Selected Class details for 2027 from pricing table
-  const selectedClass2027Details = classPrices.find(c => c.id === turmaPropostaId2027 && (c.ano || 2026) === 2027) 
-    || classPrices.find(c => c.id === turmaPropostaId2027) 
-    || suggestedClass2027;
+  // Selected Class details for 2027 from pricing table. "sem_regular" nunca
+  // deve cair no suggestedClass2027 de fallback (que pode ser uma turma
+  // regular de verdade, se a equipe estiver TROCANDO de regular pra Somente
+  // Contraturno) — tem que resolver sempre pro valor zerado certo.
+  const selectedClass2027Details = turmaPropostaId2027 === 'sem_regular'
+    ? SOMENTE_CONTRATURNO_CLASS
+    : (classPrices.find(c => c.id === turmaPropostaId2027 && (c.ano || 2026) === 2027)
+      || classPrices.find(c => c.id === turmaPropostaId2027)
+      || suggestedClass2027);
 
   const valorTabelaRegular2027 = selectedClass2027Details.valorMensal;
 
@@ -412,6 +424,28 @@ export default function CartaIntencaoForm({
     window.print();
   };
 
+  if (alunoConcluiFundamental) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden font-sans p-8 text-center space-y-3">
+        <div className="text-4xl">🎓</div>
+        <h3 className="font-display font-bold text-lg text-brand-green-dark">
+          {student.nome} conclui o Ensino Fundamental em 2026
+        </h3>
+        <p className="text-sm text-slate-600 max-w-md mx-auto">
+          Como já está na última turma (Benjoí), não existe próxima série em 2027 — não há Carta de Intenção para gerar para este aluno.
+        </p>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="mt-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg cursor-pointer"
+          >
+            Fechar
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden font-sans print:shadow-none print:border-none">
       {/* Printable Header - Only visible when printing */}
@@ -558,9 +592,11 @@ export default function CartaIntencaoForm({
                     onChange={(e) => {
                       const newId = e.target.value;
                       setTurmaPropostaId2027(newId);
-                      const selected = classPrices.find(c => c.id === newId && (c.ano || 2026) === 2027) 
-                        || classPrices.find(c => c.id === newId) 
-                        || suggestedClass2027;
+                      const selected = newId === 'sem_regular'
+                        ? SOMENTE_CONTRATURNO_CLASS
+                        : (classPrices.find(c => c.id === newId && (c.ano || 2026) === 2027)
+                          || classPrices.find(c => c.id === newId)
+                          || suggestedClass2027);
                       if (selected) {
                         const discReais = tipoDescontoRegular2027 === 'porcentagem'
                           ? (selected.valorMensal * descontoRegular2027 / 100)
@@ -570,6 +606,7 @@ export default function CartaIntencaoForm({
                     }}
                     className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-slate-800 font-medium focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none"
                   >
+                    <option value="sem_regular">Somente Contraturno (sem Ensino Regular)</option>
                     {classPrices.filter(c => (c.ano || 2026) === 2027).map(c => (
                       <option key={c.id} value={c.id}>
                         {c.nome} ({c.natureza}) - Tabela 2027: R$ {c.valorMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
