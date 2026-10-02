@@ -446,6 +446,12 @@ export default function ParentCartaPortal({
                     </span>
                   )}
                 </label>
+                {contraturnoDesejado && valorContraturno < valorContraturnoTabela && (
+                  <span className="block text-[11px] font-bold text-emerald-700 -mt-2 px-1">
+                    Desconto especial concedido no Contraturno: − R$ {(valorContraturnoTabela - valorContraturno).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    {' '}({((1 - valorContraturno / valorContraturnoTabela) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%) — de R$ {valorContraturnoTabela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                  </span>
+                )}
 
                 {contraturnoDesejado && (
                   <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 space-y-3 text-xs">
