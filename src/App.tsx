@@ -1657,6 +1657,46 @@ export default function App() {
     await signOutUser();
   };
 
+  // Logout automático por inatividade (só sessão de equipe de verdade —
+  // nunca a sessão anônima dos links públicos da família, que não deve
+  // expirar enquanto alguém está preenchendo com calma). Protege contra
+  // acesso indevido se o computador/celular ficar destravado e sem uso.
+  const INATIVIDADE_LIMITE_MS = 15 * 60 * 1000; // 15 minutos
+  const INATIVIDADE_AVISO_MS = 60 * 1000; // avisa 1 min antes de deslogar
+  useEffect(() => {
+    if (!isStaffLoggedIn) return;
+
+    let timerAviso: ReturnType<typeof setTimeout>;
+    let timerLogout: ReturnType<typeof setTimeout>;
+
+    const resetar = () => {
+      clearTimeout(timerAviso);
+      clearTimeout(timerLogout);
+      timerAviso = setTimeout(() => {
+        showToast(
+          'Sessão prestes a expirar',
+          'Sem uso há 14 minutos — você será desconectado em 1 minuto por segurança. Toque na tela para continuar.',
+          'info',
+          INATIVIDADE_AVISO_MS
+        );
+      }, INATIVIDADE_LIMITE_MS - INATIVIDADE_AVISO_MS);
+      timerLogout = setTimeout(() => {
+        handleLogout();
+      }, INATIVIDADE_LIMITE_MS);
+    };
+
+    const eventos: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    eventos.forEach(ev => window.addEventListener(ev, resetar, { passive: true }));
+    resetar();
+
+    return () => {
+      clearTimeout(timerAviso);
+      clearTimeout(timerLogout);
+      eventos.forEach(ev => window.removeEventListener(ev, resetar));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaffLoggedIn]);
+
   // Handler: criar acesso de um novo membro da equipe, direto pelo app
   const handleCreateTeamMember = async (email: string, password: string) => {
     try {
