@@ -43,12 +43,13 @@ import RematriculaList from './components/RematriculaList';
 import ContraturnoSchedule from './components/ContraturnoSchedule';
 import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
+import ContratosTab from './components/ContratosTab';
 import ParentCartaPortal from './components/ParentCartaPortal';
 import FichaDadosGeraisForm from './components/FichaDadosGeraisForm';
 import FichaSaudeForm from './components/FichaSaudeForm';
 import FichaAnamneseForm from './components/FichaAnamneseForm';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Data/hora em que esta versão foi publicada (vem do vite.config.ts). O typeof evita
@@ -2197,6 +2198,7 @@ export default function App() {
           {[
             { id: 'dashboard', label: 'Painel Principal', icon: LayoutDashboard },
             { id: 'students', label: 'Fichas de Alunos', icon: Users },
+            { id: 'contratos', label: 'Contratos', icon: FileText },
             { id: 'escala', label: 'Contraturno', icon: CalendarDays },
             { id: 'pricing', label: 'Configurações', icon: Settings },
           ].map((tab) => {
@@ -2289,6 +2291,7 @@ export default function App() {
               {[
                 { id: 'dashboard', label: 'Painel Principal', icon: LayoutDashboard },
                 { id: 'students', label: 'Fichas de Alunos', icon: Users },
+                { id: 'contratos', label: 'Contratos', icon: FileText },
                 { id: 'escala', label: 'Contraturno', icon: CalendarDays },
                 { id: 'pricing', label: 'Configurações', icon: Settings },
               ].map((tab) => {
@@ -2495,6 +2498,17 @@ export default function App() {
                   onUpdateEnrollmentNotes={handleUpdateEnrollmentNotes}
                   onUpdateEnrollmentDiscounts={handleUpdateEnrollmentDiscounts}
                   onSaveEnrollment={handleSaveEnrollment}
+                />
+              )}
+              {activeTab === 'contratos' && (
+                <ContratosTab
+                  students={students}
+                  guardians={guardians}
+                  enrollments={enrollments}
+                  contraturnos={contraturnos}
+                  classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
+                  showToast={showToast}
                 />
               )}
               {activeTab === 'escala' && (

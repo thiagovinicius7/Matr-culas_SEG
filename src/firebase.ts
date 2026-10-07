@@ -6,7 +6,8 @@ import {
   setDoc, 
   doc, 
   deleteDoc, 
-  writeBatch 
+  writeBatch,
+  runTransaction
 } from 'firebase/firestore';
 import {
   getAuth,
@@ -360,3 +361,31 @@ export async function deletePackDocumentFile(storagePath: string): Promise<void>
   }
 }
 
+
+
+/**
+ * Próximo número de contrato/contraturno/aditivo do ano, em sequência (001, 002…).
+ * Roda numa TRANSAÇÃO: se duas pessoas gerarem ao mesmo tempo, cada uma recebe um
+ * número diferente, e um número nunca é reaproveitado.
+ */
+export async function proximoNumeroContrato(tipo: 'contrato' | 'contraturno' | 'aditivo', ano: number): Promise<number> {
+  const caminho = `contratoContadores/${ano}`;
+  try {
+    const ref = doc(db, 'contratoContadores', String(ano));
+    return await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const atual = snap.exists() ? snap.data() : {};
+      const novo = {
+        id: String(ano),
+        contrato: Number(atual.contrato) || 0,
+        contraturno: Number(atual.contraturno) || 0,
+        aditivo: Number(atual.aditivo) || 0,
+      };
+      novo[tipo] += 1;
+      tx.set(ref, novo);
+      return novo[tipo];
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, caminho);
+  }
+}

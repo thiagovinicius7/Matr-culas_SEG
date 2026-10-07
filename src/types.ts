@@ -353,3 +353,43 @@ export interface FichaAnamnese {
   oQueProfessorDeveSaber?: string;
   outrasInformacoesFundamental?: string;
 }
+
+
+// ---------- Contratos (aba Contratos) ----------
+export type TipoDocContrato = 'contrato' | 'contraturno' | 'aditivo' | 'imagem';
+export type StatusContrato = 'nao_gerado' | 'gerado' | 'enviado' | 'assinado' | 'correcao';
+
+/** Andamento de UM documento de UM aluno. Só existe depois da primeira geração (antes disso é "não gerado"). */
+export interface ContratoDoc {
+  id: string;                 // `${alunoId}_${ano}_${tipo}`
+  alunoId: string;
+  ano: number;
+  tipo: TipoDocContrato;
+  status: Exclude<StatusContrato, 'nao_gerado'>;
+  numero?: string;            // "014" — o ano vem escrito no modelo ("/2027")
+  versao: number;             // sobe a cada nova geração (correção); o número se mantém
+  geradoEm?: string;          // YYYY-MM-DD
+  enviadoEm?: string;
+  assinadoEm?: string;
+  nota?: string;              // o que precisa ser corrigido
+  link?: string;              // número ou link do documento na plataforma de assinatura
+  historico?: { status: StatusContrato; versao: number; geradoEm?: string; enviadoEm?: string; assinadoEm?: string }[];
+}
+
+/** Modelo Word (com marcadores {{...}}) guardado no banco — são arquivos pequenos. */
+export interface ContratoModelo {
+  id: TipoDocContrato;
+  nome: string;               // nome do arquivo enviado
+  base64: string;
+  tamanho: number;            // bytes
+  atualizadoEm: string;       // YYYY-MM-DD
+  marcadores?: string[];
+}
+
+/** Contadores da numeração em sequência (um documento por ano; id = ano). */
+export interface ContratoContador {
+  id: string;
+  contrato: number;
+  contraturno: number;
+  aditivo: number;
+}
