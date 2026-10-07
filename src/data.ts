@@ -675,8 +675,26 @@ export function valorComPontualidade(valorRegularProposto: number, valorTabela: 
   return Math.round((Number(valorRegularProposto || 0) - descontoPontualidadeReais) * 100) / 100;
 }
 
-/** Taxa de material 2027 — vale para toda turma regular (Infantil e Fundamental), parcelável. */
-export const TAXA_MATERIAL_2027 = { valor: 800, parcelas: 10 };
+/**
+ * Dados do responsável financeiro exigidos para gerar os contratos (qualificação
+ * do CONTRATANTE). Devolve o que ainda falta, em texto pronto pra mostrar.
+ */
+export function getDadosFaltandoParaContrato(g: Guardian | undefined): string[] {
+  if (!g) return ['responsável financeiro'];
+  const faltam: string[] = [];
+  if (!g.cpf?.trim()) faltam.push('CPF');
+  if (!g.rg?.trim()) faltam.push('RG');
+  if (!g.endereco?.trim()) faltam.push('endereço');
+  if (!g.email?.trim()) faltam.push('e-mail');
+  if (!(g.telefone || g.contato || '').trim()) faltam.push('telefone');
+  if (!g.estadoCivil) faltam.push('estado civil');
+  if (!g.nacionalidade?.trim()) faltam.push('nacionalidade');
+  if (!g.profissao?.trim()) faltam.push('profissão');
+  return faltam;
+}
+
+/** Taxa de material 2027 — valor por etapa (Infantil R$ 800, Fundamental R$ 600), parcelável em até 12x. */
+export const TAXA_MATERIAL_2027 = { Infantil: 800, Fundamental: 600, parcelas: 12 };
 
 /**
  * Novidades de 2027 específicas da turma proposta — usadas no recado da
@@ -685,7 +703,12 @@ export const TAXA_MATERIAL_2027 = { valor: 800, parcelas: 10 };
  * tem aulas extras diferentes de Mirim (1 e 2).
  */
 export function getNovidades2027(turma: RegularClass): string[] {
-  const taxaTexto = `Taxa de material: R$ ${TAXA_MATERIAL_2027.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (pode ser parcelada em até ${TAXA_MATERIAL_2027.parcelas}x)`;
+  // Somente Contraturno não tem Ensino Regular: sem taxa de material nem
+  // aulas extras — não há recado de turma pra mostrar.
+  if (turma.natureza !== 'Infantil' && turma.natureza !== 'Fundamental') return [];
+
+  const valorTaxa = TAXA_MATERIAL_2027[turma.natureza];
+  const taxaTexto = `Taxa de material: R$ ${valorTaxa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (pode ser parcelada em até ${TAXA_MATERIAL_2027.parcelas}x)`;
 
   if (turma.natureza === 'Fundamental') {
     return [

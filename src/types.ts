@@ -30,6 +30,9 @@ export interface Guardian {
   endereco?: string;
   dataNascimento?: string; // YYYY-MM-DD
   estadoCivil?: EstadoCivil;
+  /** Exigidos nos contratos (qualificação do CONTRATANTE). Ex.: "brasileira". */
+  nacionalidade?: string;
+  profissao?: string;
   financeiro: boolean; // Marks who is responsible for payments — só um Guardian por aluno deve ser true
 }
 

@@ -32,6 +32,8 @@ interface TempGuardian {
   endereco: string;
   dataNascimento: string;
   estadoCivil: EstadoCivil | '';
+  nacionalidade: string;
+  profissao: string;
   financeiro: boolean;
 }
 
@@ -39,7 +41,7 @@ const PARENTESCO_OPCOES = ['Mãe', 'Pai', 'Avó', 'Avô', 'Tio', 'Tia', 'Outro']
 
 const novoResponsavel = (financeiro: boolean): TempGuardian => ({
   nome: '', parentesco: 'Mãe', parentescoOutro: '', telefone: '', email: '',
-  cpf: '', rg: '', endereco: '', dataNascimento: '', estadoCivil: '', financeiro,
+  cpf: '', rg: '', endereco: '', dataNascimento: '', estadoCivil: '', nacionalidade: '', profissao: '', financeiro,
 });
 
 const guardianParaTemp = (g: Guardian): TempGuardian => {
@@ -55,6 +57,8 @@ const guardianParaTemp = (g: Guardian): TempGuardian => {
     endereco: g.endereco || '',
     dataNascimento: g.dataNascimento || '',
     estadoCivil: g.estadoCivil || '',
+    nacionalidade: g.nacionalidade || '',
+    profissao: g.profissao || '',
     financeiro: g.financeiro,
   };
 };
@@ -99,11 +103,11 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
     }
     const responsavelIncompleto = responsaveis.some(r =>
       !r.nome.trim() || !r.telefone.trim() || !r.email.trim() || !r.cpf.trim() || !r.rg.trim() ||
-      !r.endereco.trim() || !r.dataNascimento || !r.estadoCivil ||
+      !r.endereco.trim() || !r.dataNascimento || !r.estadoCivil || !r.nacionalidade.trim() || !r.profissao.trim() ||
       (r.parentesco === 'Outro' && !r.parentescoOutro.trim())
     );
     if (responsavelIncompleto) {
-      setErro('Preencha todos os campos de cada responsável (nome, parentesco, telefone, e-mail, CPF, RG, data de nascimento, estado civil e endereço).');
+      setErro('Preencha todos os campos de cada responsável (nome, parentesco, telefone, e-mail, CPF, RG, data de nascimento, estado civil, nacionalidade, profissão e endereço).');
       return;
     }
     const responsaveisValidos = responsaveis;
@@ -118,6 +122,8 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
       endereco: r.endereco || undefined,
       dataNascimento: r.dataNascimento || undefined,
       estadoCivil: r.estadoCivil || undefined,
+      nacionalidade: r.nacionalidade.trim() || undefined,
+      profissao: r.profissao.trim() || undefined,
       financeiro: r.financeiro,
     }));
 
@@ -350,6 +356,24 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
                     <option value="União estável">União estável</option>
                     <option value="Outro">Outro</option>
                   </select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold text-slate-400 block">Nacionalidade</label>
+                    <input
+                      type="text" placeholder="Ex.: brasileira" required value={r.nacionalidade}
+                      onChange={(e) => updateResponsavel(idx, 'nacionalidade', e.target.value)}
+                      className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold text-slate-400 block">Profissão</label>
+                    <input
+                      type="text" placeholder="Ex.: arquiteta" required value={r.profissao}
+                      onChange={(e) => updateResponsavel(idx, 'profissao', e.target.value)}
+                      className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white"
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="space-y-0.5">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry, FichaSaude, FichaAnamnese } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO } from '../data';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO, getDadosFaltandoParaContrato } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
@@ -122,6 +122,8 @@ export default function StudentProfile({
   const [newGuardianEndereco, setNewGuardianEndereco] = useState('');
   const [newGuardianDataNascimento, setNewGuardianDataNascimento] = useState('');
   const [newGuardianEstadoCivil, setNewGuardianEstadoCivil] = useState<EstadoCivil | ''>('');
+  const [newGuardianNacionalidade, setNewGuardianNacionalidade] = useState('');
+  const [newGuardianProfissao, setNewGuardianProfissao] = useState('');
   const [newGuardianFinanceiro, setNewGuardianFinanceiro] = useState(false);
   const [isAddingSingleGuardian, setIsAddingSingleGuardian] = useState(false);
 
@@ -137,6 +139,8 @@ export default function StudentProfile({
   const [editGuardianEndereco, setEditGuardianEndereco] = useState('');
   const [editGuardianDataNascimento, setEditGuardianDataNascimento] = useState('');
   const [editGuardianEstadoCivil, setEditGuardianEstadoCivil] = useState<EstadoCivil | ''>('');
+  const [editGuardianNacionalidade, setEditGuardianNacionalidade] = useState('');
+  const [editGuardianProfissao, setEditGuardianProfissao] = useState('');
   const [editGuardianFinanceiro, setEditGuardianFinanceiro] = useState(false);
 
   // Class override states
@@ -162,6 +166,8 @@ export default function StudentProfile({
     setEditGuardianEndereco(g.endereco || '');
     setEditGuardianDataNascimento(g.dataNascimento || '');
     setEditGuardianEstadoCivil(g.estadoCivil || '');
+    setEditGuardianNacionalidade(g.nacionalidade || '');
+    setEditGuardianProfissao(g.profissao || '');
     setEditGuardianFinanceiro(g.financeiro);
   };
 
@@ -199,6 +205,8 @@ export default function StudentProfile({
       endereco: editGuardianEndereco || undefined,
       dataNascimento: editGuardianDataNascimento || undefined,
       estadoCivil: editGuardianEstadoCivil || undefined,
+      nacionalidade: editGuardianNacionalidade.trim() || undefined,
+      profissao: editGuardianProfissao.trim() || undefined,
       financeiro: editGuardianFinanceiro
     });
     setEditingGuardianId(null);
@@ -514,6 +522,8 @@ export default function StudentProfile({
       endereco: newGuardianEndereco || undefined,
       dataNascimento: newGuardianDataNascimento || undefined,
       estadoCivil: newGuardianEstadoCivil || undefined,
+      nacionalidade: newGuardianNacionalidade.trim() || undefined,
+      profissao: newGuardianProfissao.trim() || undefined,
       financeiro: newGuardianFinanceiro
     });
 
@@ -527,6 +537,8 @@ export default function StudentProfile({
     setNewGuardianEndereco('');
     setNewGuardianDataNascimento('');
     setNewGuardianEstadoCivil('');
+    setNewGuardianNacionalidade('');
+    setNewGuardianProfissao('');
     setNewGuardianFinanceiro(false);
     setIsAddingSingleGuardian(false);
   };
@@ -964,6 +976,20 @@ export default function StudentProfile({
                           </div>
                         </div>
 
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">Nacionalidade</label>
+                            <input type="text" placeholder="Ex.: brasileira" value={tg.nacionalidade || ''}
+                              onChange={(e) => updateTempGuardian(idx, 'nacionalidade', e.target.value)}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500">Profissão</label>
+                            <input type="text" placeholder="Ex.: arquiteta" value={tg.profissao || ''}
+                              onChange={(e) => updateTempGuardian(idx, 'profissao', e.target.value)}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white" />
+                          </div>
+                        </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500">Endereço completo</label>
                           <input
@@ -1623,6 +1649,20 @@ export default function StudentProfile({
                           </select>
                         </div>
                       </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500">Nacionalidade</label>
+                          <input type="text" placeholder="Ex.: brasileira" value={newGuardianNacionalidade}
+                            onChange={(e) => setNewGuardianNacionalidade(e.target.value)}
+                            className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500">Profissão</label>
+                          <input type="text" placeholder="Ex.: arquiteta" value={newGuardianProfissao}
+                            onChange={(e) => setNewGuardianProfissao(e.target.value)}
+                            className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-200 bg-white" />
+                        </div>
+                      </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500">Endereço completo</label>
                         <input
@@ -1762,6 +1802,20 @@ export default function StudentProfile({
                                 </select>
                               </div>
                             </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-slate-500">Nacionalidade</label>
+                                <input type="text" placeholder="Ex.: brasileira" value={editGuardianNacionalidade}
+                                  onChange={(e) => setEditGuardianNacionalidade(e.target.value)}
+                                  className="w-full text-xs px-2 py-1 rounded-md border border-slate-300 bg-white" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-slate-500">Profissão</label>
+                                <input type="text" placeholder="Ex.: arquiteta" value={editGuardianProfissao}
+                                  onChange={(e) => setEditGuardianProfissao(e.target.value)}
+                                  className="w-full text-xs px-2 py-1 rounded-md border border-slate-300 bg-white" />
+                              </div>
+                            </div>
                             <div className="space-y-1">
                               <label className="text-[9px] font-bold text-slate-500">Endereço</label>
                               <input
@@ -1822,11 +1876,18 @@ export default function StudentProfile({
                             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
                               {g.dataNascimento && <span>Nasc.: {new Date(g.dataNascimento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
                               {g.estadoCivil && <span>{g.estadoCivil}</span>}
+                              {g.nacionalidade && <span>Nacionalidade: {g.nacionalidade}</span>}
+                              {g.profissao && <span>Profissão: {g.profissao}</span>}
                               {g.cpf && <span>CPF: {g.cpf}</span>}
                               {g.rg && <span>RG: {g.rg}</span>}
                             </div>
                             {g.endereco && (
                               <p className="text-[10px] text-slate-400">{g.endereco}</p>
+                            )}
+                            {g.financeiro && getDadosFaltandoParaContrato(g).length > 0 && (
+                              <p className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-block">
+                                Faltam para o contrato: {getDadosFaltandoParaContrato(g).join(', ')}
+                              </p>
                             )}
                             {!g.financeiro && (
                               <button
