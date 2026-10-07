@@ -11,7 +11,7 @@ import { formatarMoeda, formatarPercentual } from '../contratos/extenso';
 import {
   preencherModelo, validarModelo, nomeDoArquivo, zipar, baixarArquivo, base64ParaBytes, bytesParaBase64,
 } from '../contratos/gerarDocx';
-import { FileText, Search, X, Download, Upload, Settings2, Copy, MessageCircle, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
+import { FileText, Search, X, Download, Upload, Settings2, Copy, MessageCircle, ChevronRight, Loader2, AlertTriangle, Send } from 'lucide-react';
 
 const ANO = ANO_CARTA_INTENCAO;
 const TAMANHO_MAX_MODELO = 650_000; // bytes — o modelo vai como texto (base64) num documento do Firestore (limite ~1 MB)
@@ -140,6 +140,8 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
   }, [visiveis]);
 
   const incompletos = linhas.filter(l => l.faltas.length > 0).length;
+  // quantos documentos "gerados, falta enviar" os alunos selecionados têm (alimenta o botão de marcar como enviados)
+  const geradosSelecionados = linhas.filter(l => sel.has(l.aluno.id)).reduce((n, l) => n + l.tipos.filter(t => statusDe(l.aluno.id, t) === 'gerado').length, 0);
   const modelosFaltando = ORDEM_TIPOS.filter(t => !modelos.find(m => m.id === t));
   const linhaAberta = abertoId ? linhas.find(l => l.aluno.id === abertoId) : undefined;
 
@@ -244,7 +246,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
 
   // ---------- andamento ----------
   const muda = async (l: Linha, tipo: TipoContrato, status: StatusContrato) => {
-    const d = docDe(l.aluno.id, tipo); if (!d) return;
+    const d = docsRef.current.find(x => x.id === idDoc(l.aluno.id, tipo)); if (!d) return;
     const hoje = isoHoje();
     try {
       await gravarDoc({
@@ -253,6 +255,20 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
         historico: [...(d.historico || []), snapshot(d)].slice(-10),
       });
     } catch (e: any) { showToast('Não foi possível salvar', String(e?.message || e), 'error'); }
+  };
+  /** Marca vários documentos de uma vez (um por um, na ordem) — é o que a equipe faz ao mandar um grupo pra plataforma de assinatura. */
+  const marcarVarios = async (itens: { l: Linha; t: TipoContrato }[], status: StatusContrato) => {
+    for (const { l, t } of itens) await muda(l, t, status);
+  };
+  const aoMarcarEnviados = async () => {
+    const itens = linhas.filter(l => sel.has(l.aluno.id)).flatMap(l => l.tipos.filter(t => statusDe(l.aluno.id, t) === 'gerado').map(t => ({ l, t })));
+    if (!itens.length) return;
+    setOcupado('lote');
+    try {
+      await marcarVarios(itens, 'enviado');
+      setSel(new Set());
+      showToast('Marcados como enviados', `${itens.length} ${itens.length === 1 ? 'documento' : 'documentos'} de ${new Set(itens.map(i => i.l.aluno.id)).size} ${new Set(itens.map(i => i.l.aluno.id)).size === 1 ? 'aluno' : 'alunos'}.`, 'success');
+    } finally { setOcupado(null); }
   };
   const desfazer = async (l: Linha, tipo: TipoContrato) => {
     const d = docDe(l.aluno.id, tipo); const h = d?.historico?.[d.historico.length - 1];
@@ -405,11 +421,19 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
           </select>
         </label>
         <span className="flex-1" />
+        <button disabled={geradosSelecionados === 0 || ocupado !== null} onClick={aoMarcarEnviados}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+          <Send size={13} /> Marcar como enviados ({geradosSelecionados})
+        </button>
         <button disabled={sel.size === 0 || ocupado !== null} onClick={aoGerarLote}
           className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
           {ocupado === 'lote' ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Gerar selecionados ({sel.size})
         </button>
       </div>
+
+      <p className="text-[11px] text-slate-400">
+        Clique no aluno para abrir os documentos e marcar <strong>enviado</strong> ou <strong>assinado</strong>. Para marcar vários de uma vez, selecione os alunos e use <strong>Marcar como enviados</strong>.
+      </p>
 
       {/* Lista agrupada por turma de 2027 */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -450,7 +474,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
             <GavetaAluno
               l={linhaAberta} guardians={guardians} docDe={docDe} ocupado={ocupado}
               onFechar={() => setAbertoId(null)} onGerar={aoGerar} onBaixar={aoBaixarDeNovo}
-              onMuda={muda} onDesfazer={desfazer} onCampo={salvaCampo}
+              onMuda={muda} onMudaVarios={(l, tipos, st) => marcarVarios(tipos.map(t => ({ l, t })), st)} onDesfazer={desfazer} onCampo={salvaCampo}
               mensagem={mensagemFicha(linhaAberta)} link={linkFicha(linhaAberta.aluno.id)} showToast={showToast}
             />
           </aside>
@@ -471,12 +495,13 @@ interface GavetaProps {
   onGerar: (l: Linha, t: TipoContrato) => void;
   onBaixar: (l: Linha, t: TipoContrato) => void;
   onMuda: (l: Linha, t: TipoContrato, s: StatusContrato) => void;
+  onMudaVarios: (l: Linha, tipos: TipoContrato[], s: StatusContrato) => void;
   onDesfazer: (l: Linha, t: TipoContrato) => void;
   onCampo: (l: Linha, t: TipoContrato, campo: 'link' | 'nota', valor: string) => void;
   mensagem: string; link: string; showToast: ShowToast;
 }
 
-function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar, onMuda, onDesfazer, onCampo, mensagem, link, showToast }: GavetaProps) {
+function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar, onMuda, onMudaVarios, onDesfazer, onCampo, mensagem, link, showToast }: GavetaProps) {
   const r = responsavelFinanceiro(guardians, l.aluno.id);
   const c = l.carta;
   const falta = (campo: string) => l.faltas.includes(campo);
@@ -490,6 +515,7 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
     catch { showToast('Não foi possível copiar', 'Copie o link manualmente: ' + link, 'error', 9000); }
   };
   const telefone = (r?.telefone || r?.contato || '').replace(/\D/g, '');
+  const gerados = l.tipos.filter(t => docDe(l.aluno.id, t)?.status === 'gerado');
 
   return (
     <>
@@ -547,6 +573,13 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
           </div>
         </div>
       </details>
+
+      {gerados.length >= 2 && (
+        <button onClick={() => onMudaVarios(l, gerados, 'enviado')} disabled={ocupado !== null}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg bg-brand-orange text-white hover:bg-orange-700 disabled:opacity-50 cursor-pointer">
+          <Send size={13} /> Marcar os {gerados.length} documentos gerados como enviados
+        </button>
+      )}
 
       {l.tipos.map(tipo => {
         const d = docDe(l.aluno.id, tipo);
