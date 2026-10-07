@@ -286,7 +286,10 @@ export default function Dashboard({
                   key={yr}
                   disabled={isProcessingRollover}
                   onClick={async () => {
-                    if (yr > activeYear && onAdvanceSchoolYear) {
+                    // A virada roda UMA vez (quando o ano de destino ainda não tem matrículas).
+                    // Depois disso, trocar de ano é só visualizar — nada é recalculado nem gravado.
+                    const anoJaTemMatriculas = enrollments.some(e => e.ano === yr);
+                    if (yr > activeYear && onAdvanceSchoolYear && !anoJaTemMatriculas) {
                       setIsProcessingRollover(true);
                       try {
                         await onAdvanceSchoolYear(activeYear, yr);

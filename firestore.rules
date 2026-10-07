@@ -75,7 +75,7 @@ service cloud.firestore {
         && data.id is string && data.id.size() <= 128
         && data.alunoId is string && data.alunoId.size() <= 128
         && data.data is string && data.data.size() == 10
-        && (data.tipo == 'Matrícula' || data.tipo == 'Contraturno_Ativação' || data.tipo == 'Contraturno_Cancelamento' || data.tipo == 'Desconto_Alterado' || data.tipo == 'Reajuste_Geral')
+        && (data.tipo == 'Matrícula' || data.tipo == 'Contraturno_Ativação' || data.tipo == 'Contraturno_Cancelamento' || data.tipo == 'Desconto_Alterado' || data.tipo == 'Reajuste_Geral' || data.tipo == 'Transição_Ano_Letivo')
         && data.descricao is string && data.descricao.size() <= 2000
         && (data.valorAnterior is int || data.valorAnterior is float)
         && (data.valorNovo is int || data.valorNovo is float);
