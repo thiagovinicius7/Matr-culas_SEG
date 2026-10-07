@@ -1577,13 +1577,18 @@ export default function App() {
       }
 
       // Save in Firebase
-      await Promise.all([
-        ...newEnrollmentsToSave.map(e => saveDocument('enrollments', e)),
-        ...newMovementsToSave.map(m => saveDocument('movements', m))
-      ]);
+      // Matrículas primeiro: são o que importa. O extrato (movimento) é só histórico —
+      // se ele for recusado (ex.: regras do Firestore desatualizadas), a virada não pode falhar por isso.
+      await Promise.all(newEnrollmentsToSave.map(e => saveDocument('enrollments', e)));
+      const resultadoMov = await Promise.allSettled(newMovementsToSave.map(m => saveDocument('movements', m)));
+      const movGravados = newMovementsToSave.filter((_, i) => resultadoMov[i].status === 'fulfilled');
+      if (movGravados.length < newMovementsToSave.length) {
+        console.error('Movimentos da virada recusados:', resultadoMov.filter(r => r.status === 'rejected'));
+        showToast('Matrículas criadas, extrato não', 'As matrículas foram criadas, mas o histórico (extrato) foi recusado pelo banco. Publique o firestore.rules atualizado no Console do Firebase.', 'info', 12000);
+      }
 
       setEnrollments(updatedEnrollments);
-      setMovements(prev => [...prev, ...newMovementsToSave]);
+      setMovements(prev => [...prev, ...movGravados]);
       setActiveYear(targetYear);
 
       // Trocar de ano chama essa função toda vez (pra garantir que todo
@@ -1604,7 +1609,8 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error during school year rollover:', error);
-      showToast('Erro na Virada de Ano', 'Ocorreu um problema ao processar a virada de ano letivo.', 'error');
+      const detalhe = error instanceof Error ? error.message.slice(0, 160) : '';
+      showToast('Erro na Virada de Ano', `Ocorreu um problema ao processar a virada de ano letivo.${detalhe ? ' Detalhe: ' + detalhe : ''}`, 'error', 12000);
     } finally {
       setLoading(false);
     }
