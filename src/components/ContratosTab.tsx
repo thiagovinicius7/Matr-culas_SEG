@@ -36,6 +36,7 @@ interface Linha {
   tipos: TipoContrato[];
   faltas: string[];
   avisos: string[];
+  bloqueios: string[];
   turmaNome: string;
   turmaOrdem: number;
 }
@@ -103,7 +104,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
       if (!carta) continue;
       const v = validarParaContrato(ctx, carta);
       out.push({
-        aluno, ctx, carta, perfil: perfilDoAluno(carta), tipos: documentosDoAluno(carta), faltas: v.faltas, avisos: v.avisos,
+        aluno, ctx, carta, perfil: perfilDoAluno(carta), tipos: documentosDoAluno(carta), faltas: v.faltas, avisos: v.avisos, bloqueios: v.bloqueios,
         turmaNome: carta.somenteContraturno ? 'Somente Contraturno' : carta.turma.nome,
         turmaOrdem: carta.somenteContraturno ? 999 : carta.turma.idadeRef,
       });
@@ -154,6 +155,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
   /** Gera o Word de UM documento, registra o andamento e devolve o arquivo (sem baixar). */
   const gerarDocumento = async (l: Linha, tipo: TipoContrato): Promise<{ ok: true; nome: string; bytes: Uint8Array } | { ok: false; motivo: string }> => {
     if (l.faltas.length) return { ok: false, motivo: `Faltam dados do responsável: ${l.faltas.join(', ')}.` };
+    if (l.bloqueios.length) return { ok: false, motivo: l.bloqueios[0] };
     const modelo = modelos.find(m => m.id === tipo);
     if (!modelo) return { ok: false, motivo: `Falta enviar o modelo "${NOMES_DOCS[tipo].nome}" (botão Modelos).` };
 
@@ -222,7 +224,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
     let deFora = 0; const motivos = new Set<string>();
     try {
       for (const l of alvo) {
-        if (l.faltas.length) { deFora++; continue; }
+        if (l.faltas.length || l.bloqueios.length) { deFora++; continue; }
         for (const tipo of l.tipos) {
           // só o que ainda não foi gerado (correções a equipe refaz documento por documento); lê da fonte atualizada
           if (docsRef.current.some(d => d.id === idDoc(l.aluno.id, tipo))) continue;
@@ -456,7 +458,9 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
                   </div>
                   <div className="flex flex-wrap gap-1.5 flex-1 min-w-[240px]">{l.tipos.map(t => chip(l, t))}</div>
                   <div className="w-44 text-[11px] font-semibold">
-                    {l.faltas.length ? <span className="text-rose-700">Faltam: {l.faltas.join(', ')}</span> : <span className="text-emerald-700">✔ Dados completos</span>}
+                    {l.faltas.length ? <span className="text-rose-700">Faltam: {l.faltas.join(', ')}</span>
+                      : l.bloqueios.length ? <span className="text-amber-700">⚠ Confirmar contraturno na Carta</span>
+                      : <span className="text-emerald-700">✔ Dados completos</span>}
                   </div>
                   <ChevronRight size={14} className="text-slate-300" />
                 </div>
@@ -540,6 +544,13 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
         </div>
       )}
 
+      {l.bloqueios.length > 0 && (
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 space-y-1">
+          <p className="font-bold">Antes de gerar, falta resolver na Carta:</p>
+          {l.bloqueios.map((b, i) => <p key={i}>{b}</p>)}
+        </div>
+      )}
+
       {l.avisos.length > 0 && (
         <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg text-[11px] text-sky-900 space-y-1">
           {l.avisos.map((a, i) => <p key={i}>{a}</p>)}
@@ -566,10 +577,15 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
                 <p>Taxa de material: R$ {formatarMoeda(TAXA_MATERIAL_2027[c.natureza!])} em até {TAXA_MATERIAL_2027.parcelas}x. Lanche: {c.lancheAdiciona ? `aderiu, R$ ${formatarMoeda(c.lancheValor)}` : `não aderiu (valor de referência R$ ${formatarMoeda(c.lancheValor)})`}.</p>
               </>
             )}
+            {!c.contraturno && <p>Contraturno: <strong>não</strong> (a Carta não prevê contraturno em {ANO}).</p>}
             {c.contraturno && (
               <p>Contraturno: {c.contraturno.frequencia}x por semana ({diasPorExtenso(c.contraturno.dias)}), {c.contraturno.periodo === 'Completo' ? 'das 12h às 18h' : 'das 12h às 15h'}; valor combinado <strong>R$ {formatarMoeda(c.contraturno.valor)}</strong>{c.contraturno.temDesconto && <> (desconto de {formatarPercentual(c.contraturno.descontoPercentual)}% sobre R$ {formatarMoeda(c.contraturno.valorTabela)})</>}.</p>
             )}
             <p>Vencimento: dia {c.diaVencimento}.</p>
+            <p className="text-[10px] text-slate-400 pt-1">
+              Fonte: matrícula {c.fonte.anoMatricula}; Carta {c.fonte.cartaEm ? `respondida em ${dataBR(c.fonte.cartaEm)}` : 'sem data de resposta'};
+              contraturno na Carta: <strong>{c.fonte.contraturnoNaCarta === 'sim' ? 'Sim' : c.fonte.contraturnoNaCarta === 'nao' ? 'Não' : 'não registrado'}</strong>.
+            </p>
           </div>
         </div>
       </details>
@@ -585,7 +601,7 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
         const d = docDe(l.aluno.id, tipo);
         const s: StatusContrato = d?.status || 'nao_gerado';
         const trabalhando = ocupado === `${l.aluno.id}_${tipo}`;
-        const bloqueado = l.faltas.length > 0 || ocupado !== null;
+        const bloqueado = l.faltas.length > 0 || l.bloqueios.length > 0 || ocupado !== null;
         const tempo = [d?.geradoEm && `Gerado em ${ddmm(d.geradoEm)}`, d?.enviadoEm && `Enviado em ${ddmm(d.enviadoEm)}`, d?.assinadoEm && `Assinado em ${ddmm(d.assinadoEm)}`].filter(Boolean);
         const btn = 'px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
         const pri = `${btn} bg-brand-orange text-white hover:bg-orange-700`;
@@ -616,6 +632,7 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
               </label>
             )}
             {s === 'nao_gerado' && l.faltas.length > 0 && <p className="text-[11px] text-rose-700">Complete os dados do responsável para gerar.</p>}
+            {s === 'nao_gerado' && l.faltas.length === 0 && l.bloqueios.length > 0 && <p className="text-[11px] text-rose-700">Resolva a pendência da Carta para gerar.</p>}
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
               {s === 'nao_gerado' && <button className={pri} disabled={bloqueado} onClick={() => onGerar(l, tipo)}>{trabalhando ? 'Gerando…' : 'Gerar Word'}</button>}

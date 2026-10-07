@@ -56,6 +56,10 @@ export interface CartaResolvida {
   lancheAdiciona: boolean;
   lancheValor: number;
   diaVencimento: string;
+  /** A Carta não registra a escolha de contraturno, mas o aluno tem contraturno hoje: a equipe precisa abrir a Carta e salvar. */
+  contraturnoSemEscolha: boolean;
+  /** De onde vieram os dados (aparece na gaveta, pra conferir contra a Carta). */
+  fonte: { anoMatricula: number; contraturnoNaCarta: 'sim' | 'nao' | 'nao_registrado'; cartaEm?: string };
 }
 
 export type ResultadoElegibilidade = { ok: true } | { ok: false; motivo: string };
@@ -123,7 +127,11 @@ export function resolverCarta(ctx: ContratoContexto): CartaResolvida | null {
 
   // ---- contraturno (mesmos padrões da tela dos pais)
   const ativo = contraturnos.find(c => c.alunoId === student.id && c.dataFim === null);
-  const desejado = base.contraturnoDesejado2027 !== undefined ? base.contraturnoDesejado2027 : !!ativo;
+  // REGRA: o contrato segue a Carta, e só ela. Só entra contraturno se a Carta diz "Sim". Nunca se deduz
+  // do contraturno que o aluno já tem no cadastro (isso é só uma sugestão da tela da Carta, não uma escolha).
+  const escolhaNaCarta = base.contraturnoDesejado2027;
+  const desejado = escolhaNaCarta === true;
+  const contraturnoSemEscolha = escolhaNaCarta === undefined && !!ativo;
   let contraturno: CartaResolvida['contraturno'] = null;
   if (desejado) {
     const dias: Dia[] = (base.diasContraturno2027 && base.diasContraturno2027.length > 0)
@@ -153,6 +161,12 @@ export function resolverCarta(ctx: ContratoContexto): CartaResolvida | null {
     pontualidadeAtiva, mensalidadePontualidade, contraturno,
     lancheAdiciona, lancheValor,
     diaVencimento: base.diaVencimento2027 || DIA_VENCIMENTO_PADRAO,
+    contraturnoSemEscolha,
+    fonte: {
+      anoMatricula: base.ano,
+      contraturnoNaCarta: escolhaNaCarta === true ? 'sim' : escolhaNaCarta === false ? 'nao' : 'nao_registrado',
+      cartaEm: base.dataIntencao2027 || base.cartaEnviadaEm2027,
+    },
   };
 }
 
@@ -177,9 +191,13 @@ export function responsavelFinanceiro(guardians: Guardian[], alunoId: string): G
 }
 
 /** O que impede de gerar (faltas) e o que merece atenção (avisos). */
-export function validarParaContrato(ctx: ContratoContexto, carta: CartaResolvida): { faltas: string[]; avisos: string[] } {
-  const faltas: string[] = [];
+export function validarParaContrato(ctx: ContratoContexto, carta: CartaResolvida): { faltas: string[]; avisos: string[]; bloqueios: string[] } {
+  const faltas: string[] = [];   // dados que a FAMÍLIA precisa completar na ficha
   const avisos: string[] = [];
+  const bloqueios: string[] = []; // pendências que a EQUIPE resolve (impedem gerar)
+  if (carta.contraturnoSemEscolha) {
+    bloqueios.push('A Carta de Intenção não registra se o aluno terá contraturno em 2027 (e ele tem contraturno hoje). Abra a Carta, confirme a escolha e salve.');
+  }
   const resp = responsavelFinanceiro(ctx.guardians, ctx.student.id);
   faltas.push(...getDadosFaltandoParaContrato(resp));
   if (!ctx.student.nascimento) faltas.push('data de nascimento do aluno');
@@ -191,10 +209,17 @@ export function validarParaContrato(ctx: ContratoContexto, carta: CartaResolvida
     if (carta.contraturno.valor <= 0) avisos.push('O valor do contraturno está zerado.');
   }
   if (!carta.somenteContraturno && carta.mensalidade <= 0) avisos.push('A mensalidade combinada na Carta está zerada.');
+  if (carta.somenteContraturno && !carta.contraturno && !carta.contraturnoSemEscolha) {
+    avisos.push('O aluno é "somente contraturno", mas a Carta diz que ele não terá contraturno.');
+  }
+  const comResposta = ctx.enrollments.filter(e => e.alunoId === ctx.student.id && e.statusIntencao2027 !== undefined);
+  if (comResposta.length > 1) {
+    avisos.push(`Há mais de uma matrícula com resposta da Carta (anos ${comResposta.map(e => e.ano).sort().join(' e ')}); o contrato usa a de ${carta.base.ano}.`);
+  }
   if (carta.base.valorLanche2027 === undefined && carta.base.valorLanche === undefined) {
     avisos.push(`Valor do lanche não definido na Carta: o contrato usa R$ ${formatarMoeda(LANCHE_VALOR_PADRAO)}.`);
   }
-  return { faltas, avisos };
+  return { faltas, avisos, bloqueios };
 }
 
 // ---------- formatação de textos ----------
