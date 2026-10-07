@@ -44,6 +44,7 @@ import ContraturnoSchedule from './components/ContraturnoSchedule';
 import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
 import ContratosTab from './components/ContratosTab';
+import ImportarTab from './components/ImportarTab';
 import ParentCartaPortal from './components/ParentCartaPortal';
 import FichaDadosGeraisForm from './components/FichaDadosGeraisForm';
 import FichaSaudeForm from './components/FichaSaudeForm';
@@ -2200,6 +2201,7 @@ export default function App() {
             { id: 'students', label: 'Fichas de Alunos', icon: Users },
             { id: 'contratos', label: 'Contratos', icon: FileText },
             { id: 'escala', label: 'Contraturno', icon: CalendarDays },
+            { id: 'importar', label: 'Importar', icon: Upload },
             { id: 'pricing', label: 'Configurações', icon: Settings },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -2293,6 +2295,7 @@ export default function App() {
                 { id: 'students', label: 'Fichas de Alunos', icon: Users },
                 { id: 'contratos', label: 'Contratos', icon: FileText },
                 { id: 'escala', label: 'Contraturno', icon: CalendarDays },
+                { id: 'importar', label: 'Importar', icon: Upload },
                 { id: 'pricing', label: 'Configurações', icon: Settings },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -2509,6 +2512,22 @@ export default function App() {
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   showToast={showToast}
+                />
+              )}
+              {activeTab === 'importar' && (
+                <ImportarTab
+                  students={students}
+                  guardians={guardians}
+                  enrollments={enrollments}
+                  showToast={showToast}
+                  onExportBackup={handleExportBackup}
+                  onApplied={({ guardiansAtualizados, guardiansCriados, studentsCriados }) => {
+                    if (studentsCriados.length) setStudents(prev => [...prev, ...studentsCriados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+                    setGuardians(prev => {
+                      const novos = new Map(guardiansAtualizados.map(g => [g.id, g]));
+                      return [...prev.map(g => novos.get(g.id) ?? g), ...guardiansCriados];
+                    });
+                  }}
                 />
               )}
               {activeTab === 'escala' && (
