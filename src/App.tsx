@@ -1821,37 +1821,57 @@ export default function App() {
 
       setLoading(true);
 
-      if (Array.isArray(data.students)) {
-        await Promise.all(data.students.map((s: any) => saveDocument('students', s)));
-        setStudents(data.students);
-      }
-      if (Array.isArray(data.guardians)) {
-        await Promise.all(data.guardians.map((g: any) => saveDocument('guardians', g)));
-        setGuardians(data.guardians);
-      }
-      if (Array.isArray(data.enrollments)) {
-        await Promise.all(data.enrollments.map((e: any) => saveDocument('enrollments', e)));
-        setEnrollments(data.enrollments);
-      }
-      if (Array.isArray(data.contraturnos)) {
-        await Promise.all(data.contraturnos.map((c: any) => saveDocument('contraturnos', c)));
-        setContraturnos(data.contraturnos);
-      }
-      if (Array.isArray(data.movements)) {
-        await Promise.all(data.movements.map((m: any) => saveDocument('movements', m)));
-        setMovements(data.movements);
-      }
-      if (Array.isArray(data.classPrices)) {
-        await Promise.all(data.classPrices.map((cp: any) => saveDocument('classPrices', cp)));
-        setClassPrices(data.classPrices);
-      }
+      // Grava documento por documento e junta os resultados: um registro recusado pelo banco
+      // não derruba o resto, e o aviso final diz exatamente qual foi recusado e por quê.
+      const falhas: string[] = [];
+      let gravados = 0;
+      const gravar = async (colecao: string, lista: any[] | undefined) => {
+        if (!Array.isArray(lista)) return [] as any[];
+        const ok: any[] = [];
+        const res = await Promise.allSettled(lista.map(d => saveDocument(colecao, d)));
+        res.forEach((r, i) => {
+          if (r.status === 'fulfilled') { ok.push(lista[i]); gravados++; }
+          else {
+            const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+            falhas.push(`${colecao}/${lista[i]?.id ?? '?'}: ${msg.slice(0, 120)}`);
+          }
+        });
+        return ok;
+      };
+      // Mescla pelo id (não substitui a lista inteira na tela): um arquivo parcial não esvazia nada.
+      const mescla = <T extends { id: string }>(prev: T[], novos: T[]) => {
+        if (novos.length === 0) return prev;
+        const m = new Map(novos.map(n => [n.id, n]));
+        const base = prev.map(p => m.get(p.id) ?? p);
+        const ids = new Set(prev.map(p => p.id));
+        return [...base, ...novos.filter(n => !ids.has(n.id))];
+      };
+
+      const st = await gravar('students', data.students);
+      if (st.length) setStudents(prev => mescla(prev, st).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+      const gu = await gravar('guardians', data.guardians);
+      if (gu.length) setGuardians(prev => mescla(prev, gu));
+      const en = await gravar('enrollments', data.enrollments);
+      if (en.length) setEnrollments(prev => mescla(prev, en));
+      const ct = await gravar('contraturnos', data.contraturnos);
+      if (ct.length) setContraturnos(prev => mescla(prev, ct));
+      const mv = await gravar('movements', data.movements);
+      if (mv.length) setMovements(prev => mescla(prev, mv));
+      const cp = await gravar('classPrices', data.classPrices);
+      if (cp.length) setClassPrices(prev => mescla(prev, cp));
 
       setLoading(false);
-      showToast('Backup Restaurado', 'Todos os dados do arquivo JSON foram importados para o Firebase com sucesso.', 'success', 6000);
+      if (falhas.length === 0) {
+        showToast('Backup Restaurado', `${gravados} registro(s) gravados no Firebase com sucesso.`, 'success', 6000);
+      } else {
+        console.error('Registros recusados na restauração:', falhas);
+        showToast(`Restauração parcial: ${falhas.length} recusado(s)`, `${gravados} gravados. Primeiro recusado: ${falhas[0]}`, 'error', 20000);
+      }
     } catch (err) {
       console.error('Erro ao restaurar backup:', err);
       setLoading(false);
-      showToast('Erro ao Restaurar Backup', 'Verifique se o arquivo importado é um JSON válido e estruturado.', 'error', 6000);
+      const detalhe = err instanceof Error ? err.message.slice(0, 160) : '';
+      showToast('Erro ao Restaurar Backup', `Verifique se o arquivo importado é um JSON válido e estruturado.${detalhe ? ' Detalhe: ' + detalhe : ''}`, 'error', 15000);
     }
     event.target.value = '';
   };
