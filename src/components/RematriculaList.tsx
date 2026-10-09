@@ -67,7 +67,12 @@ export default function RematriculaList({
   const availableYears = Array.from(new Set([2026, ...enrollments.map(e => e.ano)])).sort((a, b) => a - b);
 
   // Filter enrollments by selected year
-  const yearEnrollments = enrollments.filter(e => e.ano === selectedYear);
+  // Alunos inativos ou cancelados saem da rematrícula (contagens, lista e Cartas não enviadas).
+  // Os dados deles continuam guardados; só não aparecem aqui. Trancado continua visível, com etiqueta.
+  const alunosForaDaRematricula = new Set(
+    students.filter(s => s.status === 'inativo' || s.status === 'cancelado').map(s => s.id)
+  );
+  const yearEnrollments = enrollments.filter(e => e.ano === selectedYear && !alunosForaDaRematricula.has(e.alunoId));
 
   // Counter summary
   const total = yearEnrollments.length;
