@@ -165,7 +165,9 @@ export default function Dashboard({
   const cartaPorAluno = activeStudents.map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
   const idsCarta = (estados: CartaEstado[]) => cartaPorAluno.filter(c => estados.includes(c.estado)).map(c => c.id);
   const cartaIds = {
-    faltaEnviar: idsCarta(['nao_enviada']),
+    // Famílias com parceria ficam à parte: a Carta só vai depois da conversa pessoal.
+    faltaEnviar: idsCarta(['nao_enviada']).filter(id => !activeStudents.find(s => s.id === id)?.parceria),
+    emParceria: idsCarta(['nao_enviada']).filter(id => !!activeStudents.find(s => s.id === id)?.parceria),
     enviadas: idsCarta(['aguardando', 'confirmada', 'em_analise', 'nao_renova']),
     aguardando: idsCarta(['aguardando']),
     confirmam: idsCarta(['confirmada']),
@@ -410,7 +412,7 @@ export default function Dashboard({
 
       {/* O que precisa de você agora — junta num feed só os cadastros novos,
           as sugestões da Coordenação e quem ainda falta enviar a carta */}
-      {(novosAutoCadastrados.length > 0 || coordenacaoSugestoes.filter(s => !s.resolvida).length > 0 || cartaIds.faltaEnviar.length > 0) && (
+      {(novosAutoCadastrados.length > 0 || coordenacaoSugestoes.filter(s => !s.resolvida).length > 0 || cartaIds.faltaEnviar.length > 0 || cartaIds.emParceria.length > 0) && (
         <div className="bg-white border-l-4 border-brand-orange border-y border-r border-slate-200/80 rounded-xl shadow-xs p-5">
           <h3 className="font-display font-bold text-sm text-brand-green-dark mb-1">
             O que precisa de você agora
@@ -460,6 +462,23 @@ export default function Dashboard({
               </div>
             ))}
 
+            {cartaIds.emParceria.length > 0 && (
+              <div className="flex items-center gap-3 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-brand-orange flex items-center justify-center shrink-0 text-base">🤝</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-800">
+                    {cartaIds.emParceria.length} {cartaIds.emParceria.length === 1 ? 'família' : 'famílias'} com parceria — conversar antes da Carta
+                  </p>
+                  <p className="text-[11px] text-slate-500">A Carta de Intenção só vai depois da negociação pessoal</p>
+                </div>
+                <button
+                  onClick={() => onNavigate('rematricula')}
+                  className="shrink-0 px-3 py-1.5 bg-white border border-slate-200 hover:border-brand-orange hover:text-brand-orange text-slate-600 text-[11px] font-bold rounded-md cursor-pointer"
+                >
+                  Ver e enviar mensagem
+                </button>
+              </div>
+            )}
             {cartaIds.faltaEnviar.length > 0 && (
               <div className="flex items-center gap-3 py-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-50 text-brand-orange flex items-center justify-center shrink-0 text-base">📤</div>
