@@ -4,6 +4,7 @@ import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCarta
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CartaIntencaoForm from './CartaIntencaoForm';
+import { mensagemParceria } from '../mensagens';
 
 interface RematriculaListProps {
   students: Student[];
@@ -18,6 +19,7 @@ interface RematriculaListProps {
   onUpdateEnrollmentNotes: (alunoId: string, notes: string) => void;
   onUpdateEnrollmentDiscounts: (alunoId: string, discountRegular: number, discountContraturno: number) => void;
   onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void | Promise<void>;
+  onUpdateStudent?: (student: Student) => void | Promise<void>;
 }
 
 export default function RematriculaList({
@@ -32,7 +34,8 @@ export default function RematriculaList({
   onUpdateEnrollmentStatus,
   onUpdateEnrollmentNotes,
   onUpdateEnrollmentDiscounts,
-  onSaveEnrollment
+  onSaveEnrollment,
+  onUpdateStudent
 }: RematriculaListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todas' | 'Pendente' | 'Em Negociação' | 'Confirmada'>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,6 +49,9 @@ export default function RematriculaList({
   const [filterEnvio, setFilterEnvio] = useState<'Todas' | 'Enviada' | 'Não enviada'>('Todas');
   const [filterResposta, setFilterResposta] = useState<'Todas' | 'Confirmada' | 'Em Análise' | 'Não Renovará' | 'Aguardando'>('Todas');
   const [agruparPorTurma, setAgruparPorTurma] = useState(true);
+  const [filterParceria, setFilterParceria] = useState<'Todas' | 'Só parceria' | 'Sem parceria'>('Todas');
+  const [parceriaMsgStudentId, setParceriaMsgStudentId] = useState<string | null>(null);
+  const [parceriaMsgTexto, setParceriaMsgTexto] = useState('');
 
   const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
   const [tempDiscountRegular, setTempDiscountRegular] = useState<number>(0);
@@ -178,7 +184,11 @@ export default function RematriculaList({
     const respostaAluno = item.cartaInfo ? respostaMap[item.cartaInfo.estado] : 'Aguardando';
     const matchesResposta = filterResposta === 'Todas' || respostaAluno === filterResposta;
     
-    return matchesSearch && matchesStatus && matchesTurmaProposta && matchesIdade && matchesEnvio && matchesResposta;
+    const matchesParceria = filterParceria === 'Todas'
+      || (filterParceria === 'Só parceria' && !!item.student.parceria)
+      || (filterParceria === 'Sem parceria' && !item.student.parceria);
+
+    return matchesSearch && matchesParceria && matchesStatus && matchesTurmaProposta && matchesIdade && matchesEnvio && matchesResposta;
   });
 
   // Turmas propostas em uso nesta lista — pra montar o filtro e os grupos,
@@ -214,6 +224,25 @@ export default function RematriculaList({
   };
 
   const [copiedContact, setCopiedContact] = useState<string | null>(null);
+
+  const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+  const toggleParceria = (st: Student) => {
+    if (!onUpdateStudent) return;
+    const nova = !st.parceria;
+    const atualizado: Student = { ...st, parceria: nova };
+    if (!nova) delete atualizado.parceriaMensagemEm;
+    onUpdateStudent(atualizado);
+  };
+
+  const abrirMensagemParceria = (st: Student, g?: Guardian) => {
+    setParceriaMsgStudentId(st.id);
+    setParceriaMsgTexto(mensagemParceria(g?.nome));
+  };
+
+  const marcarMensagemEnviada = (st: Student) => {
+    if (onUpdateStudent) onUpdateStudent({ ...st, parceria: true, parceriaMensagemEm: hojeISO() });
+  };
 
   const handleCopyContact = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -351,6 +380,19 @@ export default function RematriculaList({
         </div>
 
         <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase">Parceria</label>
+          <select
+            value={filterParceria}
+            onChange={(e) => setFilterParceria(e.target.value as any)}
+            className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-50 font-semibold focus:outline-none cursor-pointer"
+          >
+            <option value="Todas">Todas</option>
+            <option value="Só parceria">🤝 Só parceria</option>
+            <option value="Sem parceria">Sem parceria</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
           <label className="block text-[10px] font-bold text-slate-500 uppercase">Carta enviada?</label>
           <select
             value={filterEnvio}
@@ -433,6 +475,11 @@ export default function RematriculaList({
                               Novo(a)
                             </span>
                           )}
+                          {student.parceria && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-violet-100 text-violet-800 border border-violet-300 uppercase" title="Família com parceria/troca de serviços: conversar pessoalmente antes da Carta">
+                              🤝 Parceria
+                            </span>
+                          )}
                           {student.status === 'trancado' && (
                             <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 uppercase">
                               Trancado
@@ -485,6 +532,27 @@ export default function RematriculaList({
                               <Copy size={10} />
                             </button>
                           </div>
+                          {onUpdateStudent && (
+                            <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                              <button
+                                onClick={() => toggleParceria(student)}
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-pointer ${student.parceria ? 'bg-violet-600 text-white border-violet-700' : 'bg-white text-violet-700 border-violet-300 hover:bg-violet-50'}`}
+                              >
+                                {student.parceria ? '🤝 Parceria ✓' : '🤝 Marcar parceria'}
+                              </button>
+                              {student.parceria && (
+                                <button
+                                  onClick={() => abrirMensagemParceria(student, guardian)}
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 cursor-pointer"
+                                >
+                                  💬 Mensagem WhatsApp
+                                </button>
+                              )}
+                              {student.parceria && student.parceriaMensagemEm && (
+                                <span className="text-[9px] text-slate-500 font-semibold">enviada em {student.parceriaMensagemEm.split('-').reverse().slice(0, 2).join('/')}</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-400 italic">Não cadastrado</span>
@@ -743,6 +811,48 @@ export default function RematriculaList({
           </motion.div>
         )}
 
+        {parceriaMsgStudentId && (() => {
+          const st = students.find(s => s.id === parceriaMsgStudentId);
+          if (!st) return null;
+          const gd = guardians.find(g => g.alunoId === st.id && g.financeiro);
+          const tel = (gd?.telefone || gd?.contato || '').replace(/\D/g, '');
+          const numero = tel.startsWith('55') && tel.length > 11 ? tel : `55${tel}`;
+          return (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-3"
+            >
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 text-sm">🤝 Mensagem de parceria</h3>
+                    <p className="text-[11px] text-slate-500">{st.nome} — {gd?.nome || 'sem responsável financeiro'}{gd ? ` · ${gd.telefone || gd.contato || 'sem telefone'}` : ''}</p>
+                  </div>
+                  <button onClick={() => setParceriaMsgStudentId(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"><X size={16} /></button>
+                </div>
+                <textarea
+                  value={parceriaMsgTexto}
+                  onChange={(e) => setParceriaMsgTexto(e.target.value)}
+                  rows={12}
+                  className="w-full text-xs p-2 rounded-md border border-slate-200 bg-slate-50 focus:outline-none"
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(parceriaMsgTexto); marcarMensagemEnviada(st); setCopiedContact('mensagem'); setTimeout(() => setCopiedContact(null), 2000); }}
+                    className="px-3 py-1.5 rounded-md border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >Copiar</button>
+                  <button
+                    disabled={tel.length < 8}
+                    onClick={() => { marcarMensagemEnviada(st); window.open(`https://wa.me/${numero}?text=${encodeURIComponent(parceriaMsgTexto)}`, '_blank'); }}
+                    className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-40 cursor-pointer"
+                  >Abrir no WhatsApp</button>
+                </div>
+                <p className="text-[10px] text-slate-500">Ao copiar ou abrir o WhatsApp, o sistema registra a data do envio. A Carta de Intenção só vai depois da conversa.</p>
+              </div>
+            </motion.div>
+          );
+        })()}
+
         {activeCartaStudentId && (() => {
           const st = students.find(s => s.id === activeCartaStudentId);
           if (!st) return null;
@@ -759,6 +869,11 @@ export default function RematriculaList({
               className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 overflow-y-auto"
             >
               <div className="w-full max-w-4xl my-2 sm:my-6 relative">
+                {st.parceria && (
+                  <div className="mb-2 p-2.5 rounded-lg bg-violet-100 border border-violet-300 text-violet-900 text-xs font-bold">
+                    🤝 Família com parceria/troca de serviços — negocie pessoalmente antes de enviar o link da Carta.
+                  </div>
+                )}
                 <CartaIntencaoForm
                   student={st}
                   guardian={gd}

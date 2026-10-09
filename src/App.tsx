@@ -2527,6 +2527,7 @@ export default function App() {
                   onUpdateEnrollmentNotes={handleUpdateEnrollmentNotes}
                   onUpdateEnrollmentDiscounts={handleUpdateEnrollmentDiscounts}
                   onSaveEnrollment={handleSaveEnrollment}
+                  onUpdateStudent={handleUpdateStudent}
                 />
               )}
               {activeTab === 'contratos' && (

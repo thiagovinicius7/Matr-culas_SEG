@@ -12,6 +12,10 @@ export interface Student {
   autorizadosBuscar?: string; // nomes de pessoas extras autorizadas a buscar a criança
   irmaosIds?: string[]; // IDs de outros Students que são irmãos matriculados na escola
   origemCadastro?: 'auto' | 'staff'; // 'auto' = criado pela própria família via Ficha de Dados Gerais pública
+  /** Família com parceria/troca de serviços: negociar pessoalmente ANTES de enviar a Carta de Intenção. */
+  parceria?: boolean;
+  /** Data (AAAA-MM-DD) em que a mensagem de convite para a conversa foi aberta no WhatsApp. */
+  parceriaMensagemEm?: string;
 }
 
 export type EstadoCivil = 'Solteiro(a)' | 'Casado(a)' | 'Divorciado(a)' | 'Viúvo(a)' | 'União estável' | 'Outro';
