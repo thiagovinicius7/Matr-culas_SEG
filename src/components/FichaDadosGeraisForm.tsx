@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, Guardian, Enrollment, RegularClass, EstadoCivil } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, ANO_CARTA_INTENCAO } from '../data';
 import { Sprout, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -65,7 +65,9 @@ const guardianParaTemp = (g: Guardian): TempGuardian => {
 
 export default function FichaDadosGeraisForm({ classPrices, activeYear, existingStudent, existingGuardians, onSubmit, onUpdate }: FichaDadosGeraisFormProps) {
   const isUpdateMode = !!existingStudent;
-  const [anoPretendido, setAnoPretendido] = useState<number>(activeYear);
+  // O link público é SEMPRE para o ano seguinte (ano da Carta de Intenção). Nunca cria matrícula
+  // no ano em andamento, para o aluno novo não entrar numa turma de 2026 nem "avançar" depois.
+  const anoPretendido = ANO_CARTA_INTENCAO;
   const [nomeAluno, setNomeAluno] = useState(existingStudent?.nome || '');
   const [nascimento, setNascimento] = useState(existingStudent?.nascimento || '');
   const [cpfAluno, setCpfAluno] = useState(existingStudent?.cpf || '');
@@ -220,24 +222,8 @@ export default function FichaDadosGeraisForm({ classPrices, activeYear, existing
 
           {/* Ano pretendido — só faz sentido para cadastro de aluno novo */}
           {!isUpdateMode && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Matrícula para qual ano letivo?</label>
-            <div className="flex gap-2">
-              {[activeYear, activeYear + 1].map(ano => (
-                <button
-                  key={ano}
-                  type="button"
-                  onClick={() => setAnoPretendido(ano)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-colors cursor-pointer ${
-                    anoPretendido === ano
-                      ? 'bg-brand-green-dark text-white border-brand-green-dark'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-brand-green-light'
-                  }`}
-                >
-                  {ano} {ano === activeYear ? '(atual)' : '(próximo)'}
-                </button>
-              ))}
-            </div>
+          <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800">
+            Matrícula para o ano letivo de {anoPretendido}
           </div>
           )}
 
