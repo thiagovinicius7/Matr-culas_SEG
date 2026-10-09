@@ -73,6 +73,9 @@ export default function RematriculaList({
     students.filter(s => s.status === 'inativo' || s.status === 'cancelado').map(s => s.id)
   );
   const yearEnrollments = enrollments.filter(e => e.ano === selectedYear && !alunosForaDaRematricula.has(e.alunoId));
+  // Na busca por nome, inativos e cancelados aparecem (para poder consultar); fora dela, não.
+  const buscando = searchQuery.trim().length > 0;
+  const enrollmentsDaLista = buscando ? enrollments.filter(e => e.ano === selectedYear) : yearEnrollments;
 
   // Counter summary
   const total = yearEnrollments.length;
@@ -81,7 +84,7 @@ export default function RematriculaList({
   const pending = yearEnrollments.filter(e => e.statusNegociacao === 'Pendente').length;
 
   // Process list with student and guardian joins
-  const rematriculaData = yearEnrollments.map(e => {
+  const rematriculaData = enrollmentsDaLista.map(e => {
     const student = students.find(s => s.id === e.alunoId);
     const financialGuardian = guardians.find(g => g.alunoId === e.alunoId && g.financeiro);
     const regularClass = classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
