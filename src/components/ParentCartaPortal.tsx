@@ -95,6 +95,18 @@ export default function ParentCartaPortal({
 
   const periodoContraturno: 'Parcial' | 'Completo' = horarioSaida === '17:30' ? 'Completo' : 'Parcial';
 
+  // Desconto que a equipe concedeu no contraturno, guardado como PERCENTUAL
+  // sobre a tabela da época em que foi salvo. Se a família trocar dias ou
+  // horário, o mesmo percentual é aplicado à nova tabela (antes o valor
+  // salvo ficava congelado e não acompanhava a troca).
+  const [pctDescontoContraturno] = useState<number>(() => {
+    const salvo = enrollment?.valorContraturnoProposto2027;
+    if (salvo === undefined) return 0;
+    const tabelaNaAbertura = getContraturnoPriceDynamic(diasContraturno.length, periodoContraturno, contraturnoPrices, 2027);
+    if (!(tabelaNaAbertura > 0)) return 0;
+    return Math.min(1, Math.max(0, (tabelaNaAbertura - salvo) / tabelaNaAbertura));
+  });
+
   const [adicionarLanche, setAdicionarLanche] = useState<boolean>(() => {
     if (enrollment?.adicionarLanche2027 !== undefined) return enrollment.adicionarLanche2027;
     return enrollment?.adicionarLanche || false;
@@ -147,7 +159,7 @@ export default function ParentCartaPortal({
   const valorContraturnoTabela = contraturnoDesejado ? getContraturnoPriceDynamic(frequencia, periodoContraturno, contraturnoPrices, 2027) : 0;
   // Respeita o desconto que a equipe já concedeu e salvou, se houver
   const valorContraturno = contraturnoDesejado
-    ? (enrollment?.valorContraturnoProposto2027 !== undefined ? enrollment.valorContraturnoProposto2027 : valorContraturnoTabela)
+    ? Math.round(valorContraturnoTabela * (1 - pctDescontoContraturno) * 100) / 100
     : 0;
   const lancheVal = adicionarLanche ? valorLanche : 0;
   // Almoço na escola é se a pessoa NÃO optar pelo contraturno, mas quer que a criança almoce

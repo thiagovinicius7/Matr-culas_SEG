@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
 import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, REGULAR_CLASSES, getNextYearClass, normalizeClassId, valorComPontualidade, DIA_VENCIMENTO_PADRAO, getNovidades2027, SOMENTE_CONTRATURNO_CLASS } from '../data';
 import { auth } from '../firebase';
@@ -154,14 +154,26 @@ export default function CartaIntencaoForm({
     return valorContraturnoTabela2027;
   });
 
-  // Reaplica o desconto atual sempre que a tabela do contraturno mudar
-  // (trocou dias/horário/ligou-desligou) — mesmo padrão do reajuste que já
-  // existe quando a turma regular muda.
+  // Quando a tabela do contraturno muda (trocou dias/horário/ligou-desligou),
+  // mantém o PERCENTUAL de desconto que estava valendo e recalcula o valor.
+  const tabelaAnteriorContraturno = useRef<number>(valorContraturnoTabela2027);
+  const valorAtualContraturno = useRef<number>(valorContraturnoProposto2027);
+  valorAtualContraturno.current = valorContraturnoProposto2027;
   useEffect(() => {
-    const discReais = tipoDescontoContraturno2027 === 'porcentagem'
-      ? (valorContraturnoTabela2027 * descontoContraturno2027 / 100)
-      : descontoContraturno2027;
-    setValorContraturnoProposto2027(Math.max(0, valorContraturnoTabela2027 - discReais));
+    const anterior = tabelaAnteriorContraturno.current;
+    tabelaAnteriorContraturno.current = valorContraturnoTabela2027;
+    if (anterior === valorContraturnoTabela2027) return;
+    const pct = anterior > 0
+      ? Math.min(1, Math.max(0, (anterior - valorAtualContraturno.current) / anterior))
+      : 0;
+    const novoValor = Math.round(valorContraturnoTabela2027 * (1 - pct) * 100) / 100;
+    const novoDescontoReais = Math.max(0, valorContraturnoTabela2027 - novoValor);
+    setValorContraturnoProposto2027(novoValor);
+    setDescontoContraturno2027(
+      tipoDescontoContraturno2027 === 'porcentagem'
+        ? Number((pct * 100).toFixed(2))
+        : Number(novoDescontoReais.toFixed(2))
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valorContraturnoTabela2027]);
 
