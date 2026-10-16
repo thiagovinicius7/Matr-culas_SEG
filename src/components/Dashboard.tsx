@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Student, Enrollment, ContraturnoSegment, RegularClass, PackDocument, CoordenacaoSugestao } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
+import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, PackDocument, CoordenacaoSugestao } from '../types';
+import { mensagemLembreteCarta, mensagemReuniao } from '../mensagens';
+import { REGULAR_CLASSES, getEnrollmentBaseDaCarta, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
 import type { CartaEstado } from '../data';
 import { 
   Users, 
@@ -23,6 +24,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface DashboardProps {
   students: Student[];
+  guardians?: Guardian[];
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
   classPrices?: RegularClass[];
@@ -42,6 +44,7 @@ interface DashboardProps {
 
 export default function Dashboard({ 
   students, 
+  guardians = [],
   enrollments, 
   contraturnos, 
   classPrices = [],
@@ -1096,18 +1099,46 @@ export default function Dashboard({
                   .map(id => {
                   const st = students.find(s => s.id === id);
                   if (!st) return null;
+                  const lembrete = selectedFaseForModal.label.includes('Aguardando retorno');
+                  const emAnalise = selectedFaseForModal.label.includes('Em Análise');
+                  const gd = guardians.find(g => g.alunoId === id && g.financeiro) || guardians.find(g => g.alunoId === id);
+                  const tel = (gd?.telefone || gd?.contato || '').replace(/\D/g, '');
+                  const abrirWhats = () => {
+                    if (tel.length < 8) return;
+                    const numero = tel.startsWith('55') && tel.length > 11 ? tel : `55${tel}`;
+                    let msg: string;
+                    if (lembrete) {
+                      const link = `${window.location.origin}${window.location.pathname}?alunoId=${id}`;
+                      msg = mensagemLembreteCarta(gd?.nome, st.nome, ANO_CARTA_INTENCAO, link);
+                    } else {
+                      const base = getEnrollmentBaseDaCarta(id, enrollments);
+                      msg = mensagemReuniao(gd?.nome, st.nome, base?.reuniaoData2027, base?.reuniaoHora2027);
+                    }
+                    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
+                  };
                   return (
-                    <button
-                      key={id}
-                      onClick={() => {
-                        setSelectedFaseForModal(null);
-                        onNavigateWithStudent?.('students', id);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer"
-                    >
-                      <span className="text-sm font-semibold text-slate-800">{st.nome}</span>
-                      <span className="text-slate-300">›</span>
-                    </button>
+                    <div key={id} className="flex items-center hover:bg-slate-50 transition-colors">
+                      <button
+                        onClick={() => {
+                          setSelectedFaseForModal(null);
+                          onNavigateWithStudent?.('students', id);
+                        }}
+                        className="flex-1 text-left px-4 py-3 flex items-center justify-between cursor-pointer"
+                      >
+                        <span className="text-sm font-semibold text-slate-800">{st.nome}</span>
+                        <span className="text-slate-300">›</span>
+                      </button>
+                      {(lembrete || emAnalise) && (
+                        <button
+                          onClick={abrirWhats}
+                          disabled={tel.length < 8}
+                          title={tel.length < 8 ? 'Sem telefone cadastrado' : (lembrete ? 'Lembrar a família de responder a Carta' : 'Chamar no WhatsApp para combinar a reunião')}
+                          className="mr-3 shrink-0 text-[11px] font-bold px-2 py-1 rounded border bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 disabled:opacity-40 cursor-pointer"
+                        >
+                          {lembrete ? '🔔 Lembrar' : '💬 WhatsApp'}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>

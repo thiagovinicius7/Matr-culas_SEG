@@ -1633,7 +1633,7 @@ export default function App() {
         'diasContraturno2027', 'horarioSaida2027', 'periodoContraturno2027',
         'adicionarLanche2027', 'valorLanche2027', 'adicionarAlmoco2027', 'valorAlmoco2027',
         'valorContraturnoProposto2027', 'diaVencimento2027', 'descontoPontualidadeAtivo2027', 'cartaEnviadaEm2027',
-        'statusIntencao2027', 'observacoesFamilia2027', 'dataIntencao2027'
+        'statusIntencao2027', 'observacoesFamilia2027', 'dataIntencao2027', 'reuniaoData2027', 'reuniaoHora2027'
       ];
       const baseYearEnrollments = enrollments.filter(e => e.ano === targetYear - 1);
       const cleanedBaseYear = baseYearEnrollments.map(e => {
@@ -2452,6 +2452,7 @@ export default function App() {
               {activeTab === 'dashboard' && (
                 <Dashboard 
                   students={students} 
+                  guardians={guardians}
                   enrollments={enrollments} 
                   contraturnos={contraturnos} 
                   activeYear={activeYear}

@@ -134,6 +134,8 @@ export interface Enrollment {
   statusIntencao2027?: 'Pendente' | 'Confirmada' | 'Em Análise' | 'Não Renovará';
   cartaEnviadaEm2027?: string; // ISO — quando a equipe copiou/enviou o link da carta pra família (controle de "enviada / aguardando retorno")
   observacoesFamilia2027?: string;
+  reuniaoData2027?: string; // YYYY-MM-DD — reunião combinada com família que marcou "Em análise"
+  reuniaoHora2027?: string; // HH:MM
   dataIntencao2027?: string;
 }
 

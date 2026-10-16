@@ -21,3 +21,26 @@ export function mensagemParceria(nomeResponsavel?: string): string {
     `Um abraço!`
   );
 }
+
+/** Mensagem para famílias que marcaram "Em análise" na Carta e pediram conversa. */
+export function mensagemReuniao(nomeResponsavel?: string, nomeAluno?: string, dataISO?: string, hora?: string): string {
+  const primeiro = (nomeResponsavel || '').trim().split(/\s+/)[0];
+  const saudacao = primeiro ? `Olá, ${primeiro}! Tudo bem?` : 'Olá! Tudo bem?';
+  const aluno = nomeAluno ? ` sobre a rematrícula de ${nomeAluno.trim().split(/\s+/)[0]}` : '';
+  let quando = '';
+  if (dataISO) {
+    const [a, m, d] = dataISO.split('-');
+    quando = ` Podemos conversar no dia ${d}/${m}/${a}${hora ? ` às ${hora}` : ''}? Se não for um bom horário, me diga qual fica melhor para vocês.`;
+  } else {
+    quando = ' Me diga quais dias e horários ficam melhores para vocês que eu encaixo.';
+  }
+  return `${saudacao} Aqui é o Thiago, do Sítio-Escola Geranium. Vi que vocês marcaram "em análise" na Carta de Intenção e pediram para conversarmos${aluno}.${quando} Será um prazer ouvir vocês!`;
+}
+
+/** Lembrete para famílias que receberam a Carta de Intenção e ainda não responderam. */
+export function mensagemLembreteCarta(nomeResponsavel: string | undefined, nomeAluno: string | undefined, ano: number, link: string): string {
+  const primeiro = (nomeResponsavel || '').trim().split(/\s+/)[0];
+  const saudacao = primeiro ? `Olá, ${primeiro}! Tudo bem?` : 'Olá! Tudo bem?';
+  const aluno = nomeAluno ? ` de ${nomeAluno.trim().split(/\s+/)[0]}` : '';
+  return `${saudacao} Aqui é o Thiago, do Sítio-Escola Geranium. Passando para lembrar com carinho da Carta de Intenção ${ano}${aluno}: ainda não recebemos a resposta de vocês. Ela leva só alguns minutos e nos ajuda a organizar as turmas do próximo ano.\n\n${link}\n\nSe tiver qualquer dúvida, é só me chamar!`;
+}
