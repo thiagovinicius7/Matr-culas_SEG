@@ -4,7 +4,7 @@ import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCarta
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CartaIntencaoForm from './CartaIntencaoForm';
-import { mensagemParceria } from '../mensagens';
+import { mensagemParceria, mensagemReuniao, mensagemLembreteCarta } from '../mensagens';
 
 interface RematriculaListProps {
   students: Student[];
@@ -224,6 +224,33 @@ export default function RematriculaList({
   };
 
   const [copiedContact, setCopiedContact] = useState<string | null>(null);
+
+  const salvarReuniao = (alunoId: string, campo: 'reuniaoData2027' | 'reuniaoHora2027', valor: string) => {
+    if (!onSaveEnrollment) return;
+    const base = getEnrollmentBaseDaCarta(alunoId, enrollments);
+    if (!base) return;
+    const atualizado: Enrollment = { ...base };
+    if (valor) (atualizado as any)[campo] = valor; else delete (atualizado as any)[campo];
+    onSaveEnrollment(atualizado, false);
+  };
+
+  const abrirWhatsAppReuniao = (st: Student, g: Guardian | undefined) => {
+    const base = getEnrollmentBaseDaCarta(st.id, enrollments);
+    const tel = (g?.telefone || g?.contato || '').replace(/\D/g, '');
+    if (tel.length < 8) return;
+    const numero = tel.startsWith('55') && tel.length > 11 ? tel : `55${tel}`;
+    const msg = mensagemReuniao(g?.nome, st.nome, base?.reuniaoData2027, base?.reuniaoHora2027);
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  const abrirWhatsAppLembrete = (st: Student, g: Guardian | undefined) => {
+    const tel = (g?.telefone || g?.contato || '').replace(/\D/g, '');
+    if (tel.length < 8) return;
+    const numero = tel.startsWith('55') && tel.length > 11 ? tel : `55${tel}`;
+    const link = `${window.location.origin}${window.location.pathname}?alunoId=${st.id}`;
+    const msg = mensagemLembreteCarta(g?.nome, st.nome, ANO_CARTA_INTENCAO, link);
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
 
   const hojeISO = () => new Date().toISOString().slice(0, 10);
 
@@ -532,6 +559,53 @@ export default function RematriculaList({
                               <Copy size={10} />
                             </button>
                           </div>
+                          {cartaInfo?.estado === 'aguardando' && (
+                            <button
+                              onClick={() => abrirWhatsAppLembrete(student, guardian)}
+                              className="mt-1 text-[10px] font-bold px-1.5 py-1 rounded border bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 cursor-pointer"
+                              title="Abre o WhatsApp com um lembrete e o link da Carta"
+                            >
+                              🔔 Lembrar de responder
+                            </button>
+                          )}
+                          {cartaInfo?.estado === 'em_analise' && (() => {
+                            const baseCarta = getEnrollmentBaseDaCarta(student.id, enrollments);
+                            return (
+                              <div className="mt-1 p-2 rounded-md bg-amber-50 border border-amber-300 space-y-1.5">
+                                <div className="text-[10px] font-extrabold text-amber-900 uppercase">⏳ Em análise — pediu conversa</div>
+                                {baseCarta?.observacoesFamilia2027 && (
+                                  <div className="text-[10px] text-slate-700 italic">“{baseCarta.observacoesFamilia2027}”</div>
+                                )}
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <input
+                                    type="date"
+                                    value={baseCarta?.reuniaoData2027 || ''}
+                                    onChange={(e) => salvarReuniao(student.id, 'reuniaoData2027', e.target.value)}
+                                    className="px-1.5 py-1 rounded border border-amber-300 bg-white text-[10px]"
+                                    title="Dia da reunião"
+                                  />
+                                  <input
+                                    type="time"
+                                    value={baseCarta?.reuniaoHora2027 || ''}
+                                    onChange={(e) => salvarReuniao(student.id, 'reuniaoHora2027', e.target.value)}
+                                    className="px-1.5 py-1 rounded border border-amber-300 bg-white text-[10px]"
+                                    title="Horário da reunião"
+                                  />
+                                  <button
+                                    onClick={() => abrirWhatsAppReuniao(student, guardian)}
+                                    className="text-[10px] font-bold px-1.5 py-1 rounded border bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 cursor-pointer"
+                                  >
+                                    💬 Chamar no WhatsApp
+                                  </button>
+                                </div>
+                                {baseCarta?.reuniaoData2027 && (
+                                  <div className="text-[10px] font-bold text-amber-900">
+                                    📅 Reunião: {baseCarta.reuniaoData2027.split('-').reverse().join('/')}{baseCarta.reuniaoHora2027 ? ` às ${baseCarta.reuniaoHora2027}` : ''}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           {onUpdateStudent && (
                             <div className="flex items-center gap-1 flex-wrap pt-0.5">
                               <button
