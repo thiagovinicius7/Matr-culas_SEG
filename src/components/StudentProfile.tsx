@@ -381,16 +381,27 @@ export default function StudentProfile({
   const [browseTurmaId, setBrowseTurmaId] = useState<string | null>(null);
 
   const turmaCatalog = classPrices.length > 0 ? classPrices : REGULAR_CLASSES;
-  const turmaCounts = turmaCatalog.map(cls => {
+  // Aluno sem Ensino Regular (só Contraturno) não pertence a nenhuma turma regular
+  const ehSoContraturno = (st: Student) =>
+    enrollments.some(e => e.alunoId === st.id && e.ano === activeYear && e.turmaRegularId === 'sem_regular');
+  const turmaCountsRegulares = turmaCatalog.map(cls => {
     const count = filteredStudents.filter(st => {
+      if (ehSoContraturno(st)) return false;
       const age = calculateAgeAtCutoff(st.nascimento, activeYear);
       return normalizeClassId(getRegularClassForAge(age).id) === normalizeClassId(cls.id);
     }).length;
     return { ...cls, count };
   });
+  const qtdSoContraturno = filteredStudents.filter(ehSoContraturno).length;
+  const turmaCounts = qtdSoContraturno > 0
+    ? [...turmaCountsRegulares, { id: 'sem_regular', nome: 'Somente Contraturno', count: qtdSoContraturno } as any]
+    : turmaCountsRegulares;
 
-  const studentsInBrowseTurma = browseTurmaId
+  const studentsInBrowseTurma = browseTurmaId === 'sem_regular'
+    ? filteredStudents.filter(ehSoContraturno)
+    : browseTurmaId
     ? filteredStudents.filter(st => {
+        if (ehSoContraturno(st)) return false;
         const age = calculateAgeAtCutoff(st.nascimento, activeYear);
         return normalizeClassId(getRegularClassForAge(age).id) === normalizeClassId(browseTurmaId);
       })
@@ -679,7 +690,9 @@ export default function StudentProfile({
                     >
                       <h4 className="font-bold text-xs text-slate-800 truncate">{st.nome}</h4>
                       <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                        {bAge} anos • <span className="text-slate-700 font-semibold">{bClass.nome}</span>
+                        {bAge} anos • {ehSoContraturno(st)
+                          ? <span className="text-amber-800 font-bold bg-amber-100 border border-amber-300 px-1.5 rounded">Somente Contraturno</span>
+                          : <span className="text-slate-700 font-semibold">{bClass.nome}</span>}
                       </p>
                     </button>
 
