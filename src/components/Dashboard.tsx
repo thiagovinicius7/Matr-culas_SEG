@@ -368,7 +368,10 @@ export default function Dashboard({
                 .slice(0, 5)
                 .map(student => {
                   const age = calculateAgeAtCutoff(student.nascimento, activeYear);
-                  const regularClass = getRegularClassForAgeDynamic(age, classPrices, activeYear);
+                  const soContraturno = enrollments.some(e => e.alunoId === student.id && e.ano === activeYear && e.turmaRegularId === 'sem_regular');
+                  const regularClass = soContraturno
+                    ? { nome: 'Somente Contraturno' }
+                    : getRegularClassForAgeDynamic(age, classPrices, activeYear);
                   return (
                     <div key={student.id} className="p-3 space-y-1.5 hover:bg-slate-50/50 transition-colors">
                       <div>
