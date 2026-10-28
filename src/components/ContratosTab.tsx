@@ -562,8 +562,8 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
         <div className="mt-3 space-y-3 text-xs text-slate-700">
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             {cel('Responsável', r?.nome)}{cel('CPF', r?.cpf, 'CPF')}
-            {cel('RG', r?.rg, 'RG')}{cel('Estado civil', r?.estadoCivil, 'estado civil')}
-            {cel('Nacionalidade', r?.nacionalidade, 'nacionalidade')}{cel('Profissão', r?.profissao, 'profissão')}
+            {cel('RG', r?.rg, 'RG')}{cel('Estado civil (opcional)', r?.estadoCivil)}
+            {cel('Nacionalidade (opcional)', r?.nacionalidade)}{cel('Profissão (opcional)', r?.profissao)}
             <div className="col-span-2">{cel('Endereço', r?.endereco, 'endereço')}</div>
             {cel('E-mail', r?.email, 'e-mail')}{cel('Telefone', r?.telefone || r?.contato, 'telefone')}
             {cel('Aluno(a)', l.aluno.nome)}{cel('Nascimento', dataBR(l.aluno.nascimento), 'data de nascimento do aluno')}
