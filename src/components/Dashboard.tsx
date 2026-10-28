@@ -438,12 +438,11 @@ export default function Dashboard({
                 </div>
                 <button
                   onClick={() => {
-                    const primeiro = novosAutoCadastrados[0];
-                    if (primeiro && onNavigateWithStudent) {
-                      onNavigateWithStudent('students', primeiro.id);
-                    } else {
-                      onNavigate('students');
-                    }
+                    setSelectedFaseForModal({
+                      label: 'Novas famílias — Ficha de Dados Gerais',
+                      emoji: '🌱',
+                      alunoIds: novosAutoCadastrados.map(s => s.id),
+                    });
                   }}
                   className="shrink-0 px-3 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[11px] font-bold rounded-md cursor-pointer"
                 >

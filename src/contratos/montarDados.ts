@@ -270,6 +270,10 @@ export function montarDadosDoContrato(
     responsavel_nacionalidade: resp?.nacionalidade || '',
     responsavel_estado_civil: minuscula(resp?.estadoCivil),
     responsavel_profissao: resp?.profissao || '',
+    // Nacionalidade, estado civil e profissão são opcionais: só entram no texto os que existirem.
+    // Uso no modelo: {{responsavel_nome}}, {{responsavel_qualificacao}}portador do CPF...
+    responsavel_qualificacao: [resp?.nacionalidade, minuscula(resp?.estadoCivil), resp?.profissao]
+      .map(x => (x || '').trim()).filter(Boolean).map(x => x + ', ').join(''),
     responsavel_cpf: resp?.cpf || '',
     responsavel_rg: resp?.rg || '',
     responsavel_endereco: resp?.endereco || '',
@@ -327,7 +331,7 @@ export const MARCADORES_CONHECIDOS: string[] = Object.keys(
 function montarDadosDoContratoVazio(): Record<string, string | boolean> {
   const chaves = [
     'numero_contrato', 'numero_contraturno', 'numero_aditivo',
-    'responsavel_nome', 'responsavel_nacionalidade', 'responsavel_estado_civil', 'responsavel_profissao',
+    'responsavel_nome', 'responsavel_qualificacao', 'responsavel_nacionalidade', 'responsavel_estado_civil', 'responsavel_profissao',
     'responsavel_cpf', 'responsavel_rg', 'responsavel_endereco', 'responsavel_email', 'responsavel_telefone',
     'aluno_nome', 'aluno_nascimento', 'aluno_turma', 'data_documento', 'dia_vencimento',
     'lanche_valor', 'lanche_valor_extenso', 'taxa_material_valor', 'taxa_material_extenso',

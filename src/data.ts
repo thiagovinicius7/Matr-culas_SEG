@@ -687,9 +687,6 @@ export function getDadosFaltandoParaContrato(g: Guardian | undefined): string[] 
   if (!g.endereco?.trim()) faltam.push('endereço');
   if (!g.email?.trim()) faltam.push('e-mail');
   if (!(g.telefone || g.contato || '').trim()) faltam.push('telefone');
-  if (!g.estadoCivil) faltam.push('estado civil');
-  if (!g.nacionalidade?.trim()) faltam.push('nacionalidade');
-  if (!g.profissao?.trim()) faltam.push('profissão');
   return faltam;
 }
 
