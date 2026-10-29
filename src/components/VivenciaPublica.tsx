@@ -5,7 +5,7 @@ import type { Vivencia, VivenciaInscricao } from '../types';
 import {
   carregarVivenciasAbertas, inscreverNaVivencia, VagasEsgotadasError, InscricoesEncerradasError,
   dataPorExtenso, horario, faixaEtaria, textoIdade, idadeEm, vagasRestantes, novoId,
-  COMO_CONHECEU_OPCOES, PARENTESCO_VIVENCIA,
+  COMO_CONHECEU_OPCOES, PARENTESCO_VIVENCIA, turmaDeInteresse, ANO_INTERESSE,
 } from '../vivencias';
 
 /**
@@ -309,6 +309,11 @@ function FormularioInscricao({ v, onVoltar, onSucesso, onRecarregar }: {
                   <input id={`cd-${idx}`} type="date" required className={inputCls} value={c.nascimento} onChange={e => atualizarCrianca(idx, 'nascimento', e.target.value)} />
                   {c.nascimento && !avisosIdade[idx] && textoIdade(c.nascimento, v.data) && (
                     <p className="text-[11px] text-slate-500">Na data da vivência: {textoIdade(c.nascimento, v.data)}</p>
+                  )}
+                  {c.nascimento && turmaDeInteresse(c.nascimento).texto && (
+                    <p className="text-[11px] font-bold text-brand-green-dark">
+                      {turmaDeInteresse(c.nascimento).foraDaFaixa ? turmaDeInteresse(c.nascimento).texto : `Turma em ${ANO_INTERESSE}: ${turmaDeInteresse(c.nascimento).texto}`}
+                    </p>
                   )}
                   {avisosIdade[idx] && <p className="text-[11px] text-amber-700">{avisosIdade[idx]}</p>}
                 </div>

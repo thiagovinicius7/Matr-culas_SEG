@@ -4,10 +4,11 @@ import {
   CalendarDays, Clock, MessageCircle, Check, UserPlus, Lock, Unlock,
 } from 'lucide-react';
 import { getCollectionData, saveDocument, deleteDocument } from '../firebase';
-import type { Vivencia, VivenciaInscricao, PresencaVivencia } from '../types';
+import type { Vivencia, VivenciaInscricao, PresencaVivencia, RegularClass } from '../types';
 import {
   COL_VIVENCIAS, COL_INSCRICOES, COMO_CONHECEU_OPCOES, PARENTESCO_VIVENCIA,
   dataPorExtenso, dataBR, horario, faixaEtaria, textoIdade, numeroWhatsApp, hojeISO, novoId, linkPublico,
+  turmaDeInteresse, ANO_INTERESSE,
 } from '../vivencias';
 
 type ShowToast = (title: string, description?: string, type?: 'success' | 'error' | 'info', duration?: number) => void;
@@ -38,6 +39,7 @@ export default function VivenciasTab({ showToast }: { showToast: ShowToast }) {
   const [carregando, setCarregando] = useState(true);
   const [vivencias, setVivencias] = useState<Vivencia[]>([]);
   const [inscricoes, setInscricoes] = useState<VivenciaInscricao[]>([]);
+  const [turmas, setTurmas] = useState<RegularClass[]>([]);
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [editando, setEditando] = useState<Vivencia | null>(null);
 
@@ -49,6 +51,8 @@ export default function VivenciasTab({ showToast }: { showToast: ShowToast }) {
       ]);
       setVivencias(vs);
       setInscricoes(is);
+      // Turmas configuradas no sistema (para a turma de interesse pela data de corte). Se falhar, usa o catálogo padrão.
+      getCollectionData<RegularClass>('classPrices').then(setTurmas).catch(() => {});
     } catch {
       showToast('Não foi possível carregar as vivências', 'Confira se as regras de segurança das vivências foram publicadas no Firebase Console.', 'error', 9000);
     } finally {
@@ -153,6 +157,7 @@ export default function VivenciasTab({ showToast }: { showToast: ShowToast }) {
         <ListaInscritos
           v={aberta}
           inscricoes={porVivencia.get(aberta.id) || []}
+          turmas={turmas}
           onVoltar={() => setAbertaId(null)}
           onEditar={() => setEditando(aberta)}
           onAlternarAberta={() => alternarAberta(aberta)}
@@ -365,9 +370,10 @@ function EditorVivencia({ v, ehNova, onCancelar, onSalvar, onExcluir }: {
 
 /* ------------------------------------------------------------------ */
 
-function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, onSalvar, onExcluir, onSincronizar, showToast }: {
+function ListaInscritos({ v, inscricoes, turmas, onVoltar, onEditar, onAlternarAberta, onSalvar, onExcluir, onSincronizar, showToast }: {
   v: Vivencia;
   inscricoes: VivenciaInscricao[];
+  turmas: RegularClass[];
   onVoltar: () => void;
   onEditar: () => void;
   onAlternarAberta: () => void;
@@ -377,6 +383,8 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
   showToast: ShowToast;
 }) {
   const [busca, setBusca] = useState('');
+  const [filtroTurma, setFiltroTurma] = useState('');
+  const turmaDe = (i: VivenciaInscricao) => turmaDeInteresse(i.criancaNascimento, turmas);
   const [editandoInsc, setEditandoInsc] = useState<VivenciaInscricao | null>(null);
   const passada = v.data < hojeISO();
 
@@ -388,6 +396,7 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
     [inscricoes]
   );
   const filtradas = ordenadas.filter(i => {
+    if (filtroTurma && turmaDe(i).texto !== filtroTurma) return false;
     const t = busca.trim().toLowerCase();
     if (!t) return true;
     return [i.criancaNome, i.responsavelNome, i.telefone, i.email].some(x => (x || '').toLowerCase().includes(t));
@@ -395,6 +404,16 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
   const presentes = inscricoes.filter(i => i.presenca === 'presente').length;
   const faltas = inscricoes.filter(i => i.presenca === 'faltou').length;
   const familias = new Set(inscricoes.map(i => i.grupoId)).size;
+  const porTurma = useMemo(() => {
+    const m = new Map<string, { n: number; idade: number }>();
+    inscricoes.forEach(i => {
+      const t = turmaDe(i);
+      if (!t.texto) return;
+      const atual = m.get(t.texto) || { n: 0, idade: t.idadeCorte ?? 99 };
+      m.set(t.texto, { n: atual.n + 1, idade: atual.idade });
+    });
+    return [...m.entries()].sort((a, b) => a[1].idade - b[1].idade);
+  }, [inscricoes, turmas]);
 
   const marcarPresenca = (i: VivenciaInscricao) => onSalvar({ ...i, presenca: PROXIMA_PRESENCA[i.presenca || 'pendente'] });
 
@@ -404,13 +423,14 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
         <td class="n">${n + 1}</td>
         <td><b>${esc(i.criancaNome)}</b></td>
         <td class="c">${esc(textoIdade(i.criancaNascimento, v.data))}</td>
+        <td class="t">${esc(turmaDe(i).texto)}</td>
         <td>${esc(i.responsavelNome)}<div class="s">${esc(i.parentesco)}</div></td>
         <td class="nw">${esc(i.telefone)}</td>
         <td class="obs">${esc(i.observacoes || '')}</td>
         <td class="box">${i.presenca === 'presente' ? '✔' : ''}</td>
         <td class="ass"></td>
       </tr>`).join('');
-    const extras = Array.from({ length: 4 }, () => '<tr class="vazia"><td class="n"></td><td></td><td></td><td></td><td></td><td></td><td class="box"></td><td class="ass"></td></tr>').join('');
+    const extras = Array.from({ length: 4 }, () => '<tr class="vazia"><td class="n"></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="box"></td><td class="ass"></td></tr>').join('');
     const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Lista de presença — ${esc(v.titulo)}</title>
       <style>
         @page { size: A4 landscape; margin: 12mm; }
@@ -428,7 +448,8 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
         .n { width: 26px; text-align: center; color: #6b7280; }
         .c { width: 56px; text-align: center; }
         .nw { white-space: nowrap; width: 110px; }
-        .obs { width: 22%; font-size: 10px; color: #374151; }
+        .t { width: 92px; font-size: 10px; }
+        .obs { width: 18%; font-size: 10px; color: #374151; }
         .box { width: 54px; text-align: center; font-size: 14px; }
         th.box { font-size: 10px; }
         .ass { width: 18%; }
@@ -441,7 +462,7 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
           <div class="sub">${esc(dataPorExtenso(v.data, true))}${horario(v) ? ' · ' + esc(horario(v)) : ''}</div></div>
         <div class="tot">${inscricoes.length} ${inscricoes.length === 1 ? 'criança inscrita' : 'crianças inscritas'}<br>${familias} ${familias === 1 ? 'família' : 'famílias'}</div>
       </div>
-      <table><thead><tr><th class="n">Nº</th><th>Criança</th><th class="c">Idade</th><th>Responsável</th><th>Telefone</th><th>Observações</th><th class="box">Presença</th><th>Assinatura do responsável</th></tr></thead>
+      <table><thead><tr><th class="n">Nº</th><th>Criança</th><th class="c">Idade</th><th class="t">Turma ${ANO_INTERESSE}</th><th>Responsável</th><th>Telefone</th><th>Observações</th><th class="box">Presença</th><th>Assinatura do responsável</th></tr></thead>
       <tbody>${linhas}${extras}</tbody></table>
       <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
       </body></html>`;
@@ -453,10 +474,10 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
   };
 
   const baixarPlanilha = () => {
-    const cab = ['Criança', 'Nascimento', `Idade em ${dataBR(v.data)}`, 'Responsável', 'Parentesco', 'Telefone', 'E-mail', 'Escola atual', 'Como conheceu', 'Observações', 'Presença', 'Inscrito em', 'Origem'];
+    const cab = ['Criança', 'Nascimento', `Idade em ${dataBR(v.data)}`, `Turma ${ANO_INTERESSE} (corte 31/03)`, 'Responsável', 'Parentesco', 'Telefone', 'E-mail', 'Escola atual', 'Como conheceu', 'Observações', 'Presença', 'Inscrito em', 'Origem'];
     const cel = (x: unknown) => `"${String(x ?? '').replace(/"/g, '""')}"`;
     const linhas = ordenadas.map(i => [
-      i.criancaNome, dataBR(i.criancaNascimento), textoIdade(i.criancaNascimento, v.data), i.responsavelNome, i.parentesco,
+      i.criancaNome, dataBR(i.criancaNascimento), textoIdade(i.criancaNascimento, v.data), turmaDe(i).texto, i.responsavelNome, i.parentesco,
       i.telefone, i.email, i.escolaAtual, i.comoConheceu, i.observacoes, PRESENCA_INFO[i.presenca || 'pendente'].rot,
       i.criadoEm ? new Date(i.criadoEm).toLocaleString('pt-BR') : '', i.origem === 'equipe' ? 'Equipe' : 'Link',
     ].map(cel).join(';'));
@@ -511,6 +532,22 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
         ))}
       </div>
 
+      {porTurma.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 space-y-2">
+          <p className="text-[11px] font-bold text-slate-500">Turma de interesse em {ANO_INTERESSE} <span className="font-normal">(idade em 31/03/{ANO_INTERESSE})</span></p>
+          <div className="flex flex-wrap gap-1.5">
+            {porTurma.map(([nome, { n }]) => (
+              <button key={nome} type="button" onClick={() => setFiltroTurma(f => (f === nome ? '' : nome))}
+                aria-pressed={filtroTurma === nome}
+                className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${filtroTurma === nome ? 'bg-brand-green-dark text-white border-brand-green-dark' : 'bg-brand-sand/60 text-slate-700 border-slate-200 hover:border-brand-green-light'}`}>
+                {nome} · {n}
+              </button>
+            ))}
+            {filtroTurma && <button type="button" onClick={() => setFiltroTurma('')} className="text-xs font-bold px-2 text-slate-500 hover:text-slate-800">Mostrar todas</button>}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -539,6 +576,11 @@ function ListaInscritos({ v, inscricoes, onVoltar, onEditar, onAlternarAberta, o
                   <div className="min-w-0">
                     <p className="font-bold text-slate-800">{i.criancaNome}</p>
                     <p className="text-xs text-slate-500">{textoIdade(i.criancaNascimento, v.data)}{i.escolaAtual ? ` · ${i.escolaAtual}` : ''}</p>
+                    {turmaDe(i).texto && (
+                      <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${turmaDe(i).foraDaFaixa ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                        {turmaDe(i).foraDaFaixa ? turmaDe(i).texto : `${turmaDe(i).texto} em ${ANO_INTERESSE}`}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <p className="text-slate-700">{i.responsavelNome} <span className="text-xs text-slate-500">({i.parentesco})</span></p>

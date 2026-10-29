@@ -3,7 +3,8 @@
 // tocam em alunos, responsáveis ou matrículas.
 import { collection, doc, getDocs, query, where, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Vivencia, VivenciaInscricao } from './types';
+import type { Vivencia, VivenciaInscricao, RegularClass } from './types';
+import { calculateAgeAtCutoff, getRegularClassForAge, getRegularClassForAgeDynamic, ANO_CARTA_INTENCAO } from './data';
 
 export const COL_VIVENCIAS = 'vivencias';
 export const COL_INSCRICOES = 'vivenciaInscricoes';
@@ -131,4 +132,22 @@ export async function inscreverNaVivencia(vivenciaId: string, inscricoes: Vivenc
     inscricoes.forEach(i => tx.set(doc(db, COL_INSCRICOES, i.id), i));
     tx.update(ref, { inscritos: atuais + inscricoes.length });
   });
+}
+
+/** Ano letivo de interesse das famílias que vêm às vivências. */
+export const ANO_INTERESSE = ANO_CARTA_INTENCAO;
+
+/**
+ * Turma de interesse no ano letivo de matrícula, pela data de corte (31/03):
+ * mesma regra usada na Ficha de Dados Gerais para aluno novo.
+ * Usa as turmas configuradas no sistema quando disponíveis (tela da equipe);
+ * na página pública usa o catálogo padrão de turmas.
+ */
+export function turmaDeInteresse(nascimento: string, turmas?: RegularClass[]): { texto: string; idadeCorte: number | null; foraDaFaixa: boolean } {
+  if (!nascimento) return { texto: '', idadeCorte: null, foraDaFaixa: false };
+  const idade = calculateAgeAtCutoff(nascimento, ANO_INTERESSE);
+  if (idade < 2) return { texto: `Menos de 2 anos em 31/03/${ANO_INTERESSE}`, idadeCorte: idade, foraDaFaixa: true };
+  if (idade > 10) return { texto: `Mais de 10 anos em 31/03/${ANO_INTERESSE}`, idadeCorte: idade, foraDaFaixa: true };
+  const turma = turmas && turmas.length ? getRegularClassForAgeDynamic(idade, turmas, ANO_INTERESSE) : getRegularClassForAge(idade);
+  return { texto: turma.nome, idadeCorte: idade, foraDaFaixa: false };
 }
