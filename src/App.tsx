@@ -45,12 +45,13 @@ import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
 import ContratosTab from './components/ContratosTab';
 import ImportarTab from './components/ImportarTab';
+import VivenciasTab from './components/VivenciasTab';
 import ParentCartaPortal from './components/ParentCartaPortal';
 import FichaDadosGeraisForm from './components/FichaDadosGeraisForm';
 import FichaSaudeForm from './components/FichaSaudeForm';
 import FichaAnamneseForm from './components/FichaAnamneseForm';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2, FileText, Leaf } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Data/hora em que esta versão foi publicada (vem do vite.config.ts). O typeof evita
@@ -2226,6 +2227,7 @@ export default function App() {
             { id: 'dashboard', label: 'Painel Principal', icon: LayoutDashboard },
             { id: 'students', label: 'Fichas de Alunos', icon: Users },
             { id: 'contratos', label: 'Contratos', icon: FileText },
+            { id: 'vivencias', label: 'Vivências', icon: Leaf },
             { id: 'escala', label: 'Contraturno', icon: CalendarDays },
             { id: 'importar', label: 'Importar', icon: Upload },
             { id: 'pricing', label: 'Configurações', icon: Settings },
@@ -2320,6 +2322,7 @@ export default function App() {
                 { id: 'dashboard', label: 'Painel Principal', icon: LayoutDashboard },
                 { id: 'students', label: 'Fichas de Alunos', icon: Users },
                 { id: 'contratos', label: 'Contratos', icon: FileText },
+                { id: 'vivencias', label: 'Vivências', icon: Leaf },
                 { id: 'escala', label: 'Contraturno', icon: CalendarDays },
                 { id: 'importar', label: 'Importar', icon: Upload },
                 { id: 'pricing', label: 'Configurações', icon: Settings },
@@ -2541,6 +2544,9 @@ export default function App() {
                   contraturnoPrices={contraturnoPrices}
                   showToast={showToast}
                 />
+              )}
+              {activeTab === 'vivencias' && (
+                <VivenciasTab showToast={showToast} />
               )}
               {activeTab === 'importar' && (
                 <ImportarTab

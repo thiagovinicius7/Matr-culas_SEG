@@ -399,3 +399,49 @@ export interface ContratoContador {
   contraturno: number;
   aditivo: number;
 }
+
+// ---------------------------------------------------------------------------
+// Vivências (eventos abertos do sítio para famílias interessadas na matrícula)
+// Ficam em coleções próprias e NUNCA se misturam com alunos/responsáveis.
+// ---------------------------------------------------------------------------
+
+export interface Vivencia {
+  id: string;
+  titulo: string;
+  data: string; // YYYY-MM-DD
+  horaInicio?: string; // HH:MM
+  horaFim?: string; // HH:MM
+  descricao?: string;
+  /** Total de vagas (crianças). 0 = sem limite. */
+  vagas: number;
+  /** Faixa de idade indicada (anos completos na data da vivência). Opcionais, só informativas. */
+  idadeMin?: number;
+  idadeMax?: number;
+  /** Inscrições abertas no link público. */
+  aberta: boolean;
+  /** Quantidade de crianças inscritas — mantida pela página pública e recalculada pela equipe. */
+  inscritos?: number;
+  criadoEm: string; // ISO
+}
+
+export type PresencaVivencia = 'pendente' | 'presente' | 'faltou';
+
+/** Uma inscrição = UMA criança. Irmãos inscritos juntos compartilham o mesmo `grupoId`. */
+export interface VivenciaInscricao {
+  id: string;
+  vivenciaId: string;
+  grupoId: string;
+  criancaNome: string;
+  criancaNascimento: string; // YYYY-MM-DD
+  responsavelNome: string;
+  parentesco: string;
+  telefone: string;
+  email?: string;
+  escolaAtual?: string;
+  comoConheceu?: string;
+  observacoes?: string; // alergias, cuidados, necessidades
+  criadoEm: string; // ISO
+  presenca: PresencaVivencia;
+  /** 'link' = família pelo link público; 'equipe' = lançada pela equipe. */
+  origem: 'link' | 'equipe';
+}
