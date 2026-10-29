@@ -51,7 +51,7 @@ export default function BuscaRapida({ students, guardians, enrollments, classPri
         </button>
       )}
       {q && (
-        <div className="absolute z-50 top-full left-0 right-0 sm:left-auto sm:w-96 mt-1.5 border border-slate-200 rounded-lg shadow-lg overflow-hidden divide-y divide-slate-100 bg-white max-h-96 overflow-y-auto">
+        <div className="absolute z-50 top-full left-0 lg:left-auto lg:right-0 w-full sm:w-96 max-w-[calc(100vw-2rem)] mt-1.5 border border-slate-200 rounded-lg shadow-lg overflow-hidden divide-y divide-slate-100 bg-white max-h-96 overflow-y-auto">
           {resultados.map(student => {
             const soContraturno = enrollments.some(e => e.alunoId === student.id && e.ano === activeYear && e.turmaRegularId === 'sem_regular');
             const idade = calculateAgeAtCutoff(student.nascimento, activeYear);
