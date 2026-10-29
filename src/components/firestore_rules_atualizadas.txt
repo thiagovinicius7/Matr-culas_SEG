@@ -234,5 +234,20 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/vivencias/$(request.resource.data.vivenciaId)).data.aberta == true
       );
     }
+
+    // ===================== CONTRATOS =====================
+    // Só a equipe (login com e-mail e senha). Famílias com link público não
+    // leem nem gravam contratos.
+    match /contratos/{contratoId} {
+      allow read, write: if isEquipe();
+    }
+
+    match /contratoModelos/{modeloId} {
+      allow read, write: if isEquipe();
+    }
+
+    match /contratoContadores/{anoId} {
+      allow read, write: if isEquipe();
+    }
   }
 }
