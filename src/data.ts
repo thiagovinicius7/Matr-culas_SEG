@@ -725,3 +725,40 @@ export function getNovidades2027(turma: RegularClass): string[] {
     : 'Aulas extras: Educação Ambiental, Circo, Yoga e Musicalização';
   return [taxaTexto, aulasExtras];
 }
+
+/**
+ * Alunos que fazem parte do ano letivo `ano` (base de TODAS as contagens e turmas do Painel).
+ * Entram: alunos ativos com matrícula no ano que não esteja Cancelada.
+ * Ficam de fora:
+ *  - formandos: quem estava na última turma (Benjoí) no ano anterior conclui o Fundamental;
+ *  - cancelados / trancados.
+ * Se o ano ainda não tem nenhuma matrícula (virada não feita), usa todos os ativos.
+ */
+export function getAlunosDoAno(
+  students: Student[],
+  enrollments: Enrollment[],
+  classPrices: RegularClass[],
+  ano: number
+): Student[] {
+  const doAno = enrollments.filter(e => e.ano === ano);
+  const ativos = students.filter(s => s.status === 'ativo');
+  if (doAno.length === 0) return ativos;
+  const classes = classPrices.length > 0 ? classPrices : REGULAR_CLASSES;
+  return ativos.filter(s => {
+    const e = doAno.find(x => x.alunoId === s.id);
+    if (!e || e.statusNegociacao === 'Cancelada') return false;
+    const anterior = enrollments.find(x => x.alunoId === s.id && x.ano === ano - 1);
+    if (anterior?.turmaRegularId && anterior.turmaRegularId !== 'sem_regular' && anterior.statusNegociacao !== 'Cancelada') {
+      const turmaAnterior =
+        classes.find(c => normalizeClassId(c.id) === normalizeClassId(anterior.turmaRegularId))
+        || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(anterior.turmaRegularId));
+      if (turmaAnterior && turmaAnterior.idadeRef >= IDADE_REF_ULTIMA_TURMA) return false; // formando
+    }
+    return true;
+  });
+}
+
+/** Novas matrículas do ano: alunos do ano que não tinham NENHUMA matrícula em anos anteriores. */
+export function getNovasMatriculasDoAno(alunosDoAno: Student[], enrollments: Enrollment[], ano: number): Student[] {
+  return alunosDoAno.filter(s => !enrollments.some(e => e.alunoId === s.id && e.ano < ano && e.statusNegociacao !== 'Cancelada'));
+}

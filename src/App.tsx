@@ -14,7 +14,8 @@ import {
   getNextYearClass,
   ANO_CARTA_INTENCAO,
   getEnrollmentBaseDaCarta,
-  getFaseProcesso
+  getFaseProcesso,
+  getAlunosDoAno
 } from './data';
 import {
   seedDatabaseIfEmpty,
@@ -37,6 +38,7 @@ import {
   getImportedContraturnos
 } from './importedStudents';
 import Dashboard from './components/Dashboard';
+import BuscaRapida from './components/BuscaRapida';
 import StudentProfile from './components/StudentProfile';
 import NegotiationCalc from './components/NegotiationCalc';
 import RematriculaList from './components/RematriculaList';
@@ -173,7 +175,7 @@ export default function App() {
   const [contraturnoPrices, setContraturnoPrices] = useState<ContraturnoPrice[]>([]);
 
   // Active School Year (e.g. 2026, 2027)
-  const [activeYear, setActiveYear] = useState<number>(2026);
+  const [activeYear, setActiveYear] = useState<number>(2027);
 
   // Selected student ID shared across components
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -382,6 +384,26 @@ export default function App() {
     
     initFirebase();
   }, [isCheckingAuth, currentUser]);
+
+  // Correção pontual pedida pela escola (29/10/2026): estes alunos são SÓ contraturno em 2027
+  // e não podem aparecer nas turmas regulares. Roda só enquanto a matrícula 2027 ainda estiver
+  // numa turma regular — depois de corrigida, não faz mais nada (a equipe pode mudar na Ficha).
+  useEffect(() => {
+    if (loading || !currentUser) return;
+    const SO_CONTRATURNO_2027 = ['maria fernanda lisboa da silva ribeiro'];
+    const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const alvos = students.filter(st => SO_CONTRATURNO_2027.includes(semAcento(st.nome)));
+    const corrigidas: Enrollment[] = [];
+    alvos.forEach(st => {
+      const e = enrollments.find(x => x.alunoId === st.id && x.ano === 2027);
+      if (e && e.turmaRegularId !== 'sem_regular') {
+        corrigidas.push({ ...e, turmaRegularId: 'sem_regular', valorRegularOriginal: 0, descontoMensal: 0, valorFinalRegular: 0, anotacoes: `${e.anotacoes || ''} Somente contraturno em 2027.`.trim() });
+      }
+    });
+    if (corrigidas.length === 0) return;
+    setEnrollments(prev => prev.map(e => corrigidas.find(c => c.id === e.id) || e));
+    corrigidas.forEach(c => { saveDocument('enrollments', c).catch(err => console.error('Correção só contraturno:', err)); });
+  }, [loading, currentUser, students, enrollments]);
 
   // Handle direct navigation to a tab for a specific student
   const handleNavigateWithStudent = (tabId: string, studentId: string) => {
@@ -1465,6 +1487,14 @@ export default function App() {
     showToast('Tabela de Preços Salva', `Configurações de mensalidades para o ano ${year} foram salvas.`, 'success');
   };
 
+  // Troca o ano ativo (Configurações). A virada roda UMA vez, quando o ano de destino ainda não tem matrículas.
+  const handleChangeActiveYear = async (yr: number) => {
+    if (yr > activeYear && !enrollments.some(e => e.ano === yr)) {
+      await handleAdvanceSchoolYear(activeYear, yr);
+    }
+    setActiveYear(yr);
+  };
+
   // Handler: Advance school year / Rollover to new academic year
   const handleAdvanceSchoolYear = async (fromYear: number, targetYear: number) => {
     try {
@@ -1730,8 +1760,10 @@ export default function App() {
     ])
   ).sort((a, b) => a - b);
 
-  const totalStudentsCount = students.filter(s => s.status === 'ativo').length;
-  const validStudentIds = new Set(students.filter(s => s.status === 'ativo').map(s => s.id));
+  // Alunos do ano ativo: sem formandos, cancelados nem trancados
+  const alunosDoAnoAtivo = getAlunosDoAno(students, enrollments, classPrices, activeYear);
+  const totalStudentsCount = alunosDoAnoAtivo.length;
+  const validStudentIds = new Set(alunosDoAnoAtivo.map(s => s.id));
   const validActiveYearEnrollments = enrollments.filter(e => e.ano === activeYear && validStudentIds.has(e.alunoId));
   const confirmedEnrollmentsCount = validActiveYearEnrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
   const pendingEnrollmentsCount = validActiveYearEnrollments.filter(e => e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação').length;
@@ -2412,6 +2444,14 @@ export default function App() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <BuscaRapida
+              students={students}
+              guardians={guardians}
+              enrollments={enrollments}
+              classPrices={classPrices}
+              activeYear={activeYear}
+              onNavigateWithStudent={handleNavigateWithStudent}
+            />
             <button 
               onClick={handleExportBackup}
               className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 font-display"
@@ -2580,6 +2620,9 @@ export default function App() {
               )}
               {activeTab === 'pricing' && (
                 <PricingSettings 
+                  activeYear={activeYear}
+                  availableYears={availableYears}
+                  onChangeActiveYear={handleChangeActiveYear}
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   onSavePrices={handleSavePrices}

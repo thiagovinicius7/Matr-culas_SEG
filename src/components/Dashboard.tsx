@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, PackDocument, CoordenacaoSugestao } from '../types';
 import { mensagemLembreteCarta, mensagemReuniao } from '../mensagens';
-import { REGULAR_CLASSES, getEnrollmentBaseDaCarta, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO } from '../data';
+import { REGULAR_CLASSES, getEnrollmentBaseDaCarta, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO, getAlunosDoAno, getNovasMatriculasDoAno } from '../data';
 import type { CartaEstado } from '../data';
 import { 
   Users, 
@@ -91,6 +91,11 @@ export default function Dashboard({
     return getRegularClassForAgeDynamic(age, classPrices, activeYear);
   };
 
+  // Base do ano ativo: sem formandos, cancelados nem trancados (ver getAlunosDoAno em data.ts)
+  const alunosDoAno = getAlunosDoAno(students, enrollments, classPrices, activeYear);
+  const idsDoAno = new Set(alunosDoAno.map(s => s.id));
+  const novasMatriculas = getNovasMatriculasDoAno(alunosDoAno, enrollments, activeYear);
+
   const getStudentClassId = (student: Student): string => {
     const info = getStudentClassInfo(student);
     return normalizeClassId(info.id);
@@ -109,7 +114,7 @@ export default function Dashboard({
     const targetClassId = normalizeClassId(selectedClassForModal.id);
 
     return students
-      .filter(student => student.status === 'ativo' && !isEnrollmentCancelledForActiveYear(student))
+      .filter(student => idsDoAno.has(student.id))
       .filter(student => getStudentClassId(student) === targetClassId)
       .map(student => {
         const e = enrollments.find(e => e.alunoId === student.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === student.id) || {
@@ -141,14 +146,14 @@ export default function Dashboard({
   // quem foi cancelado ou trancado sai da contagem/lista de vagas ocupadas
   // e fica só no histórico como ex-aluno.
   const studentCountByClassId: Record<string, number> = {};
-  students.filter(s => s.status === 'ativo' && !isEnrollmentCancelledForActiveYear(s)).forEach(student => {
+  alunosDoAno.forEach(student => {
     const classId = getStudentClassId(student);
     studentCountByClassId[classId] = (studentCountByClassId[classId] || 0) + 1;
   });
 
   // Stats calculations for ACTIVE YEAR
-  const activeStudents = students.filter(s => s.status === 'ativo');
-  const totalStudentsCount = students.length;
+  const activeStudents = alunosDoAno;
+  const totalStudentsCount = activeStudents.length;
   const activeStudentsCount = activeStudents.length;
 
   // Rematrícula Funnel - Filter to active students in activeYear
@@ -282,138 +287,25 @@ export default function Dashboard({
               Ano Letivo Ativo: {activeYear}
             </span>
 
-            {/* Quick selector of available years — trocar de ano já garante
-                (por trás dos panos, sem perguntar nada) que todo aluno ativo
-                tenha uma matrícula criada nesse ano, controlando as vagas */}
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200">
-              {availableYears.map(yr => (
-                <button
-                  key={yr}
-                  disabled={isProcessingRollover}
-                  onClick={async () => {
-                    // A virada roda UMA vez (quando o ano de destino ainda não tem matrículas).
-                    // Depois disso, trocar de ano é só visualizar — nada é recalculado nem gravado.
-                    const anoJaTemMatriculas = enrollments.some(e => e.ano === yr);
-                    if (yr > activeYear && onAdvanceSchoolYear && !anoJaTemMatriculas) {
-                      setIsProcessingRollover(true);
-                      try {
-                        await onAdvanceSchoolYear(activeYear, yr);
-                      } catch (err) {
-                        console.error(err);
-                      } finally {
-                        setIsProcessingRollover(false);
-                      }
-                    }
-                    onSelectActiveYear?.(yr);
-                  }}
-                  className={`px-2.5 py-0.5 text-xs font-bold rounded cursor-pointer transition-all disabled:opacity-50 disabled:cursor-wait ${
-                    activeYear === yr 
-                      ? 'bg-brand-green-dark text-white shadow-2xs' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                  }`}
-                >
-                  {isProcessingRollover && yr !== activeYear ? '...' : yr}
-                </button>
-              ))}
-            </div>
           </div>
           <p className="text-xs text-slate-500 font-sans">
             Todos os cálculos, status de rematrícula, progressão de turmas e faturamento refletem o ciclo <strong>{activeYear}</strong>.
           </p>
         </div>
 
-        {onResetRematriculas && availableYears.length > 1 && (
-          <button
-            onClick={() => {
-              const anoParaZerar = Math.max(...availableYears);
-              if (confirm(
-                `Isso vai APAGAR de vez todas as matrículas de ${anoParaZerar} (inclusive pré-matrículas automáticas) e limpar as respostas da Carta de Intenção guardadas em ${anoParaZerar - 1} — de todos os alunos.\n\nOs dados de ${anoParaZerar - 1} (aluno, responsáveis, fichas, matrícula) NÃO são afetados.\n\nTem certeza que quer zerar tudo isso?`
-              )) {
-                onResetRematriculas(anoParaZerar);
-              }
-            }}
-            className="shrink-0 self-start text-[11px] font-bold text-slate-400 hover:text-rose-600 underline decoration-dotted cursor-pointer"
-            title={`Apaga as matrículas de teste de ${Math.max(...availableYears)} pra recomeçar do zero`}
-          >
-            🗑️ Zerar rematrículas de teste
-          </button>
-        )}
       </div>
 
-      {/* Header compacto + Busca Rápida flutuante (resultado aparece só enquanto digita) */}
+      {/* Header compacto (a Busca Rápida agora fica no topo de todas as telas) */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-display font-extrabold tracking-tight text-brand-green-dark">
             Painel Principal
           </h2>
           <p className="text-xs text-slate-500 font-sans mt-0.5">
-            {students.length} alunos cadastrados • ciclo {activeYear}
+            {activeStudentsCount} alunos em {activeYear}
           </p>
         </div>
 
-        <div className="relative w-full sm:w-80" id="quick-student-search-panel">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar aluno ou responsável…"
-            value={quickSearch}
-            onChange={(e) => setQuickSearch(e.target.value)}
-            className="w-full text-xs pl-8 pr-3 py-2.5 rounded-lg border border-slate-200 focus:border-brand-green-light focus:ring-1 focus:ring-brand-green-light focus:outline-none bg-white"
-          />
-
-          {quickSearch.trim().length > 0 && (
-            <div className="absolute z-30 top-full left-0 right-0 mt-1.5 border border-slate-200 rounded-lg shadow-lg overflow-hidden divide-y divide-slate-100 bg-white max-h-96 overflow-y-auto">
-              {students
-                .filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase()))
-                .slice(0, 5)
-                .map(student => {
-                  const age = calculateAgeAtCutoff(student.nascimento, activeYear);
-                  const soContraturno = enrollments.some(e => e.alunoId === student.id && e.ano === activeYear && e.turmaRegularId === 'sem_regular');
-                  const regularClass = soContraturno
-                    ? { nome: 'Somente Contraturno' }
-                    : getRegularClassForAgeDynamic(age, classPrices, activeYear);
-                  return (
-                    <div key={student.id} className="p-3 space-y-1.5 hover:bg-slate-50/50 transition-colors">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-800">{student.nome}</h4>
-                        <p className="text-[10px] text-slate-500">
-                          {age} anos • Turma: <span className="font-semibold text-brand-green-dark">{regularClass.nome}</span>
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <button
-                          onClick={() => { onNavigateWithStudent?.('students', student.id); setQuickSearch(''); }}
-                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <FileText size={11} />
-                          Ficha
-                        </button>
-                        <button
-                          onClick={() => { onNavigateWithStudent?.('negotiation', student.id); setQuickSearch(''); }}
-                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <Calculator size={11} />
-                          Calculadora
-                        </button>
-                        <button
-                          onClick={() => { onNavigateWithStudent?.('rematricula', student.id); setQuickSearch(''); }}
-                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <ClipboardList size={11} />
-                          Lista de Trabalho
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              {students.filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase())).length === 0 && (
-                <div className="p-4 text-center text-xs text-slate-400 italic">
-                  Nenhum aluno encontrado com "{quickSearch}".
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* O que precisa de você agora — junta num feed só os cadastros novos,
@@ -506,7 +398,7 @@ export default function Dashboard({
       )}
 
       {/* Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="stats-grid font-display">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" id="stats-grid font-display">
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -520,6 +412,23 @@ export default function Dashboard({
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total de Alunos</p>
             <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{activeStudentsCount}</h3>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          onClick={() => setSelectedFaseForModal({ label: `Novas matrículas ${activeYear}`, emoji: '🌟', alunoIds: novasMatriculas.map(s => s.id) })}
+          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4 cursor-pointer hover:border-brand-green-light transition-colors"
+        >
+          <div className="p-2.5 bg-orange-50 text-brand-orange rounded-lg">
+            <Sparkles size={20} />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Novas matrículas</p>
+            <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{novasMatriculas.length}</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">não estavam em {activeYear - 1}</p>
           </div>
         </motion.div>
 
