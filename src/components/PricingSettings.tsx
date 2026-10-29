@@ -5,6 +5,9 @@ import { DollarSign, Check, RotateCcw, Info, Sliders, Shield, Plus, Trash2, File
 import { motion } from 'motion/react';
 
 interface PricingSettingsProps {
+  activeYear?: number;
+  availableYears?: number[];
+  onChangeActiveYear?: (year: number) => Promise<void> | void;
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
   onSavePrices: (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[], year: number) => void;
@@ -16,6 +19,9 @@ interface PricingSettingsProps {
 }
 
 export default function PricingSettings({
+  activeYear,
+  availableYears: anosDoSistema = [],
+  onChangeActiveYear,
   classPrices,
   contraturnoPrices,
   onSavePrices,
@@ -25,6 +31,7 @@ export default function PricingSettings({
   onUploadPackDocument,
   onRemovePackDocument
 }: PricingSettingsProps) {
+  const [trocandoAno, setTrocandoAno] = useState(false);
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberPassword, setNewMemberPassword] = useState('');
@@ -211,6 +218,34 @@ export default function PricingSettings({
 
   return (
     <div className="space-y-6 animate-fade-in" id="pricing-settings-container">
+      {/* Ano letivo ativo — define turmas, contagens e listas do sistema inteiro */}
+      {activeYear !== undefined && onChangeActiveYear && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-700 font-display">Ano letivo do sistema</p>
+            <p className="text-[11px] text-slate-500">Turmas, quantidade de alunos e faturamento do Painel seguem o ano escolhido. Dados de anos anteriores ficam guardados.</p>
+          </div>
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200 self-start">
+            {anosDoSistema.map(yr => (
+              <button
+                key={yr}
+                disabled={trocandoAno}
+                onClick={async () => {
+                  if (yr === activeYear) return;
+                  setTrocandoAno(true);
+                  try { await onChangeActiveYear(yr); } finally { setTrocandoAno(false); }
+                }}
+                className={`px-3 py-1 text-xs font-bold rounded cursor-pointer transition-all disabled:opacity-50 disabled:cursor-wait ${
+                  activeYear === yr ? 'bg-brand-green-dark text-white' : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {trocandoAno && yr !== activeYear ? '...' : yr}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-3">
         <div>
