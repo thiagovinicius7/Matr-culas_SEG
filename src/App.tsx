@@ -2407,7 +2407,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* Global Statistics / Top Header inside Main Content */}
-        <header className="bg-white border-b border-[#FAF9F5] py-2 md:py-3 px-4 md:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0" id="main-header">
+        <header className="bg-white border-b border-[#FAF9F5] py-2 md:py-3 px-4 md:px-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 shrink-0" id="main-header">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2 font-display">
             {activeTab === 'escala' ? (
               <>
@@ -2443,7 +2443,8 @@ export default function App() {
               </>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0 w-full lg:w-auto lg:flex-1 lg:justify-end">
+            <div className="w-full sm:w-72 lg:w-64 xl:w-80 shrink-0">
             <BuscaRapida
               students={students}
               guardians={guardians}
@@ -2452,6 +2453,7 @@ export default function App() {
               activeYear={activeYear}
               onNavigateWithStudent={handleNavigateWithStudent}
             />
+            </div>
             <button 
               onClick={handleExportBackup}
               className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 font-display"
