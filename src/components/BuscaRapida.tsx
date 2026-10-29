@@ -36,7 +36,7 @@ export default function BuscaRapida({ students, guardians, enrollments, classPri
   const ir = (aba: string, id: string) => { onNavigateWithStudent(aba, id); setTermo(''); };
 
   return (
-    <div ref={raiz} className="relative w-full sm:w-72 lg:w-80" id="quick-student-search-panel">
+    <div ref={raiz} className="relative w-full" id="quick-student-search-panel">
       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
       <input
         type="text"

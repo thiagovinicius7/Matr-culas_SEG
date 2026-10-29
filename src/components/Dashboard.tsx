@@ -61,7 +61,7 @@ export default function Dashboard({
   onImportGeraniumData, 
   onClearDatabase 
 }: DashboardProps) {
-  const [quickSearch, setQuickSearch] = useState('');
+  const [receitaVisivel, setReceitaVisivel] = useState(false);
   const [linkCopiado, setLinkCopiado] = useState(false);
   const [selectedClassForModal, setSelectedClassForModal] = useState<{
     id: string;
@@ -398,7 +398,7 @@ export default function Dashboard({
       )}
 
       {/* Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" id="stats-grid font-display">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="stats-grid font-display">
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -475,8 +475,30 @@ export default function Dashboard({
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.12 }}
+          onClick={() => setSelectedFaseForModal({
+            label: `Pendentes — sem resposta (${activeYear})`, emoji: '🕓',
+            alunoIds: validEnrollments.filter(e => e.statusNegociacao !== 'Confirmada' && e.statusNegociacao !== 'Em Negociação').map(e => e.alunoId)
+          })}
+          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4 cursor-pointer hover:border-brand-green-light transition-colors"
+        >
+          <div className="p-2.5 bg-slate-100 text-slate-500 rounded-lg">
+            <Calendar size={20} />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Pendentes ({activeYear})</p>
+            <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{pending}</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">{confirmed} + {negotiating} + {pending} = {totalStudentsCount} alunos</p>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
-          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex flex-col justify-between"
+          onClick={() => setReceitaVisivel(v => !v)}
+          title={receitaVisivel ? 'Clique para esconder' : 'Clique para mostrar os valores'}
+          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-100 text-brand-clay rounded-lg shrink-0">
@@ -484,11 +506,11 @@ export default function Dashboard({
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Receita Mensal ({activeYear})</p>
-              <p className="text-[10px] text-slate-400 font-sans">Regular + Contraturnos</p>
+              <p className="text-[10px] text-slate-400 font-sans">Regular + Contraturnos • {receitaVisivel ? 'clique p/ esconder' : 'clique p/ ver'}</p>
             </div>
           </div>
 
-          <div className="space-y-1.5 mt-2 pt-2 border-t border-slate-100 font-sans text-xs">
+          <div className={`space-y-1.5 mt-2 pt-2 border-t border-slate-100 font-sans text-xs transition-[filter] select-none ${receitaVisivel ? '' : 'blur-sm'}`}>
             <div className="flex items-center justify-between gap-1">
               <span className="text-slate-500 text-[10px] font-medium">Sem desc. pontualidade:</span>
               <span className="font-bold text-slate-800 font-mono text-xs">
