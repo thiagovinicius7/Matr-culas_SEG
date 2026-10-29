@@ -102,17 +102,44 @@ export default function VivenciaPublica({ vivenciaIdInicial }: { vivenciaIdInici
   );
 }
 
-function ResumoVivencia({ v }: { v: Vivencia }) {
-  const restantes = vagasRestantes(v);
+const MESES_ADESIVO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const SEMANA_ADESIVO = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const horaCurta = (h?: string) => (h ? h.replace(/^0/, '').replace(':00', 'h').replace(':', 'h') : '');
+
+/** Adesivo de calendário com a data e o horário, para a data saltar aos olhos. */
+function AdesivoCalendario({ v, tamanho = 'g' }: { v: Vivencia; tamanho?: 'g' | 'p' }) {
+  const [a, m, d] = v.data.split('-').map(Number);
+  const semana = SEMANA_ADESIVO[new Date(Date.UTC(a, m - 1, d)).getUTCDay()];
+  const hora = v.horaInicio ? (v.horaFim ? `${horaCurta(v.horaInicio)} às ${horaCurta(v.horaFim)}` : horaCurta(v.horaInicio)) : '';
+  const g = tamanho === 'g';
+  return (
+    <div className={`shrink-0 ${g ? 'w-[118px] -rotate-3' : 'w-[92px] -rotate-2'} rounded-2xl bg-white p-[3px] shadow-[0_6px_14px_-4px_rgba(31,63,36,0.35)]`} aria-label={`${semana}, ${d} de ${MESES_ADESIVO[m - 1]}${hora ? ', ' + hora : ''}`}>
+      <div className="rounded-[13px] overflow-hidden border border-slate-200">
+        <div className="relative bg-brand-orange text-white text-center pt-2.5 pb-1">
+          <span className="absolute top-1 left-[22%] w-1.5 h-1.5 rounded-full bg-white/80" />
+          <span className="absolute top-1 right-[22%] w-1.5 h-1.5 rounded-full bg-white/80" />
+          <span className={`block font-bold uppercase tracking-wide ${g ? 'text-[11px]' : 'text-[9px]'}`}>{MESES_ADESIVO[m - 1]}</span>
+        </div>
+        <div className="bg-white text-center pt-1 pb-1.5">
+          <span className={`block font-display font-bold text-brand-green-dark leading-none ${g ? 'text-[46px]' : 'text-[34px]'}`}>{d}</span>
+          <span className={`block font-semibold text-slate-500 ${g ? 'text-[12px]' : 'text-[10px]'}`}>{semana}</span>
+        </div>
+        {hora && (
+          <div className={`bg-brand-green-dark text-white text-center font-bold ${g ? 'text-[12px] py-1.5' : 'text-[10px] py-1'}`}>{hora}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResumoVivencia({ v, semDataHora = false }: { v: Vivencia; semDataHora?: boolean }) {
   const faixa = faixaEtaria(v);
   return (
     <div className="space-y-1.5 text-sm text-slate-600">
-      <p className="flex items-center gap-2"><CalendarDays size={15} className="text-brand-green-light shrink-0" /> <span className="first-letter:uppercase">{dataPorExtenso(v.data, true)}</span></p>
-      {horario(v) && <p className="flex items-center gap-2"><Clock size={15} className="text-brand-green-light shrink-0" /> {horario(v)}</p>}
-      {(faixa || restantes !== null) && (
-        <p className="flex items-center gap-2"><Users size={15} className="text-brand-green-light shrink-0" />
-          {[faixa && `Para crianças ${faixa}`, restantes !== null && (restantes > 0 ? `${restantes} ${restantes === 1 ? 'vaga' : 'vagas'}` : 'Vagas esgotadas')].filter(Boolean).join(' · ')}
-        </p>
+      {!semDataHora && <p className="flex items-center gap-2"><CalendarDays size={15} className="text-brand-green-light shrink-0" /> <span className="first-letter:uppercase">{dataPorExtenso(v.data, true)}</span></p>}
+      {!semDataHora && horario(v) && <p className="flex items-center gap-2"><Clock size={15} className="text-brand-green-light shrink-0" /> {horario(v)}</p>}
+      {faixa && (
+        <p className="flex items-center gap-2"><Users size={15} className="text-brand-green-light shrink-0" /> Para crianças {faixa}</p>
       )}
     </div>
   );
@@ -140,9 +167,14 @@ function ListaVivencias({ vivencias, linkInvalido, onEscolher }: { vivencias: Vi
               return (
                 <button key={v.id} type="button" disabled={esgotada} onClick={() => onEscolher(v.id)}
                   className="w-full text-left border border-slate-200 rounded-xl p-4 hover:border-brand-green-light hover:bg-emerald-50/40 transition disabled:opacity-60 disabled:hover:bg-white disabled:cursor-not-allowed">
-                  <p className="font-display font-bold text-brand-green-dark text-base mb-2">{v.titulo}</p>
-                  <ResumoVivencia v={v} />
-                  {!esgotada && <p className="mt-3 text-sm font-bold text-brand-orange">Inscrever →</p>}
+                  <div className="flex items-start gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display font-bold text-brand-green-dark text-base mb-2">{v.titulo}</p>
+                      <ResumoVivencia v={v} semDataHora />
+                      {!esgotada && <p className="mt-3 text-sm font-bold text-brand-orange">Inscrever →</p>}
+                    </div>
+                    <AdesivoCalendario v={v} tamanho="p" />
+                  </div>
                 </button>
               );
             })}
@@ -239,9 +271,14 @@ function FormularioInscricao({ v, onVoltar, onSucesso, onRecarregar }: {
         </button>
       )}
 
-      <div className="rounded-xl bg-emerald-50/60 border border-emerald-100 p-4 space-y-2">
-        <h2 className="font-display font-bold text-brand-green-dark text-lg leading-tight">{v.titulo}</h2>
-        <ResumoVivencia v={v} />
+      <div className="rounded-xl bg-emerald-50/60 border border-emerald-100 p-4 space-y-3">
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1 space-y-2 pt-1">
+            <h2 className="font-display font-bold text-brand-green-dark text-lg leading-tight">{v.titulo}</h2>
+            <ResumoVivencia v={v} semDataHora />
+          </div>
+          <AdesivoCalendario v={v} />
+        </div>
         {v.descricao && <p className="text-sm text-slate-700 whitespace-pre-line pt-1">{v.descricao}</p>}
       </div>
 
