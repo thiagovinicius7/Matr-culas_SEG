@@ -179,6 +179,7 @@ export default function App() {
 
   // Selected student ID shared across components
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [filtroListaAluno, setFiltroListaAluno] = useState<string>('');
 
   // Sync state with Firebase on mount — só depois que a autenticação estiver
   // pronta (usuário da equipe logado, ou visitante público com login anônimo).
@@ -405,9 +406,14 @@ export default function App() {
     corrigidas.forEach(c => { saveDocument('enrollments', c).catch(err => console.error('Correção só contraturno:', err)); });
   }, [loading, currentUser, students, enrollments]);
 
+  // Saiu da Lista de Trabalho: na próxima vez ela abre completa, sem aluno pré-filtrado
+  useEffect(() => { if (activeTab !== 'rematricula') setFiltroListaAluno(''); }, [activeTab]);
+
   // Handle direct navigation to a tab for a specific student
   const handleNavigateWithStudent = (tabId: string, studentId: string) => {
     setSelectedStudentId(studentId);
+    // A Lista de Trabalho só abre filtrada num aluno quando você veio de um clique nele.
+    setFiltroListaAluno(tabId === 'rematricula' ? studentId : '');
     setActiveTab(tabId);
   };
 
@@ -2567,7 +2573,7 @@ export default function App() {
                   contraturnos={contraturnos}
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
-                  preselectedStudentId={selectedStudentId}
+                  preselectedStudentId={filtroListaAluno}
                   onNavigateBack={() => setActiveTab('dashboard')}
                   onUpdateEnrollmentStatus={handleUpdateEnrollmentStatus}
                   onUpdateEnrollmentNotes={handleUpdateEnrollmentNotes}
