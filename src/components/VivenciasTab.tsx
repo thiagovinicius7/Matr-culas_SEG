@@ -4,6 +4,7 @@ import {
   CalendarDays, Clock, MessageCircle, Check, UserPlus, Lock, Unlock,
 } from 'lucide-react';
 import { getCollectionData, saveDocument, deleteDocument } from '../firebase';
+import { REGULAR_CLASSES } from '../data';
 import type { Vivencia, VivenciaInscricao, PresencaVivencia, RegularClass } from '../types';
 import {
   COL_VIVENCIAS, COL_INSCRICOES, COMO_CONHECEU_OPCOES, PARENTESCO_VIVENCIA,
@@ -170,6 +171,7 @@ export default function VivenciasTab({ showToast }: { showToast: ShowToast }) {
         <ListaVivencias
           vivencias={vivencias}
           porVivencia={porVivencia}
+          turmas={turmas}
           onNova={() => setEditando({ id: novoId('viv'), titulo: '', data: '', horaInicio: '', horaFim: '', descricao: '', vagas: 0, aberta: true, inscritos: 0, criadoEm: new Date().toISOString() })}
           onAbrir={setAbertaId}
           onEditar={setEditando}
@@ -193,9 +195,10 @@ export default function VivenciasTab({ showToast }: { showToast: ShowToast }) {
 
 /* ------------------------------------------------------------------ */
 
-function ListaVivencias({ vivencias, porVivencia, onNova, onAbrir, onEditar, onAlternarAberta, showToast }: {
+function ListaVivencias({ vivencias, porVivencia, turmas, onNova, onAbrir, onEditar, onAlternarAberta, showToast }: {
   vivencias: Vivencia[];
   porVivencia: Map<string, VivenciaInscricao[]>;
+  turmas: RegularClass[];
   onNova: () => void;
   onAbrir: (id: string) => void;
   onEditar: (v: Vivencia) => void;
@@ -206,6 +209,20 @@ function ListaVivencias({ vivencias, porVivencia, onNova, onAbrir, onEditar, onA
   const ordenadas = [...vivencias].sort((a, b) => (a.data + (a.horaInicio || '')).localeCompare(b.data + (b.horaInicio || '')));
   const proximas = ordenadas.filter(v => v.data >= hoje);
   const anteriores = ordenadas.filter(v => v.data < hoje).reverse();
+  const [escopo, setEscopo] = useState<'proximas' | 'todas'>('proximas');
+  // Cada criança conta uma vez, mesmo inscrita em mais de uma vivência.
+  const criancasUnicas = useMemo(() => {
+    const ids = new Set((escopo === 'proximas' ? proximas : ordenadas).map(v => v.id));
+    const vistas = new Map<string, VivenciaInscricao>();
+    porVivencia.forEach((lista, vid) => {
+      if (!ids.has(vid)) return;
+      lista.forEach(i => {
+        const chave = `${i.criancaNome.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}|${i.criancaNascimento}`;
+        if (!vistas.has(chave)) vistas.set(chave, i);
+      });
+    });
+    return [...vistas.values()];
+  }, [porVivencia, escopo, vivencias]);
 
   const card = (v: Vivencia, passada: boolean) => {
     const n = (porVivencia.get(v.id) || []).length;
@@ -257,6 +274,23 @@ function ListaVivencias({ vivencias, porVivencia, onNova, onAbrir, onEditar, onA
           </button>
         </div>
       </div>
+
+      {vivencias.length > 0 && (
+        <ResumoPorTurma
+          inscricoes={criancasUnicas}
+          turmas={turmas}
+          titulo={`Crianças interessadas por turma em ${ANO_INTERESSE}`}
+          nota="Cada criança conta uma vez, mesmo se inscrita em mais de uma vivência."
+          extra={
+            <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs font-bold" role="group" aria-label="Quais vivências contar">
+              {([['proximas', 'Próximas vivências'], ['todas', 'Todas']] as const).map(([k, rot]) => (
+                <button key={k} type="button" onClick={() => setEscopo(k)} aria-pressed={escopo === k}
+                  className={`px-3 py-1.5 ${escopo === k ? 'bg-brand-green-dark text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>{rot}</button>
+              ))}
+            </div>
+          }
+        />
+      )}
 
       {vivencias.length === 0 ? (
         <div className="bg-white border border-dashed border-slate-300 rounded-xl p-10 text-center space-y-2">
@@ -404,16 +438,6 @@ function ListaInscritos({ v, inscricoes, turmas, onVoltar, onEditar, onAlternarA
   const presentes = inscricoes.filter(i => i.presenca === 'presente').length;
   const faltas = inscricoes.filter(i => i.presenca === 'faltou').length;
   const familias = new Set(inscricoes.map(i => i.grupoId)).size;
-  const porTurma = useMemo(() => {
-    const m = new Map<string, { n: number; idade: number }>();
-    inscricoes.forEach(i => {
-      const t = turmaDe(i);
-      if (!t.texto) return;
-      const atual = m.get(t.texto) || { n: 0, idade: t.idadeCorte ?? 99 };
-      m.set(t.texto, { n: atual.n + 1, idade: atual.idade });
-    });
-    return [...m.entries()].sort((a, b) => a[1].idade - b[1].idade);
-  }, [inscricoes, turmas]);
 
   const marcarPresenca = (i: VivenciaInscricao) => onSalvar({ ...i, presenca: PROXIMA_PRESENCA[i.presenca || 'pendente'] });
 
@@ -455,6 +479,7 @@ function ListaInscritos({ v, inscricoes, turmas, onVoltar, onEditar, onAlternarA
         .ass { width: 18%; }
         .s { font-size: 10px; color: #6b7280; }
         .vazia td { height: 26px; }
+        .resumo { font-size: 11px; color: #374151; margin: -2px 0 8px; }
       </style></head><body>
       <div class="topo">
         <img src="${LOGO}" alt="Sítio-Escola Geranium">
@@ -462,6 +487,7 @@ function ListaInscritos({ v, inscricoes, turmas, onVoltar, onEditar, onAlternarA
           <div class="sub">${esc(dataPorExtenso(v.data, true))}${horario(v) ? ' · ' + esc(horario(v)) : ''}</div></div>
         <div class="tot">${inscricoes.length} ${inscricoes.length === 1 ? 'criança inscrita' : 'crianças inscritas'}<br>${familias} ${familias === 1 ? 'família' : 'famílias'}</div>
       </div>
+      <div class="resumo"><b>Por turma em ${ANO_INTERESSE}:</b> ${esc(resumoTexto(contarPorTurma(inscricoes, turmas)))}</div>
       <table><thead><tr><th class="n">Nº</th><th>Criança</th><th class="c">Idade</th><th class="t">Turma ${ANO_INTERESSE}</th><th>Responsável</th><th>Telefone</th><th>Observações</th><th class="box">Presença</th><th>Assinatura do responsável</th></tr></thead>
       <tbody>${linhas}${extras}</tbody></table>
       <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
@@ -532,20 +558,15 @@ function ListaInscritos({ v, inscricoes, turmas, onVoltar, onEditar, onAlternarA
         ))}
       </div>
 
-      {porTurma.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 space-y-2">
-          <p className="text-[11px] font-bold text-slate-500">Turma de interesse em {ANO_INTERESSE} <span className="font-normal">(idade em 31/03/{ANO_INTERESSE})</span></p>
-          <div className="flex flex-wrap gap-1.5">
-            {porTurma.map(([nome, { n }]) => (
-              <button key={nome} type="button" onClick={() => setFiltroTurma(f => (f === nome ? '' : nome))}
-                aria-pressed={filtroTurma === nome}
-                className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${filtroTurma === nome ? 'bg-brand-green-dark text-white border-brand-green-dark' : 'bg-brand-sand/60 text-slate-700 border-slate-200 hover:border-brand-green-light'}`}>
-                {nome} · {n}
-              </button>
-            ))}
-            {filtroTurma && <button type="button" onClick={() => setFiltroTurma('')} className="text-xs font-bold px-2 text-slate-500 hover:text-slate-800">Mostrar todas</button>}
-          </div>
-        </div>
+      {inscricoes.length > 0 && (
+        <ResumoPorTurma
+          inscricoes={inscricoes}
+          turmas={turmas}
+          titulo={`Inscritos por turma em ${ANO_INTERESSE}`}
+          selecionada={filtroTurma}
+          onSelecionar={nome => setFiltroTurma(f => (f === nome ? '' : nome))}
+          nota={filtroTurma ? `Mostrando só ${filtroTurma}. Toque de novo para ver todos.` : 'Toque numa turma para ver só as crianças dela.'}
+        />
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -619,6 +640,93 @@ function ListaInscritos({ v, inscricoes, turmas, onVoltar, onEditar, onAlternarA
         />
       )}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+interface ContagemTurmas {
+  linhas: { nome: string; natureza: string; n: number }[];
+  menores: number;
+  maiores: number;
+  total: number;
+}
+
+/** Conta crianças por turma do ano de interesse, listando TODAS as turmas (inclusive as com zero). */
+function contarPorTurma(inscricoes: VivenciaInscricao[], turmas: RegularClass[]): ContagemTurmas {
+  const doAno = turmas.filter(t => (t.ano || 2026) === ANO_INTERESSE);
+  const catalogo = [...(doAno.length ? doAno : turmas.length ? turmas : REGULAR_CLASSES)]
+    .sort((a, b) => a.idadeRef - b.idadeRef)
+    .filter((t, i, arr) => arr.findIndex(x => x.nome === t.nome) === i);
+  const cont = new Map<string, number>();
+  let menores = 0, maiores = 0;
+  inscricoes.forEach(i => {
+    const r = turmaDeInteresse(i.criancaNascimento, turmas);
+    if (!r.texto) return;
+    if (r.foraDaFaixa) { if ((r.idadeCorte ?? 0) < 2) menores++; else maiores++; return; }
+    cont.set(r.texto, (cont.get(r.texto) || 0) + 1);
+  });
+  return {
+    linhas: catalogo.map(t => ({ nome: t.nome, natureza: t.natureza, n: cont.get(t.nome) || 0 })),
+    menores, maiores, total: inscricoes.length,
+  };
+}
+
+function resumoTexto(c: ContagemTurmas): string {
+  const partes = c.linhas.filter(l => l.n > 0).map(l => `${l.nome}: ${l.n}`);
+  if (c.menores) partes.push(`menos de 2 anos: ${c.menores}`);
+  if (c.maiores) partes.push(`mais de 10 anos: ${c.maiores}`);
+  return partes.join(' · ') || '—';
+}
+
+function ResumoPorTurma({ inscricoes, turmas, titulo, nota, extra, selecionada, onSelecionar }: {
+  inscricoes: VivenciaInscricao[];
+  turmas: RegularClass[];
+  titulo: string;
+  nota?: string;
+  extra?: React.ReactNode;
+  selecionada?: string;
+  onSelecionar?: (nome: string) => void;
+}) {
+  const c = useMemo(() => contarPorTurma(inscricoes, turmas), [inscricoes, turmas]);
+  const grupos = ['Infantil', 'Fundamental']
+    .map(nat => ({ nat, linhas: c.linhas.filter(l => l.natureza === nat) }))
+    .filter(g => g.linhas.length);
+  const tile = (l: { nome: string; n: number }) => {
+    const ativo = selecionada === l.nome;
+    const conteudo = (
+      <>
+        <span className={`block text-[11px] font-bold truncate ${ativo ? 'text-emerald-100' : 'text-slate-500'}`}>{l.nome}</span>
+        <span className={`block font-display font-bold text-2xl tabular-nums leading-tight ${ativo ? 'text-white' : l.n ? 'text-brand-green-dark' : 'text-slate-300'}`}>{l.n}</span>
+      </>
+    );
+    const cls = `rounded-lg border px-3 py-2 text-left min-w-0 ${ativo ? 'bg-brand-green-dark border-brand-green-dark' : l.n ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'}`;
+    return onSelecionar && l.n > 0
+      ? <button key={l.nome} type="button" onClick={() => onSelecionar(l.nome)} aria-pressed={ativo} className={`${cls} hover:border-brand-green-light transition`}>{conteudo}</button>
+      : <div key={l.nome} className={cls}>{conteudo}</div>;
+  };
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-display font-bold text-brand-green-dark">{titulo}</h3>
+          <p className="text-[11px] text-slate-500">Pela idade em 31/03/{ANO_INTERESSE} · {c.total} {c.total === 1 ? 'criança' : 'crianças'}</p>
+        </div>
+        {extra}
+      </div>
+      {grupos.map(g => (
+        <div key={g.nat} className="space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{g.nat}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2">{g.linhas.map(tile)}</div>
+        </div>
+      ))}
+      {(c.menores > 0 || c.maiores > 0) && (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+          Fora da faixa da escola: {[c.menores && `${c.menores} com menos de 2 anos`, c.maiores && `${c.maiores} com mais de 10 anos`].filter(Boolean).join(' e ')}.
+        </p>
+      )}
+      {nota && <p className="text-[11px] text-slate-500">{nota}</p>}
+    </div>
   );
 }
 
