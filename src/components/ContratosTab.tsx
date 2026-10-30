@@ -127,6 +127,15 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linhas, docs]);
 
+  // Quantos de cada tipo de documento em cada andamento (Contrato, Contraturno, Aditivo, Imagem)
+  const contagemTipo = useMemo(() => {
+    const c = {} as Record<StatusContrato, Record<TipoContrato, number>>;
+    ORDEM_STATUS.forEach(st => { c[st] = { contrato: 0, contraturno: 0, aditivo: 0, imagem: 0 }; });
+    linhas.forEach(l => l.tipos.forEach(t => { c[statusDe(l.aluno.id, t)][t]++; }));
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linhas, docs]);
+
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return linhas.filter(l => {
@@ -419,6 +428,10 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
             className={`shrink-0 w-40 sm:w-auto text-left bg-white border rounded-lg px-3 py-2 cursor-pointer ${filtroStatus === s ? 'border-brand-orange ring-1 ring-brand-orange' : 'border-slate-200 hover:border-slate-400'}`}>
             <span className="block font-display font-bold text-xl text-brand-green-dark leading-tight">{contagem[s]}</span>
             <span className="text-[11px] text-slate-500"><span aria-hidden="true">{STATUS_INFO[s].ic}</span> {STATUS_INFO[s].kpi}</span>
+            <span className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
+              {ORDEM_TIPOS.filter(t => contagemTipo[s][t] > 0).map(t => <span key={t}>{NOMES_DOCS[t].curto} <strong className="text-slate-600">{contagemTipo[s][t]}</strong></span>)}
+              {ORDEM_TIPOS.every(t => contagemTipo[s][t] === 0) && <span>—</span>}
+            </span>
           </button>
         ))}
       </nav>
