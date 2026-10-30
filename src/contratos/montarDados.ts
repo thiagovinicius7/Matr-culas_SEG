@@ -80,7 +80,10 @@ export function elegivelParaContrato(ctx: ContratoContexto): ResultadoElegibilid
   if (!base) return { ok: false, motivo: 'sem matrícula' };
   const e2027 = enrollments.find(e => e.alunoId === student.id && e.ano === ANO_CARTA_INTENCAO);
   if (e2027?.statusNegociacao === 'Cancelada') return { ok: false, motivo: 'matrícula cancelada' };
-  const confirmada = base.statusIntencao2027 === 'Confirmada' || e2027?.statusNegociacao === 'Confirmada';
+  // Aluno novo (cadastrado direto em 2027) não passa pela Carta de Intenção: entra na lista de
+  // contratos assim que existe. Rematrícula só entra depois de confirmada na Carta.
+  const alunoNovo = base.ano >= ANO_CARTA_INTENCAO;
+  const confirmada = alunoNovo || base.statusIntencao2027 === 'Confirmada' || e2027?.statusNegociacao === 'Confirmada';
   if (!confirmada) return { ok: false, motivo: 'rematrícula ainda não confirmada' };
   const carta = resolverCarta(ctx);
   if (!carta) return { ok: false, motivo: 'conclui o Ensino Fundamental' };
@@ -100,8 +103,9 @@ export function resolverCarta(ctx: ContratoContexto): CartaResolvida | null {
   let turma: RegularClass;
   const idProposto = base.turmaPropostaId2027;
   if (base.ano >= ANO_CARTA_INTENCAO) {
-    // aluno novo: o próprio registro de 2027 já traz a turma
-    const id = idProposto || base.turmaRegularId;
+    // aluno novo: o próprio registro de 2027 já traz a turma (definida pela data de nascimento);
+    // a Carta não muda a turma dele, só se a escolha foi "somente contraturno".
+    const id = idProposto === 'sem_regular' ? 'sem_regular' : base.turmaRegularId;
     turma = id === 'sem_regular'
       ? SOMENTE_CONTRATURNO_CLASS
       : (classPrices.find(c => c.id === id && (c.ano || 2026) === 2027) || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(id))
