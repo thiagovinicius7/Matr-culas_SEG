@@ -521,6 +521,8 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
     catch { showToast('Não foi possível copiar', 'Copie o link manualmente: ' + link, 'error', 9000); }
   };
   const telefone = (r?.telefone || r?.contato || '').replace(/\D/g, '');
+  const criancaNome = l.aluno.nome.split(' ')[0];
+  const boasVindas = `Olá, família de ${criancaNome}! 🌱\nÉ uma alegria enorme receber vocês no Sítio-Escola Geranium!\n\nCom a assinatura do contrato, ${criancaNome} passa a fazer parte d${l.carta.somenteContraturno ? 'o contraturno do Sítio-Escola Geranium em' : 'a turma ' + l.turmaNome + ' de'} 2027. A partir de agora, vai aprender com a terra, com o tempo das plantas e com a convivência. Vai colocar a mão na horta, acompanhar o que plantou e descobrir o mundo brincando ao ar livre.\n\nAgradecemos a confiança de vocês em nosso trabalho. Vamos caminhar juntos, escola e família, cuidando de cada criança com atenção e carinho.\n\nNos próximos dias enviaremos as informações sobre o início das aulas, a lista de materiais e a reunião de acolhimento. Qualquer dúvida, é só nos chamar por aqui.\n\nSejam muito bem-vindos à família Geranium! 💚\n\nCom carinho,\nEquipe do Sítio-Escola Geranium`;
   const gerados = l.tipos.filter(t => docDe(l.aluno.id, t)?.status === 'gerado');
 
   return (
@@ -656,6 +658,22 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
           </article>
         );
       })}
+      {l.tipos.some(t => docDe(l.aluno.id, t)) && (
+        <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-2">
+          <h4 className="font-bold text-sm text-emerald-900">💚 Mensagem de boas-vindas</h4>
+          <p className="text-[11px] text-emerald-800/80">Pronta para mandar à família junto com o contrato (ou depois da assinatura).</p>
+          <pre className="whitespace-pre-wrap font-sans text-[11px] text-slate-700 bg-white border border-emerald-100 rounded-lg p-2.5 max-h-56 overflow-y-auto">{boasVindas}</pre>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={async () => { try { await navigator.clipboard.writeText(boasVindas); showToast('Mensagem copiada', 'Cole no WhatsApp da família.', 'success'); } catch { showToast('Não foi possível copiar', 'Selecione o texto e copie manualmente.', 'error'); } }}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold rounded-md bg-white border border-emerald-300 text-emerald-900 hover:bg-emerald-100 cursor-pointer"><Copy size={12} /> Copiar mensagem</button>
+            {telefone && (
+              <a href={`https://wa.me/55${telefone}?text=${encodeURIComponent(boasVindas)}`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Abrir no WhatsApp</a>
+            )}
+          </div>
+        </section>
+      )}
+
       <p className="text-[11px] text-slate-400">O número é gerado pelo sistema na primeira vez e se mantém nas correções (muda só a versão). Cada tipo de documento tem a sua própria sequência.</p>
     </>
   );
