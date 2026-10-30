@@ -289,7 +289,7 @@ export function montarPlano(linhas: LinhaRelatorio[], ctx: ContextoSistema): Pla
     const turmas = ls.map(l => l['Turma']);
     const regular = ls.find(l => !TURMAS_CONTRATURNO.has(semAcento(l['Turma'])));
     const aluno = porChave.get(chave) ?? null;
-    const concluido = ls.every(l => semAcento(l['Situação da Matrícula']) !== 'ativa');
+    const concluido = ls.every(l => semAcento(l['Situação da Matrícula'] ?? 'Ativa') !== 'ativa');
     const pessoas = ls.flatMap(pessoasDaLinha).reduce<PessoaPlanilha[]>((acc, p) => {
       const igual = acc.find(q => (p.cpf.length === 11 && q.cpf === p.cpf) || semAcento(q.nome) === semAcento(p.nome));
       if (!igual) acc.push(p);
@@ -302,7 +302,7 @@ export function montarPlano(linhas: LinhaRelatorio[], ctx: ContextoSistema): Pla
 
     const item: ItemAluno = {
       chave, nome: base['Nome'], nascimento: dataIso(base['Data de nascimento']),
-      turmasPlanilha: turmas, situacaoPlanilha: base['Situação da Matrícula'],
+      turmasPlanilha: turmas, situacaoPlanilha: base['Situação da Matrícula'] ?? 'Ativa',
       status: aluno ? 'igual' : concluido ? 'concluido_ignorado' : 'novo',
       alunoId: aluno?.id ?? null, statusNoSistema: aluno?.status,
       alertas: [], responsaveis: [], dataEntrada: dataIso(base['Data da Matrícula']), pessoas,
