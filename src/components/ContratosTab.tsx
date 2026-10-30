@@ -39,6 +39,7 @@ interface Linha {
   bloqueios: string[];
   turmaNome: string;
   turmaOrdem: number;
+  novo: boolean; // aluno novo (sem matrícula em anos anteriores) x rematrícula
 }
 
 const STATUS_INFO: Record<StatusContrato, { rot: string; ic: string; kpi: string; chip: string }> = {
@@ -107,6 +108,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
         aluno, ctx, carta, perfil: perfilDoAluno(carta), tipos: documentosDoAluno(carta), faltas: v.faltas, avisos: v.avisos, bloqueios: v.bloqueios,
         turmaNome: carta.somenteContraturno ? 'Somente Contraturno' : carta.turma.nome,
         turmaOrdem: carta.somenteContraturno ? 999 : carta.turma.idadeRef,
+        novo: !enrollments.some(e => e.alunoId === aluno.id && e.ano < ANO && e.statusNegociacao !== 'Cancelada'),
       });
     }
     return out.sort((a, b) => a.turmaOrdem - b.turmaOrdem || a.aluno.nome.localeCompare(b.aluno.nome, 'pt-BR'));
@@ -453,7 +455,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
                   <input type="checkbox" checked={sel.has(l.aluno.id)} aria-label={`Selecionar ${l.aluno.nome}`} onClick={e => e.stopPropagation()}
                     onChange={e => setSel(prev => { const n = new Set(prev); e.target.checked ? n.add(l.aluno.id) : n.delete(l.aluno.id); return n; })} className="w-3.5 h-3.5 cursor-pointer" />
                   <div className="w-64 min-w-0">
-                    <button className="font-bold text-xs text-slate-800 text-left cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); setAbertoId(l.aluno.id); }}>{l.aluno.nome}</button>
+                    <button className="font-bold text-xs text-slate-800 text-left cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); setAbertoId(l.aluno.id); }}>{l.aluno.nome}</button><span className={`ml-1.5 align-middle text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${l.novo ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>{l.novo ? 'Aluno novo' : 'Rematrícula'}</span>
                     <span className="block text-[11px] text-slate-500 truncate">{r?.nome || 'sem responsável'}, {NOMES_PERFIL[l.perfil]}</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5 flex-1 min-w-[240px]">{l.tipos.map(t => chip(l, t))}</div>
@@ -525,7 +527,7 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
     <>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display font-bold text-lg text-brand-green-dark">{l.aluno.nome}</h3>
+          <h3 className="font-display font-bold text-lg text-brand-green-dark">{l.aluno.nome}<span className={`ml-1.5 align-middle text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${l.novo ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>{l.novo ? 'Aluno novo' : 'Rematrícula'}</span></h3>
           <p className="text-xs text-slate-500">{l.turmaNome} em {ANO}. Responsável financeiro: {r?.nome || '—'}.</p>
         </div>
         <button onClick={onFechar} aria-label="Fechar" className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer"><X size={16} /></button>
