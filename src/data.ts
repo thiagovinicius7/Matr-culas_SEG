@@ -158,6 +158,17 @@ export function getNextYearClass(
     return fallback();
   }
 
+  // A matrícula informada JÁ é do ano-alvo (aluno novo, cadastrado direto em 2027): a turma
+  // dela é a turma do ano. Não "avança uma série" em cima dela, senão o aluno que já entrou
+  // em Jataí aparecia sugerido em Uruçu.
+  if (currentEnrollment.ano >= targetYear) {
+    const doAno = classPricesList.filter(c => (c.ano || 2026) === targetYear);
+    const propria = doAno.find(c => normalizeClassId(c.id) === normalizeClassId(currentEnrollment.turmaRegularId))
+      || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId));
+    if (propria) return propria;
+    return fallback();
+  }
+
   const fromYear = currentEnrollment.ano;
   const fromYearClasses = classPricesList.filter(c => (c.ano || 2026) === fromYear);
   const currentClassDetails =

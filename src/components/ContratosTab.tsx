@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice, ContratoDoc, ContratoModelo, StatusContrato } from '../types';
-import { ANO_CARTA_INTENCAO, TAXA_MATERIAL_2027 } from '../data';
+import { ANO_CARTA_INTENCAO, TAXA_MATERIAL_2027, calculateAgeAtCutoff, getRegularClassForAgeDynamic } from '../data';
 import { getCollectionData, saveDocument, proximoNumeroContrato } from '../firebase';
 import {
   TipoContrato, ORDEM_TIPOS, NOMES_DOCS, NOMES_PERFIL, PerfilContrato, ContratoContexto, CartaResolvida, NumerosContrato,
@@ -104,8 +104,14 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
       const carta = resolverCarta(ctx);
       if (!carta) continue;
       const v = validarParaContrato(ctx, carta);
+      // Confere a turma do contrato com a turma pela data de nascimento (idade em 31/03 de 2027)
+      const avisosL = [...v.avisos];
+      if (!carta.somenteContraturno && aluno.nascimento) {
+        const pelaIdade = getRegularClassForAgeDynamic(calculateAgeAtCutoff(aluno.nascimento, ANO), classPrices, ANO);
+        if (pelaIdade.nome !== carta.turma.nome) avisosL.push(`Atenção: pela data de nascimento (${aluno.nascimento.split('-').reverse().join('/')}) a turma em ${ANO} seria ${pelaIdade.nome}, mas o contrato está com ${carta.turma.nome}. Confira antes de gerar.`);
+      }
       out.push({
-        aluno, ctx, carta, perfil: perfilDoAluno(carta), tipos: documentosDoAluno(carta), faltas: v.faltas, avisos: v.avisos, bloqueios: v.bloqueios,
+        aluno, ctx, carta, perfil: perfilDoAluno(carta), tipos: documentosDoAluno(carta), faltas: v.faltas, avisos: avisosL, bloqueios: v.bloqueios,
         turmaNome: carta.somenteContraturno ? 'Somente Contraturno' : carta.turma.nome,
         turmaOrdem: carta.somenteContraturno ? 999 : carta.turma.idadeRef,
         novo: !enrollments.some(e => e.alunoId === aluno.id && e.ano < ANO && e.statusNegociacao !== 'Cancelada'),
