@@ -170,7 +170,13 @@ export default function Dashboard({
   // quando o ano ativo do Painel estiver em 2027. Conta só alunos ativos, um por
   // aluno, pela mesma regra usada na Lista de Trabalho e na Ficha do Aluno.
   const anoCarta = ANO_CARTA_INTENCAO;
-  const cartaPorAluno = activeStudents.map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
+  // Quem respondeu "não vai renovar" tem a matrícula do ano cancelada e por isso sai de `activeStudents`,
+  // mas precisa continuar contando aqui (card "Não renovar"), senão a resposta some do painel.
+  const idsAtivosDoAno = new Set(activeStudents.map(s => s.id));
+  const naoRenovam = students
+    .filter(s => s.status === 'ativo' && !idsAtivosDoAno.has(s.id))
+    .filter(s => getCartaIntencaoInfo(s.id, enrollments).estado === 'nao_renova');
+  const cartaPorAluno = [...activeStudents, ...naoRenovam].map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
   const idsCarta = (estados: CartaEstado[]) => cartaPorAluno.filter(c => estados.includes(c.estado)).map(c => c.id);
   const cartaIds = {
     // Famílias com parceria ficam à parte: a Carta só vai depois da conversa pessoal.
@@ -707,7 +713,7 @@ export default function Dashboard({
                     Cartas de Intenção {anoCarta}
                   </span>
                   <span className="bg-amber-200/80 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-mono">
-                    {respondidasCarta} / {activeStudentsCount} Responderam
+                    {respondidasCarta} / {cartaPorAluno.length} Responderam
                   </span>
                 </div>
 
