@@ -1811,7 +1811,7 @@ export default function App() {
     );
   }
 
-  const handleExportBackup = () => {
+  const handleExportBackup = (prefixo = 'backup_geranium') => {
     const backupData = {
       app: 'Gestor Sítio-Escola Geranium',
       version: '2026.1',
@@ -1831,7 +1831,7 @@ export default function App() {
     const dateStr = new Date().toISOString().slice(0, 10);
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', jsonString);
-    downloadAnchor.setAttribute('download', `backup_geranium_${dateStr}.json`);
+    downloadAnchor.setAttribute('download', `${prefixo}_${dateStr}_${new Date().toTimeString().slice(0, 5).replace(':', 'h')}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -1854,9 +1854,19 @@ export default function App() {
       const dateInfo = data.exportedAt ? new Date(data.exportedAt).toLocaleString('pt-BR') : 'sem data';
       const countInfo = `${data.students.length} alunos e ${data.enrollments.length} matrículas`;
 
-      if (!confirm(`Restaurar backup do dia ${dateInfo} (${countInfo})?\n\nIsso atualizará os dados locais e no Firebase.`)) {
+      const digitado = prompt(
+        `ATENÇÃO: restaurar o backup do dia ${dateInfo} (${countInfo}) SUBSTITUI registros inteiros no banco ` +
+        `(Carta de Intenção, dados dos responsáveis, status dos alunos) pelos que estão no arquivo.\n\n` +
+        `Se o arquivo for antigo, você PERDE o que foi feito depois dele. Uma cópia do banco atual será baixada antes.\n\n` +
+        `Para continuar, digite RESTAURAR:`
+      );
+      if ((digitado ?? '').trim().toUpperCase() !== 'RESTAURAR') {
+        showToast('Restauração cancelada', 'Nada foi alterado.', 'info');
+        event.target.value = '';
         return;
       }
+      // cópia de segurança do estado atual, antes de gravar qualquer coisa
+      handleExportBackup('backup_antes_de_restaurar');
 
       setLoading(true);
 
@@ -2290,7 +2300,7 @@ export default function App() {
 
           <div className="pt-2 border-t border-emerald-900/30 mt-2">
             <button
-              onClick={handleExportBackup}
+              onClick={() => handleExportBackup()}
               className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md text-emerald-200 hover:text-white hover:bg-emerald-900/40 transition-all border border-emerald-800/50 cursor-pointer"
               title="Baixar cópia de segurança em arquivo JSON"
             >
@@ -2461,7 +2471,7 @@ export default function App() {
             />
             </div>
             <button 
-              onClick={handleExportBackup}
+              onClick={() => handleExportBackup()}
               className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 font-display"
               title="Baixar cópia de segurança completa do banco de dados em formato JSON"
             >
