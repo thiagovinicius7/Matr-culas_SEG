@@ -56,8 +56,8 @@ export default function ParentCartaPortal({
 
   // Sem nenhuma matrícula anterior registrada, é um aluno novo — a carta
   // então é de "Intenção de Matrícula", não de "Rematrícula".
-  const isNewStudent = !enrollment;
-  const cartaTitulo = isNewStudent ? 'Carta de Intenção de Matrícula' : 'Carta de Intenção de Rematrícula';
+  const isNewStudent = !enrollment || enrollment.ano >= 2027;
+  const cartaTitulo = isNewStudent ? 'Carta de Matrícula' : 'Carta de Intenção de Rematrícula';
 
   // Proposal base set by school
   const valorRegularProposto = enrollment?.valorProposto2027 !== undefined 
@@ -570,7 +570,7 @@ export default function ParentCartaPortal({
                   <div>
                     <span className="block font-bold text-xs text-emerald-900 flex items-center gap-1.5">
                       <CheckCircle size={16} className="text-emerald-600" />
-                      Sim, confirmamos nossa intenção de rematrícula para 2027
+                      {isNewStudent ? 'Sim, confirmamos a matrícula para 2027' : 'Sim, confirmamos nossa intenção de rematrícula para 2027'}
                     </span>
                     <span className="text-[11px] text-slate-600">
                       Garantir a vaga do(a) aluno(a) para a turma de 2027 com as condições selecionadas acima.

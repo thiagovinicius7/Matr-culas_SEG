@@ -43,8 +43,8 @@ export default function CartaIntencaoForm({
 
   // Sem nenhuma matrícula anterior registrada, é um aluno novo — a carta
   // então é de "Intenção de Matrícula", não de "Rematrícula".
-  const isNewStudent = !enrollment;
-  const cartaTitulo = isNewStudent ? 'Carta de Intenção de Matrícula' : 'Carta de Intenção de Rematrícula';
+  const isNewStudent = !enrollment || enrollment.ano >= 2027;
+  const cartaTitulo = isNewStudent ? 'Carta de Matrícula' : 'Carta de Intenção de Rematrícula';
 
   // Turma atual (2026) real do aluno — usa a matrícula de verdade dele
   // (enrollment.turmaRegularId), NÃO recalcula pela idade. Recalcular pela
@@ -407,7 +407,7 @@ export default function CartaIntencaoForm({
       `*Sítio-Escola Geranium*\n` +
       `*${cartaTitulo} — Ano Letivo 2027*\n\n` +
       `Olá, família de *${student.nome}*!\n\n` +
-      `Já estamos organizando o ano letivo de 2027 com muito carinho. Convidamos vocês a acessarem o link abaixo para conferir a proposta do próximo ano e confirmar a intenção de rematrícula:\n\n` +
+      `Já estamos organizando o ano letivo de 2027 com muito carinho. Convidamos vocês a acessarem o link abaixo para conferir a proposta do próximo ano e ${isNewStudent ? 'confirmar a matrícula' : 'confirmar a intenção de rematrícula'}:\n\n` +
       `${parentUrl}\n\n` +
       `No link vocês poderão conferir a turma prevista, selecionar opções de Contraturno e registrar a decisão da família.\n\n` +
       novidadesTexto +
@@ -988,7 +988,7 @@ export default function CartaIntencaoForm({
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
           <h3 className="font-bold text-sm text-slate-800 font-display uppercase tracking-wider flex items-center gap-2">
             <UserCheck size={18} className="text-brand-green-dark" />
-            Resposta da Família / Status da Intenção de Rematrícula 2027
+            Resposta da Família / Status da {isNewStudent ? 'Matrícula' : 'Intenção de Rematrícula'} 2027
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1002,10 +1002,10 @@ export default function CartaIntencaoForm({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-xs">Sim, Rematricular</span>
+                <span className="font-bold text-xs">{isNewStudent ? 'Sim, Matricular' : 'Sim, Rematricular'}</span>
                 <CheckCircle size={16} className={statusIntencao === 'Confirmada' ? 'text-white' : 'text-emerald-500'} />
               </div>
-              <span className="text-[10px] opacity-80">Família confirma interesse na rematrícula 2027</span>
+              <span className="text-[10px] opacity-80">{isNewStudent ? 'Família confirma a matrícula 2027' : 'Família confirma interesse na rematrícula 2027'}</span>
             </button>
 
             <button
