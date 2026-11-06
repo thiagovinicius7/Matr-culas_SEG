@@ -701,8 +701,8 @@ export function getDadosFaltandoParaContrato(g: Guardian | undefined): string[] 
   return faltam;
 }
 
-/** Taxa de material 2027 — valor por etapa (Infantil R$ 800, Fundamental R$ 600), parcelável em até 12x. */
-export const TAXA_MATERIAL_2027 = { Infantil: 800, Fundamental: 600, parcelas: 12 };
+/** Taxa de material escolar 2027 — valor por etapa (Infantil R$ 600, Fundamental R$ 400), parcelável em até 12x. */
+export const TAXA_MATERIAL_2027 = { Infantil: 600, Fundamental: 400, parcelas: 12 };
 
 /**
  * Novidades de 2027 específicas da turma proposta — usadas no recado da
@@ -716,7 +716,7 @@ export function getNovidades2027(turma: RegularClass): string[] {
   if (turma.natureza !== 'Infantil' && turma.natureza !== 'Fundamental') return [];
 
   const valorTaxa = TAXA_MATERIAL_2027[turma.natureza];
-  const taxaTexto = `Taxa de material: R$ ${valorTaxa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (pode ser parcelada em até ${TAXA_MATERIAL_2027.parcelas}x)`;
+  const taxaTexto = `Taxa de material escolar: R$ ${valorTaxa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (pode ser parcelada em até ${TAXA_MATERIAL_2027.parcelas}x)`;
 
   if (turma.natureza === 'Fundamental') {
     return [
