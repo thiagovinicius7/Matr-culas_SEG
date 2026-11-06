@@ -184,8 +184,11 @@ export interface PackDocument {
   id: string;
   nome: string;
   fase: 'semeadura' | 'enraizamento' | 'florescer';
-  url: string;
-  storagePath: string; // caminho no Firebase Storage, usado para poder substituir/excluir
+  url: string; // arquivos antigos (Storage); os novos ficam em base64 no próprio banco
+  storagePath: string; // caminho no Firebase Storage ('' quando o arquivo está em base64)
+  base64?: string;
+  mime?: string;
+  tamanho?: number;
   atualizadoEm: string; // YYYY-MM-DD
 }
 

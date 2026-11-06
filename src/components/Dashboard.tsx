@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { urlDoPackDocument } from '../packDocs';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, PackDocument, CoordenacaoSugestao } from '../types';
 import { mensagemLembreteCarta, mensagemReuniao } from '../mensagens';
 import { REGULAR_CLASSES, getEnrollmentBaseDaCarta, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO, getAlunosDoAno, getNovasMatriculasDoAno } from '../data';
@@ -829,7 +830,7 @@ export default function Dashboard({
                             )}
                             {doc ? (
                               <a
-                                href={doc.url}
+                                href={urlDoPackDocument(doc)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={`Baixar (atualizado em ${new Date(doc.atualizadoEm + 'T00:00:00').toLocaleDateString('pt-BR')})`}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { urlDoPackDocument } from '../packDocs';
 import { RegularClass, ContraturnoPrice, PackDocument } from '../types';
 import { REGULAR_CLASSES, PACK_DOCUMENT_DEFINITIONS } from '../data';
 import { DollarSign, Check, RotateCcw, Info, Sliders, Shield, Plus, Trash2, FileText, Upload, Loader2 } from 'lucide-react';
@@ -679,7 +680,7 @@ export default function PricingSettings({
                         <div className="flex items-center gap-1.5 shrink-0">
                           {existing && (
                             <a
-                              href={existing.url}
+                              href={urlDoPackDocument(existing)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-[10px] font-bold text-brand-green-dark hover:underline px-1.5"

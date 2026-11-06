@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { TAMANHO_MAX_PACK_DOC } from './packDocs';
+import { bytesParaBase64 } from './contratos/gerarDocx';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, NegotiationHistoryEntry, ContraturnoDailyException, PackDocument, CoordenacaoSugestao, FichaSaude, FichaAnamnese } from './types';
 import { 
   calculateAgeAtCutoff,
@@ -23,7 +25,6 @@ import {
   saveDocument,
   deleteDocument,
   clearAllDatabaseCollections,
-  uploadPackDocument,
   deletePackDocumentFile,
   watchAuthState,
   signOutUser,
@@ -1172,14 +1173,20 @@ export default function App() {
     file: File
   ) => {
     try {
-      const url = await uploadPackDocument(docId, file);
-      const extension = file.name.split('.').pop() || 'pdf';
+      if (file.size > TAMANHO_MAX_PACK_DOC) {
+        showToast('Arquivo grande demais', `${file.name} tem ${Math.round(file.size / 1024)} KB; o limite é ${Math.round(TAMANHO_MAX_PACK_DOC / 1024)} KB. Reduza o PDF (por exemplo, comprimindo as imagens) e envie de novo.`, 'error', 9000);
+        return;
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
       const newDoc: PackDocument = {
         id: docId,
         nome,
         fase,
-        url,
-        storagePath: `pack-documents/${docId}.${extension}`,
+        url: '',
+        storagePath: '',
+        base64: bytesParaBase64(bytes),
+        mime: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
+        tamanho: bytes.length,
         atualizadoEm: new Date().toISOString().split('T')[0],
       };
       setPackDocuments(prev => [...prev.filter(d => d.id !== docId), newDoc]);
@@ -1194,7 +1201,7 @@ export default function App() {
   const handleRemovePackDocument = async (docId: string) => {
     const existing = packDocuments.find(d => d.id === docId);
     if (!existing) return;
-    await deletePackDocumentFile(existing.storagePath);
+    if (existing.storagePath) { try { await deletePackDocumentFile(existing.storagePath); } catch { /* arquivo antigo já não existe */ } }
     setPackDocuments(prev => prev.filter(d => d.id !== docId));
     deleteDocument('packDocuments', docId);
   };
