@@ -100,7 +100,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
   // ---------- página pública "Situação da matrícula" ----------
   const [publicando, setPublicando] = useState(false);
   const [relatorioPublicacao, setRelatorioPublicacao] = useState<{ semDesconto: string[]; semCpf: string[]; total: number } | null>(null);
-  const LINK_SITUACAO = `${window.location.origin}${window.location.pathname}?situacao=1`;
+  const LINK_SITUACAO = `${window.location.origin}${window.location.pathname.replace(/\/?(index\.html)?$/, '/')}situacao/`;
   const publicarSituacao = async () => {
     setPublicando(true);
     try {
