@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { Sprout, Loader2, Search, CheckCircle2, Clock, FileText, Copy, Check, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Sprout, Loader2, Search, CheckCircle2, Clock, FileText, Copy, Check, MessageCircle, ShieldCheck, ChevronDown } from 'lucide-react';
 import { watchAuthState, signInAsPublicVisitor, getDocumentById } from '../firebase';
 import {
   COLECAO_SITUACAO, PIX_CHAVE, PIX_CHAVE_FORMATADA, ZAP_FINANCEIRO_FORMATADO, PERCENTUAL_DESCONTO_JANEIRO,
@@ -121,7 +121,7 @@ export default function SituacaoMatriculaPublica() {
 
           {sessaoPronta && resultado && (
             <div className="space-y-6">
-              {resultado.criancas.map(c => <CartaoCrianca key={c.nome} c={c} />)}
+              {resultado.criancas.map(c => <CartaoCrianca key={c.nome} c={c} inicialAberto={resultado.criancas.length === 1} />)}
               <button onClick={limpar} className="w-full border border-slate-300 text-slate-600 font-bold rounded-xl py-2.5 text-sm">Consultar outro CPF</button>
             </div>
           )}
@@ -132,7 +132,8 @@ export default function SituacaoMatriculaPublica() {
   );
 }
 
-function CartaoCrianca({ c }: { c: CriancaSituacao }) {
+function CartaoCrianca({ c, inicialAberto }: { c: CriancaSituacao; inicialAberto: boolean }) {
+  const [aberto, setAberto] = useState(inicialAberto);
   const [qr, setQr] = useState('');
   const [copiado, setCopiado] = useState<'pix' | 'chave' | ''>('');
   const codigo = c.liberado ? gerarPixCopiaECola(c.novembro) : '';
@@ -154,12 +155,18 @@ function CartaoCrianca({ c }: { c: CriancaSituacao }) {
 
   return (
     <section className="border border-slate-200 rounded-xl overflow-hidden">
-      <div className="bg-brand-cream px-4 py-4 border-b border-slate-200 space-y-2">
-        <h2 className="font-display font-bold text-lg text-brand-green-dark leading-tight">{c.nome}</h2>
-        <p className="text-sm text-slate-600">Turma em 2027: <strong className="text-slate-800">{c.turma}</strong></p>
-        <p className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${rotuloAndamento.cls}`}>{rotuloAndamento.ic}{rotuloAndamento.t}</p>
-      </div>
+      <button type="button" onClick={() => setAberto(v => !v)} aria-expanded={aberto}
+        className="w-full text-left bg-brand-cream px-4 py-4 border-b border-slate-200 space-y-2 cursor-pointer flex items-start justify-between gap-3">
+        <span className="space-y-2 block min-w-0">
+          <span className="block font-display font-bold text-lg text-brand-green-dark leading-tight">{c.nome}</span>
+          <span className="block text-sm text-slate-600">Turma em 2027: <strong className="text-slate-800">{c.turma}</strong></span>
+          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${rotuloAndamento.cls}`}>{rotuloAndamento.ic}{rotuloAndamento.t}</span>
+          {!aberto && c.liberado && <span className="block text-xs text-slate-600">1ª parcela (novembro): <strong className="text-brand-orange">{moeda(c.novembro)}</strong></span>}
+        </span>
+        <ChevronDown size={20} className={`shrink-0 mt-1 text-slate-500 transition-transform ${aberto ? 'rotate-180' : ''}`} />
+      </button>
 
+      {aberto && <>
       <div className="px-4 py-4 space-y-3">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Documentos</h3>
         <ul className="space-y-1.5">
@@ -233,6 +240,7 @@ function CartaoCrianca({ c }: { c: CriancaSituacao }) {
           </a>
         </div>
       )}
+      </>}
     </section>
   );
 }
