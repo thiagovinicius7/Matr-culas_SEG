@@ -3,6 +3,7 @@ import {
   initializeFirestore, 
   collection, 
   getDocs, 
+  getDoc,
   setDoc, 
   doc, 
   deleteDoc, 
@@ -276,6 +277,12 @@ export async function getCollectionData<T>(collectionName: string): Promise<T[]>
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, collectionName);
   }
+}
+
+/** Lê UM documento pelo identificador exato (devolve null se não existir). */
+export async function getDocumentById<T>(collectionName: string, id: string): Promise<T | null> {
+  const snap = await getDoc(doc(db, collectionName, id));
+  return snap.exists() ? (snap.data() as T) : null;
 }
 
 /**

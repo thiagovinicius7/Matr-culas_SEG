@@ -249,5 +249,13 @@ service cloud.firestore {
     match /contratoContadores/{anoId} {
       allow read, write: if isEquipe();
     }
+
+    // Resumo da situação da matrícula 2027, publicado pela equipe. O id é um hash do CPF
+    // (o CPF não é gravado). A família só consegue ler pelo id exato; listar é só da equipe.
+    match /situacaoMatricula/{id} {
+      allow get: if isSignedIn();
+      allow list: if isEquipe();
+      allow write: if isEquipe();
+    }
   }
 }

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice, ContratoDoc, ContratoModelo, StatusContrato } from '../types';
 import { ANO_CARTA_INTENCAO, TAXA_MATERIAL_2027, calculateAgeAtCutoff, getRegularClassForAgeDynamic } from '../data';
-import { getCollectionData, saveDocument, proximoNumeroContrato } from '../firebase';
+import { getCollectionData, saveDocument, deleteDocument, proximoNumeroContrato } from '../firebase';
+import { montarSituacoes, mesmoConteudo, COLECAO_SITUACAO } from '../situacao/situacao';
+import type { SituacaoDoc } from '../situacao/situacao';
 import {
   TipoContrato, ORDEM_TIPOS, NOMES_DOCS, NOMES_PERFIL, PerfilContrato, ContratoContexto, CartaResolvida, NumerosContrato,
   elegivelParaContrato, resolverCarta, documentosDoAluno, perfilDoAluno, validarParaContrato, montarDadosDoContrato,
@@ -94,6 +96,33 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
   };
   const docDe = (alunoId: string, tipo: TipoContrato) => docs.find(d => d.id === idDoc(alunoId, tipo));
   const statusDe = (alunoId: string, tipo: TipoContrato): StatusContrato => docDe(alunoId, tipo)?.status || 'nao_gerado';
+
+  // ---------- página pública "Situação da matrícula" ----------
+  const [publicando, setPublicando] = useState(false);
+  const [relatorioPublicacao, setRelatorioPublicacao] = useState<{ semDesconto: string[]; semCpf: string[]; total: number } | null>(null);
+  const LINK_SITUACAO = `${window.location.origin}${window.location.pathname}?situacao=1`;
+  const publicarSituacao = async () => {
+    setPublicando(true);
+    try {
+      const ctxs = students.map(aluno => ({ student: aluno, guardians, enrollments, classPrices, contraturnoPrices, contraturnos } as ContratoContexto));
+      const { docs: novos, semCpf, semDesconto } = await montarSituacoes(ctxs, docsRef.current);
+      const atuais = await getCollectionData<SituacaoDoc>(COLECAO_SITUACAO);
+      const porId = new Map(atuais.map(a => [a.id, a]));
+      let gravados = 0;
+      for (const n of novos) {
+        const a = porId.get(n.id);
+        if (a && mesmoConteudo(a, n)) continue;
+        await saveDocument(COLECAO_SITUACAO, n); gravados++;
+      }
+      const ids = new Set(novos.map(n => n.id));
+      let removidos = 0;
+      for (const a of atuais) if (!ids.has(a.id)) { await deleteDocument(COLECAO_SITUACAO, a.id); removidos++; }
+      setRelatorioPublicacao({ semDesconto, semCpf, total: novos.length });
+      showToast('Página das famílias atualizada', `${gravados} atualizado(s), ${removidos} removido(s), ${novos.length} CPFs no total.`, 'success', 7000);
+    } catch (e: any) {
+      showToast('Não foi possível publicar', String(e?.message || e) + ' (confira se as regras do Firestore foram publicadas)', 'error', 10000);
+    } finally { setPublicando(false); }
+  };
 
   // ---------- linhas da lista ----------
   const linhas = useMemo<Linha[]>(() => {
@@ -363,6 +392,10 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar aluno ou responsável" aria-label="Buscar aluno ou responsável"
               className="text-xs pl-8 pr-3 py-2 w-56 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-slate-400" />
           </div>
+          <button onClick={publicarSituacao} disabled={publicando} title="Atualiza os dados da página pública onde a família consulta pelo CPF"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-brand-green-light text-brand-green-dark bg-white hover:bg-brand-sand cursor-pointer disabled:opacity-60">
+            {publicando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Página das famílias
+          </button>
           <button onClick={() => setPainelModelos(v => !v)} className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white hover:border-slate-400 cursor-pointer">
             <Settings2 size={13} /> Modelos
             {modelosFaltando.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{modelosFaltando.length}</span>}
@@ -371,6 +404,22 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
       </div>
 
       {/* Painel dos modelos Word */}
+      {relatorioPublicacao && (
+        <div className="bg-white border border-brand-green-light rounded-xl p-4 text-xs text-slate-700 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <strong className="text-brand-green-dark">Página das famílias publicada ({relatorioPublicacao.total} CPFs)</strong>
+            <button onClick={() => setRelatorioPublicacao(null)} aria-label="Fechar"><X size={14} /></button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input readOnly value={LINK_SITUACAO} className="flex-1 border border-slate-200 rounded px-2 py-1.5 bg-slate-50" onFocus={e => e.currentTarget.select()} />
+            <button onClick={async () => { try { await navigator.clipboard.writeText(LINK_SITUACAO); showToast('Link copiado', 'Cole no WhatsApp das famílias.', 'success'); } catch { showToast('Copie manualmente', LINK_SITUACAO, 'error', 9000); } }}
+              className="px-3 py-1.5 rounded bg-brand-green-dark text-white font-bold flex items-center gap-1"><Copy size={12} /> Copiar</button>
+          </div>
+          {relatorioPublicacao.semDesconto.length > 0 && <p><strong>Sem direito ao desconto de 50% (Carta não confirmada até 31/10):</strong> {relatorioPublicacao.semDesconto.join(', ')}. Para essas, a página mostra "falar com o financeiro".</p>}
+          {relatorioPublicacao.semCpf.length > 0 && <p className="text-rose-700"><strong>Sem CPF válido (não conseguem consultar):</strong> {relatorioPublicacao.semCpf.join(', ')}.</p>}
+        </div>
+      )}
+
       {painelModelos && (
         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
           <div>
