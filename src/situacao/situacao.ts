@@ -108,12 +108,9 @@ export function dividirJaneiro(carta: Pick<CartaResolvida, 'mensalidade' | 'cont
   };
 }
 
-/** Confirmou a Carta até a data limite? Sem a data do aceite, não libera sozinho. */
-export function direitoAoDescontoDeJaneiro(carta: CartaResolvida, ctx: ContratoContexto): boolean {
-  const e2027 = ctx.enrollments.find(e => e.alunoId === ctx.student.id && e.ano === 2027);
-  const confirmou = carta.base.statusIntencao2027 === 'Confirmada' || e2027?.statusNegociacao === 'Confirmada';
-  const data = (carta.base.dataIntencao2027 || '').slice(0, 10);
-  return confirmou && !!data && data <= DATA_LIMITE_DESCONTO;
+/** Tem o desconto de janeiro? Vale para todos, a menos que a equipe desmarque na tela de matrícula. */
+export function direitoAoDescontoDeJaneiro(carta: CartaResolvida, _ctx?: ContratoContexto): boolean {
+  return carta.base.descontoJaneiro2027 !== false;
 }
 
 function andamento(tipos: TipoContrato[], statusDe: (t: TipoContrato) => StatusContrato) {
@@ -180,8 +177,9 @@ export async function montarSituacoes(
     return true;
   };
   for (const [alunoId, { entrada, crianca }] of criancas) {
-    let achou = add(entrada.ctx.student.cpf || '', alunoId, crianca);
-    for (const g of entrada.ctx.guardians.filter((x: Guardian) => x.alunoId === alunoId)) {
+    // Só o CPF do responsável financeiro leva à criança.
+    let achou = false;
+    for (const g of entrada.ctx.guardians.filter((x: Guardian) => x.alunoId === alunoId && x.financeiro)) {
       if (add(g.cpf || '', alunoId, crianca)) achou = true;
     }
     if (!achou) semCpf.push(crianca.nome);

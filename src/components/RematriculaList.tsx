@@ -234,6 +234,13 @@ export default function RematriculaList({
     onSaveEnrollment(atualizado, false);
   };
 
+  const alternarDescontoJaneiro = (alunoId: string) => {
+    if (!onSaveEnrollment) return;
+    const base = getEnrollmentBaseDaCarta(alunoId, enrollments);
+    if (!base) return;
+    onSaveEnrollment({ ...base, descontoJaneiro2027: base.descontoJaneiro2027 === false }, false);
+  };
+
   const abrirWhatsAppReuniao = (st: Student, g: Guardian | undefined) => {
     const base = getEnrollmentBaseDaCarta(st.id, enrollments);
     const tel = (g?.telefone || g?.contato || '').replace(/\D/g, '');
@@ -822,6 +829,20 @@ export default function RematriculaList({
                             );
                           })}
                         </div>
+
+                        {/* Desconto de 50% na mensalidade de janeiro (página das famílias) */}
+                        {(() => {
+                          const baseD = getEnrollmentBaseDaCarta(student.id, enrollments);
+                          if (!baseD) return null;
+                          const tem = baseD.descontoJaneiro2027 !== false;
+                          return (
+                            <button type="button" onClick={() => alternarDescontoJaneiro(student.id)}
+                              title="Desconto de 50% na mensalidade de janeiro (quem aceitou a proposta em outubro). Clique para alternar."
+                              className={`mt-1 px-2.5 py-1 text-[10px] font-bold rounded-md border cursor-pointer ${tem ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-rose-50 border-rose-300 text-rose-800'}`}>
+                              {tem ? '✓ Desconto 50% jan' : '✗ Sem desconto jan'}
+                            </button>
+                          );
+                        })()}
 
                         {/* Carta de Intenção 2027 Button */}
                         <button

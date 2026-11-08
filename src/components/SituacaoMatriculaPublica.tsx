@@ -83,7 +83,7 @@ export default function SituacaoMatriculaPublica() {
           {sessaoPronta && resultado === undefined && (
             <form onSubmit={consultar} className="space-y-4">
               <p className="text-sm text-slate-600">
-                Digite o CPF da criança ou de um dos responsáveis para ver a situação da matrícula, os contratos e o pagamento da 1ª parcela.
+                Digite o CPF do responsável financeiro para ver a situação da matrícula, os contratos e o pagamento da 1ª parcela.
               </p>
               <div className="space-y-1">
                 <label htmlFor="cpf-consulta" className="text-[11px] font-bold text-slate-500">CPF</label>

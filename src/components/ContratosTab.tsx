@@ -415,8 +415,8 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
             <button onClick={async () => { try { await navigator.clipboard.writeText(LINK_SITUACAO); showToast('Link copiado', 'Cole no WhatsApp das famílias.', 'success'); } catch { showToast('Copie manualmente', LINK_SITUACAO, 'error', 9000); } }}
               className="px-3 py-1.5 rounded bg-brand-green-dark text-white font-bold flex items-center gap-1"><Copy size={12} /> Copiar</button>
           </div>
-          {relatorioPublicacao.semDesconto.length > 0 && <p><strong>Sem direito ao desconto de 50% (Carta não confirmada até 31/10):</strong> {relatorioPublicacao.semDesconto.join(', ')}. Para essas, a página mostra "falar com o financeiro".</p>}
-          {relatorioPublicacao.semCpf.length > 0 && <p className="text-rose-700"><strong>Sem CPF válido (não conseguem consultar):</strong> {relatorioPublicacao.semCpf.join(', ')}.</p>}
+          {relatorioPublicacao.semDesconto.length > 0 && <p><strong>Sem desconto de 50% (desmarcado na tela de matrícula):</strong> {relatorioPublicacao.semDesconto.join(', ')}. Para essas, a página mostra "falar com o financeiro".</p>}
+          {relatorioPublicacao.semCpf.length > 0 && <p className="text-rose-700"><strong>Sem CPF válido do responsável financeiro (não conseguem consultar):</strong> {relatorioPublicacao.semCpf.join(', ')}.</p>}
         </div>
       )}
 
