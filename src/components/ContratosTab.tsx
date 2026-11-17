@@ -4,6 +4,7 @@ import { ANO_CARTA_INTENCAO, TAXA_MATERIAL_2027, calculateAgeAtCutoff, getRegula
 import { getCollectionData, saveDocument, deleteDocument, proximoNumeroContrato } from '../firebase';
 import { montarSituacoes, mesmoConteudo, COLECAO_SITUACAO } from '../situacao/situacao';
 import type { SituacaoDoc } from '../situacao/situacao';
+import { imprimirListaNovembro } from '../situacao/listaNovembro';
 import {
   TipoContrato, ORDEM_TIPOS, NOMES_DOCS, NOMES_PERFIL, PerfilContrato, ContratoContexto, CartaResolvida, NumerosContrato,
   elegivelParaContrato, resolverCarta, documentosDoAluno, perfilDoAluno, validarParaContrato, montarDadosDoContrato,
@@ -13,7 +14,7 @@ import { formatarMoeda, formatarPercentual } from '../contratos/extenso';
 import {
   preencherModelo, validarModelo, nomeDoArquivo, zipar, baixarArquivo, base64ParaBytes, bytesParaBase64,
 } from '../contratos/gerarDocx';
-import { FileText, Search, X, Download, Upload, Settings2, Copy, MessageCircle, ChevronRight, Loader2, AlertTriangle, Send } from 'lucide-react';
+import { FileText, Search, X, Download, Upload, Settings2, Copy, MessageCircle, ChevronRight, Loader2, AlertTriangle, Send, Printer } from 'lucide-react';
 
 const ANO = ANO_CARTA_INTENCAO;
 const TAMANHO_MAX_MODELO = 650_000; // bytes — o modelo vai como texto (base64) num documento do Firestore (limite ~1 MB)
@@ -122,6 +123,14 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
     } catch (e: any) {
       showToast('Não foi possível publicar', String(e?.message || e) + ' (confira se as regras do Firestore foram publicadas)', 'error', 10000);
     } finally { setPublicando(false); }
+  };
+
+  // ---------- lista impressa da parcela de novembro ----------
+  const imprimirNovembro = () => {
+    const ctxs = students.map(aluno => ({ student: aluno, guardians, enrollments, classPrices, contraturnoPrices, contraturnos } as ContratoContexto));
+    if (!imprimirListaNovembro(ctxs, docsRef.current)) {
+      showToast('O navegador bloqueou a janela de impressão', 'Permita pop-ups para este site e tente de novo.', 'error', 8000);
+    }
   };
 
   // ---------- linhas da lista ----------
@@ -392,6 +401,10 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar aluno ou responsável" aria-label="Buscar aluno ou responsável"
               className="text-xs pl-8 pr-3 py-2 w-56 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-slate-400" />
           </div>
+          <button onClick={imprimirNovembro} title="Imprime a lista dos alunos matriculados com o valor da parcela de novembro"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white hover:border-slate-400 cursor-pointer">
+            <Printer size={13} /> Lista de novembro
+          </button>
           <button onClick={publicarSituacao} disabled={publicando} title="Atualiza os dados da página pública onde a família consulta pelo CPF"
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-brand-green-light text-brand-green-dark bg-white hover:bg-brand-sand cursor-pointer disabled:opacity-60">
             {publicando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Página das famílias
