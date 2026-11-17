@@ -4,7 +4,7 @@ import { ANO_CARTA_INTENCAO, TAXA_MATERIAL_2027, calculateAgeAtCutoff, getRegula
 import { getCollectionData, saveDocument, deleteDocument, proximoNumeroContrato } from '../firebase';
 import { montarSituacoes, mesmoConteudo, COLECAO_SITUACAO } from '../situacao/situacao';
 import type { SituacaoDoc } from '../situacao/situacao';
-import { imprimirListaNovembro } from '../situacao/listaNovembro';
+import { imprimirListaNovembro, baixarExcelNovembro } from '../situacao/listaNovembro';
 import {
   TipoContrato, ORDEM_TIPOS, NOMES_DOCS, NOMES_PERFIL, PerfilContrato, ContratoContexto, CartaResolvida, NumerosContrato,
   elegivelParaContrato, resolverCarta, documentosDoAluno, perfilDoAluno, validarParaContrato, montarDadosDoContrato,
@@ -130,6 +130,16 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
     const ctxs = students.map(aluno => ({ student: aluno, guardians, enrollments, classPrices, contraturnoPrices, contraturnos } as ContratoContexto));
     if (!imprimirListaNovembro(ctxs, docsRef.current)) {
       showToast('O navegador bloqueou a janela de impressão', 'Permita pop-ups para este site e tente de novo.', 'error', 8000);
+    }
+  };
+
+  const excelNovembro = async () => {
+    try {
+      const ctxs = students.map(aluno => ({ student: aluno, guardians, enrollments, classPrices, contraturnoPrices, contraturnos } as ContratoContexto));
+      const r = await baixarExcelNovembro(ctxs, docsRef.current);
+      showToast('Planilha baixada', `${r.total} criança(s) com parcela em novembro${r.sem ? `, ${r.sem} sem desconto (aba separada)` : ''}.`, 'success', 6000);
+    } catch (e: any) {
+      showToast('Não foi possível gerar a planilha', String(e?.message || e), 'error', 8000);
     }
   };
 
@@ -404,6 +414,10 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
           <button onClick={imprimirNovembro} title="Imprime a lista dos alunos matriculados com o valor da parcela de novembro"
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white hover:border-slate-400 cursor-pointer">
             <Printer size={13} /> Lista de novembro
+          </button>
+          <button onClick={excelNovembro} title="Baixa a lista da parcela de novembro em planilha Excel (.xlsx)"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white hover:border-slate-400 cursor-pointer">
+            <Download size={13} /> Excel
           </button>
           <button onClick={publicarSituacao} disabled={publicando} title="Atualiza os dados da página pública onde a família consulta pelo CPF"
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-brand-green-light text-brand-green-dark bg-white hover:bg-brand-sand cursor-pointer disabled:opacity-60">

@@ -146,3 +146,99 @@ export function imprimirListaNovembro(ctxs: ContratoContexto[], docs: ContratoDo
   w.document.close();
   return true;
 }
+
+/* ------------------------------------------------------------------ */
+/* Planilha Excel (.xlsx) — montada à mão com PizZip, sem biblioteca nova */
+/* ------------------------------------------------------------------ */
+
+type Cel = string | number | { f: string } | null;
+const xml = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+const colLetra = (i: number) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+
+/** estilos: 0 normal · 1 cabeçalho · 2 moeda · 3 total (negrito) · 4 total moeda · 5 título */
+function folha(linhas: { cels: Cel[]; estilo?: number[] | number }[], larguras: number[], opc: { congelarLinha?: number; filtro?: string } = {}) {
+  const rows = linhas.map((l, r) => {
+    const cs = l.cels.map((v, c) => {
+      if (v === null || v === '') return '';
+      const ref = `${colLetra(c)}${r + 1}`;
+      const st = Array.isArray(l.estilo) ? (l.estilo[c] ?? 0) : (l.estilo ?? 0);
+      const s = st ? ` s="${st}"` : '';
+      if (typeof v === 'number') return `<c r="${ref}"${s}><v>${v}</v></c>`;
+      if (typeof v === 'object') return `<c r="${ref}"${s}><f>${xml(v.f)}</f></c>`;
+      return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xml(v)}</t></is></c>`;
+    }).join('');
+    return `<row r="${r + 1}">${cs}</row>`;
+  }).join('');
+  const cols = `<cols>${larguras.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>`;
+  const pane = opc.congelarLinha
+    ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${opc.congelarLinha}" topLeftCell="A${opc.congelarLinha + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+    : '';
+  const filtro = opc.filtro ? `<autoFilter ref="${opc.filtro}"/>` : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${pane}${cols}<sheetData>${rows}</sheetData>${filtro}<pageSetup orientation="landscape" paperSize="9"/></worksheet>`;
+}
+
+export async function baixarExcelNovembro(ctxs: ContratoContexto[], docs: ContratoDoc[]) {
+  const { default: PizZip } = await import('pizzip');
+  const todas = montarListaNovembro(ctxs, docs);
+  const com = todas.filter(l => l.temDesconto);
+  const sem = todas.filter(l => !l.temDesconto);
+
+  // Aba 1 — Novembro
+  const cab = ['Nº', 'Turma 2027', 'Criança', 'Responsável financeiro', 'Telefone', 'Contrato', 'Mensalidade jan.', 'Desconto 50%', 'Novembro', 'Restante jan.', 'Pago', 'Data do pagamento'];
+  const L: { cels: Cel[]; estilo?: number[] | number }[] = [
+    { cels: [`Parcela de novembro · Matrícula 2027 · Sítio-Escola Geranium · emitida em ${new Date().toLocaleDateString('pt-BR')}`], estilo: 5 },
+    { cels: cab, estilo: 1 },
+  ];
+  const moedaEst = [0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0];
+  com.forEach((l, i) => L.push({ cels: [i + 1, l.turma, l.nome, l.responsavel, l.telefone, l.contrato, l.mensalidade, l.desconto, l.novembro, l.janeiro, '', ''], estilo: moedaEst }));
+  const ini = 3, fim = 2 + com.length;
+  if (com.length) {
+    L.push({
+      cels: ['', '', `Total (${com.length} ${com.length === 1 ? 'criança' : 'crianças'})`, '', '', '', { f: `SUM(G${ini}:G${fim})` }, { f: `SUM(H${ini}:H${fim})` }, { f: `SUM(I${ini}:I${fim})` }, { f: `SUM(J${ini}:J${fim})` }, '', ''],
+      estilo: [3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 3, 3],
+    });
+  }
+  const aba1 = folha(L, [5, 20, 34, 32, 16, 22, 15, 14, 14, 14, 8, 16], { congelarLinha: 2, filtro: `A2:L${Math.max(fim, 2)}` });
+
+  // Aba 2 — Sem desconto
+  const L2: { cels: Cel[]; estilo?: number[] | number }[] = [
+    { cels: ['Sem desconto de 50% em janeiro · não pagam parcela em novembro'], estilo: 5 },
+    { cels: ['Nº', 'Turma 2027', 'Criança', 'Responsável financeiro', 'Telefone', 'Contrato'], estilo: 1 },
+    ...sem.map((l, i) => ({ cels: [i + 1, l.turma, l.nome, l.responsavel, l.telefone, l.contrato] as Cel[] })),
+  ];
+  const aba2 = folha(L2, [5, 20, 34, 32, 16, 22], { congelarLinha: 2 });
+
+  const estilos = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;R$&quot; #,##0.00"/></numFmts>
+<fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF1F3F24"/><name val="Calibri"/></font></fonts>
+<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F3F24"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF5F1E6"/></patternFill></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="6">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="164" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+
+  const zip = new PizZip();
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`);
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  zip.file('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Novembro" sheetId="1" r:id="rId1"/><sheet name="Sem desconto" sheetId="2" r:id="rId2"/></sheets>${com.length ? `<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Novembro!$A$2:$L$${fim}</definedName></definedNames>` : ''}<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`);
+  zip.file('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  zip.file('xl/styles.xml', estilos);
+  zip.file('xl/worksheets/sheet1.xml', aba1);
+  zip.file('xl/worksheets/sheet2.xml', aba2);
+  const bytes: Uint8Array = zip.generate({ type: 'uint8array', compression: 'DEFLATE' });
+
+  const d = new Date();
+  const nome = `Parcela_novembro_2027_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.xlsx`;
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return { total: com.length, sem: sem.length };
+}
