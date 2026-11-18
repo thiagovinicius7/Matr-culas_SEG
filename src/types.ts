@@ -120,6 +120,7 @@ export interface Enrollment {
   // Novos campos para Carta de Intenção e Rematrícula 2027
   valorProposto2027?: number; // Valor personalizado editável para a regular de 2027
   turmaPropostaId2027?: string; // Turma prevista 2027
+  turmaDefinidaManualmente?: boolean; // Turma trocada pela equipe (ex.: aluno adiantado), não pela data de nascimento
   contraturnoDesejado2027?: boolean;
   diasContraturno2027?: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[];
   horarioSaida2027?: '15:30' | '17:30';

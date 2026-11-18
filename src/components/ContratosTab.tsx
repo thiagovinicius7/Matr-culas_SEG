@@ -154,7 +154,8 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
       const v = validarParaContrato(ctx, carta);
       // Confere a turma do contrato com a turma pela data de nascimento (idade em 31/03 de 2027)
       const avisosL = [...v.avisos];
-      if (!carta.somenteContraturno && aluno.nascimento) {
+      const turmaManual = enrollments.some(e => e.alunoId === aluno.id && e.ano === ANO && e.turmaDefinidaManualmente);
+      if (!carta.somenteContraturno && aluno.nascimento && !turmaManual) {
         const pelaIdade = getRegularClassForAgeDynamic(calculateAgeAtCutoff(aluno.nascimento, ANO), classPrices, ANO);
         if (pelaIdade.nome !== carta.turma.nome) avisosL.push(`Atenção: pela data de nascimento (${aluno.nascimento.split('-').reverse().join('/')}) a turma em ${ANO} seria ${pelaIdade.nome}, mas o contrato está com ${carta.turma.nome}. Confira antes de gerar.`);
       }

@@ -288,6 +288,18 @@ export default function CartaIntencaoForm({
       valorProposto2027: Number(valorProposto2027),
       valorContraturnoProposto2027: contraturnoDesejado ? Number(valorContraturnoProposto2027) : undefined,
       turmaPropostaId2027,
+      // Aluno novo: a matrícula de 2027 é a própria matrícula dele, então trocar a turma na Carta
+      // (ex.: criança adiantada na escola anterior) troca a turma da matrícula e do contrato.
+      ...(isNewStudent && enrollment.ano === 2027 && turmaPropostaId2027 !== 'sem_regular'
+        && normalizeClassId(turmaPropostaId2027) !== normalizeClassId(enrollment.turmaRegularId)
+        ? {
+            turmaRegularId: turmaPropostaId2027,
+            valorRegularOriginal: valorTabelaRegular2027,
+            descontoMensal: Math.max(0, valorTabelaRegular2027 - Number(valorProposto2027)),
+            valorFinalRegular: Number(valorProposto2027),
+            turmaDefinidaManualmente: true,
+          }
+        : {}),
       contraturnoDesejado2027: contraturnoDesejado,
       diasContraturno2027: contraturnoDesejado ? diasContraturno : [],
       horarioSaida2027: horarioSaida,

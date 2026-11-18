@@ -745,6 +745,28 @@ export function getNovidades2027(turma: RegularClass): string[] {
  *  - cancelados / trancados.
  * Se o ano ainda não tem nenhuma matrícula (virada não feita), usa todos os ativos.
  */
+/**
+ * Turma de um aluno num ano: a turma gravada na matrícula daquele ano (inclusive
+ * trocas excepcionais feitas pela equipe, como aluno adiantado) e só, na falta
+ * dela, a turma pela data de nascimento. Usar sempre em vez de calcular só pela idade.
+ */
+export function getTurmaDoAno(
+  student: Student,
+  enrollments: Enrollment[],
+  classPrices: RegularClass[],
+  ano: number
+): RegularClass {
+  const e = enrollments.find(x => x.alunoId === student.id && x.ano === ano);
+  if (e?.turmaRegularId === 'sem_regular') return SOMENTE_CONTRATURNO_CLASS;
+  if (e?.turmaRegularId) {
+    const cls = classPrices.find(c => (c.ano || 2026) === ano && normalizeClassId(c.id) === normalizeClassId(e.turmaRegularId))
+      || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(e.turmaRegularId))
+      || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(e.turmaRegularId));
+    if (cls) return cls;
+  }
+  return getRegularClassForAgeDynamic(calculateAgeAtCutoff(student.nascimento, ano), classPrices, ano);
+}
+
 export function getAlunosDoAno(
   students: Student[],
   enrollments: Enrollment[],

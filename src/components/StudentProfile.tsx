@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice, EstadoCivil, NegotiationHistoryEntry, FichaSaude, FichaAnamnese } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId, getFaseProcesso, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO, getDadosFaltandoParaContrato } from '../data';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, getTurmaDoAno, normalizeClassId, getFaseProcesso, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO, getDadosFaltandoParaContrato } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
@@ -28,7 +28,7 @@ interface StudentProfileProps {
   onAddGuardian: (guardian: Omit<Guardian, 'id'>) => void;
   onDeleteGuardian: (id: string) => void;
   onUpdateGuardian: (guardian: Guardian) => void;
-  onUpdateEnrollmentClass: (alunoId: string, turmaRegularId: string) => void;
+  onUpdateEnrollmentClass: (alunoId: string, turmaRegularId: string, enrollmentId?: string) => void;
   onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
   onUpdateContraturnoDays?: (alunoId: string, segmentId: string, newDays: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[]) => void;
   onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void | Promise<void>;
@@ -144,7 +144,7 @@ export default function StudentProfile({
   const [editGuardianFinanceiro, setEditGuardianFinanceiro] = useState(false);
 
   // Class override states
-  const [isOverridingClass, setIsOverridingClass] = useState(false);
+  const [overridingEnrollmentId, setOverridingEnrollmentId] = useState<string | null>(null);
   const [overrideClassId, setOverrideClassId] = useState('');
 
   // Vínculo de irmãos
@@ -387,8 +387,7 @@ export default function StudentProfile({
   const turmaCountsRegulares = turmaCatalog.map(cls => {
     const count = filteredStudents.filter(st => {
       if (ehSoContraturno(st)) return false;
-      const age = calculateAgeAtCutoff(st.nascimento, activeYear);
-      return normalizeClassId(getRegularClassForAge(age).id) === normalizeClassId(cls.id);
+      return normalizeClassId(getTurmaDoAno(st, enrollments, classPrices, activeYear).id) === normalizeClassId(cls.id);
     }).length;
     return { ...cls, count };
   });
@@ -402,8 +401,7 @@ export default function StudentProfile({
     : browseTurmaId
     ? filteredStudents.filter(st => {
         if (ehSoContraturno(st)) return false;
-        const age = calculateAgeAtCutoff(st.nascimento, activeYear);
-        return normalizeClassId(getRegularClassForAge(age).id) === normalizeClassId(browseTurmaId);
+        return normalizeClassId(getTurmaDoAno(st, enrollments, classPrices, activeYear).id) === normalizeClassId(browseTurmaId);
       })
     : [];
 
@@ -668,7 +666,7 @@ export default function StudentProfile({
             {studentsToList.map((st) => {
               const isSelected = st.id === selectedStudentId;
               const bAge = calculateAgeAtCutoff(st.nascimento, activeYear);
-              const bClass = getRegularClassForAge(bAge);
+              const bClass = getTurmaDoAno(st, enrollments, classPrices, activeYear);
               return (
                 <div
                   key={st.id}
@@ -1984,11 +1982,12 @@ export default function StudentProfile({
                       const totalBase = regularSubtotal + contraturnoSubtotal + almocoSubtotal;
                       const finalNetValue = totalBase - totalPontualidadeDisc;
 
+                      const isOverridingClass = overridingEnrollmentId === e.id;
                       return (
                         <div key={e.id} className="space-y-3" id="enrollment-summary">
                           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold text-slate-700">Turma de Matrícula</span>
+                              <span className="text-xs font-bold text-slate-700">Turma de Matrícula {e.ano}</span>
                               {!isOverridingClass ? (
                                 <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-md border ${
                                   isOnlyContraturno 
@@ -2004,7 +2003,10 @@ export default function StudentProfile({
                                   className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-md focus:outline-none"
                                 >
                                   <option value="sem_regular">Somente Contraturno (Isento do Regular)</option>
-                                  {(classPrices.length > 0 ? classPrices : REGULAR_CLASSES).map((cls) => (
+                                  {(() => {
+                                    const doAno = classPrices.filter(c => (c.ano || 2026) === e.ano);
+                                    return doAno.length > 0 ? doAno : (classPrices.length > 0 ? classPrices.filter((c, i, arr) => arr.findIndex(x => normalizeClassId(x.id) === normalizeClassId(c.id)) === i) : REGULAR_CLASSES);
+                                  })().map((cls) => (
                                     <option key={cls.id} value={normalizeClassId(cls.id)}>
                                       {cls.nome} (R$ {cls.valorMensal})
                                     </option>
@@ -2015,14 +2017,14 @@ export default function StudentProfile({
                             
                             <div className="flex justify-between items-center pt-1 border-t border-slate-100/60 mt-1">
                               <p className="text-[10px] text-slate-500">
-                                {isOverridingClass ? 'Selecione a nova turma desejada para o aluno.' : 'Determinada automaticamente por idade (ou alterada manualmente).'}
+                                {isOverridingClass ? 'Selecione a nova turma desejada para o aluno.' : (e.turmaDefinidaManualmente ? 'Alterada manualmente pela equipe.' : 'Determinada automaticamente por idade (ou alterada manualmente).')}
                               </p>
                               {!isOverridingClass ? (
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setOverrideClassId(e.turmaRegularId);
-                                    setIsOverridingClass(true);
+                                    setOverridingEnrollmentId(e.id);
                                   }}
                                   className="text-[10px] font-bold text-orange-600 hover:underline flex items-center gap-0.5 bg-transparent border-0 cursor-pointer"
                                 >
@@ -2032,7 +2034,7 @@ export default function StudentProfile({
                                 <div className="flex gap-1.5">
                                   <button
                                     type="button"
-                                    onClick={() => setIsOverridingClass(false)}
+                                    onClick={() => setOverridingEnrollmentId(null)}
                                     className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md"
                                   >
                                     Cancelar
@@ -2040,8 +2042,8 @@ export default function StudentProfile({
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      onUpdateEnrollmentClass(activeStudent.id, overrideClassId);
-                                      setIsOverridingClass(false);
+                                      onUpdateEnrollmentClass(activeStudent.id, overrideClassId, e.id);
+                                      setOverridingEnrollmentId(null);
                                     }}
                                     className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-md"
                                   >

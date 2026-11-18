@@ -1269,34 +1269,49 @@ export default function App() {
   };
 
   // Handler: Change regular class manually (exceptional case)
-  const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
-    const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
+  const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string, enrollmentId?: string) => {
+    // Troca a turma da matrícula ESCOLHIDA (2026, 2027...). Antes estava fixo em 2026, então
+    // aluno novo (só com matrícula 2027) nunca tinha a turma trocada.
+    const alvo = enrollments.find(e => e.id === enrollmentId)
+      || enrollments.find(e => e.alunoId === alunoId && e.ano === activeYear)
+      || enrollments.find(e => e.alunoId === alunoId && e.ano === 2026);
+    if (!alvo) {
+      showToast('Turma não alterada', 'Não achei a matrícula deste aluno.', 'error');
+      return;
+    }
+    const ehSoContraturno = turmaRegularId === 'sem_regular';
+    const match = ehSoContraturno ? undefined : (
+      classPrices.find(c => (c.ano || 2026) === alvo.ano && normalizeClassId(c.id) === normalizeClassId(turmaRegularId))
+      || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId))
+      || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)));
+    const novoId = ehSoContraturno ? 'sem_regular' : (match?.id || turmaRegularId);
     const basePrice = match ? match.valorMensal : 0;
+    const turmaAntiga = classPrices.find(c => c.id === alvo.turmaRegularId)
+      || classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(alvo.turmaRegularId));
 
-    setEnrollments(prev => prev.map(e => {
-      if (e.alunoId === alunoId && e.ano === 2026) {
-        // Re-calculate the discount in Reais if the type is percentage, otherwise it remains fixed in Reais
-        let finalDiscount = e.descontoMensal;
-        if (e.tipoDescontoRegular === 'porcentagem' && e.valorDescontoRegularInput !== undefined) {
-          finalDiscount = Number((basePrice * (e.valorDescontoRegularInput / 100)).toFixed(2));
-        } else {
-          // Cap fixed discount at the new base price
-          finalDiscount = Math.min(e.descontoMensal, basePrice);
-        }
-
-        const finalRegular = Math.max(0, basePrice - finalDiscount);
-        const updatedEnroll = { 
-          ...e, 
-          turmaRegularId,
-          valorRegularOriginal: basePrice,
-          descontoMensal: finalDiscount,
-          valorFinalRegular: finalRegular
-        };
-        saveDocument('enrollments', updatedEnroll);
-        return updatedEnroll;
+    let finalDiscount = alvo.descontoMensal;
+    if (alvo.tipoDescontoRegular === 'porcentagem' && alvo.valorDescontoRegularInput !== undefined) {
+      finalDiscount = Number((basePrice * (alvo.valorDescontoRegularInput / 100)).toFixed(2));
+    } else {
+      finalDiscount = Math.min(alvo.descontoMensal, basePrice);
+    }
+    const updatedEnroll: Enrollment = {
+      ...alvo,
+      turmaRegularId: novoId,
+      valorRegularOriginal: basePrice,
+      descontoMensal: finalDiscount,
+      valorFinalRegular: Math.max(0, basePrice - finalDiscount),
+      turmaDefinidaManualmente: true,
+    };
+    // Aluno novo (a matrícula de 2027 é a base da Carta): a Carta e o contrato acompanham a turma nova.
+    if (alvo.ano >= ANO_CARTA_INTENCAO && !ehSoContraturno) {
+      if (alvo.turmaPropostaId2027 && alvo.turmaPropostaId2027 !== 'sem_regular') updatedEnroll.turmaPropostaId2027 = novoId;
+      if (alvo.valorProposto2027 !== undefined && turmaAntiga && Math.abs(alvo.valorProposto2027 - turmaAntiga.valorMensal) < 0.005) {
+        updatedEnroll.valorProposto2027 = basePrice; // estava sem desconto: segue a tabela da turma nova
       }
-      return e;
-    }));
+    }
+    setEnrollments(prev => prev.map(e => e.id === alvo.id ? updatedEnroll : e));
+    saveDocument('enrollments', updatedEnroll);
 
     // Log financial movement
     const student = students.find(s => s.id === alunoId);
@@ -1306,14 +1321,14 @@ export default function App() {
         alunoId: student.id,
         data: new Date().toISOString().split('T')[0],
         tipo: 'Desconto_Alterado',
-        descricao: `Alteração excepcional de turma regular para: ${match?.nome || 'Desconhecida'} (Mensalidade base ajustada para R$ ${basePrice}).`,
+        descricao: `Alteração excepcional de turma regular (${alvo.ano}) para: ${ehSoContraturno ? 'Somente Contraturno' : (match?.nome || 'Desconhecida')} (Mensalidade base ajustada para R$ ${basePrice}).`,
         valorAnterior: 0,
         valorNovo: 0
       };
       setMovements(prev => [...prev, movement]);
       saveDocument('movements', movement);
     }
-    showToast('Turma Alterada', `A nova turma ${match?.nome || ''} foi atribuída e salva no Firebase.`, 'success');
+    showToast('Turma Alterada', `${ehSoContraturno ? 'Somente Contraturno' : (match?.nome || '')} em ${alvo.ano}, salvo no Firebase. Se o aluno já está na página das famílias, clique de novo em "Página das famílias" (aba Contratos).`, 'success', 8000);
   };
 
   // Handler: Update an existing guardian in place

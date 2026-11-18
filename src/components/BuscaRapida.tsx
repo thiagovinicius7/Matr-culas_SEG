@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Student, Guardian, Enrollment, RegularClass } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic } from '../data';
+import { calculateAgeAtCutoff, getTurmaDoAno } from '../data';
 import { Search, FileText, Calculator, ClipboardList, X } from 'lucide-react';
 
 interface BuscaRapidaProps {
@@ -55,7 +55,7 @@ export default function BuscaRapida({ students, guardians, enrollments, classPri
           {resultados.map(student => {
             const soContraturno = enrollments.some(e => e.alunoId === student.id && e.ano === activeYear && e.turmaRegularId === 'sem_regular');
             const idade = calculateAgeAtCutoff(student.nascimento, activeYear);
-            const turma = soContraturno ? 'Somente Contraturno' : getRegularClassForAgeDynamic(idade, classPrices, activeYear).nome;
+            const turma = soContraturno ? 'Somente Contraturno' : getTurmaDoAno(student, enrollments, classPrices, activeYear).nome;
             return (
               <div key={student.id} className="p-3 space-y-1.5 hover:bg-slate-50/50 transition-colors">
                 <div>
