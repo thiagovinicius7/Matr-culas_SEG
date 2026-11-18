@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Shirt, Plus, Link2, MessageCircle, Lock, Unlock, Loader2, Search, Printer, Download, Trash2, X,
-  CheckCircle2, Truck, Ban, RotateCcw, AlertTriangle, PackageCheck, Save, Receipt, ListChecks, Settings2, FileSpreadsheet, Users,
+  CheckCircle2, Truck, Ban, RotateCcw, AlertTriangle, PackageCheck, Save, Receipt, ListChecks, Settings2, FileSpreadsheet, Users, Upload,
 } from 'lucide-react';
 import { deleteDocument } from '../firebase';
 import { moeda } from '../situacao/situacao';
@@ -10,7 +10,7 @@ import type { ContratoContexto } from '../contratos/montarDados';
 import {
   COL_CATALOGO, ROTULO_SITUACAO, situacaoDoEnvio, listaFornecedor, juntarItens, totalItens, qtdPecas, novoCodigo,
   novoIdCampanha, linkPublicoUniformes, mensagemDivulgacao, telefoneZap, dataHoraBR, separarLista, slug, compararTamanho,
-  parcelasDe, valoresParcelas, valorPago, comParcelasPagas, textoPagamento,
+  parcelasDe, valoresParcelas, valorPago, comParcelasPagas, textoPagamento, compararPagamentos, type MudancaPagamento,
   type PecaCatalogo, type CampanhaUniforme, type PedidoUniformeDoc, type EnvioUniforme, type SituacaoEnvio,
 } from '../uniformes/uniformes';
 import {
@@ -18,7 +18,7 @@ import {
   salvarPedidoAvulso, salvarCampanha, salvarPeca, carregarFamilias, publicarFamilias,
 } from '../uniformes/uniformesDb';
 import { montarFamilias, type FamiliaUniforme } from '../uniformes/familias';
-import { baixarPlanilhaUniformes } from '../uniformes/planilha';
+import { baixarPlanilhaUniformes, lerPagamentosDaPlanilha } from '../uniformes/planilha';
 import SeletorUniformes, { EscolhaPagamento, itensDaSelecao, selecaoIncompleta, type SelecaoUniformes, type CriancaUniforme } from './SeletorUniformes';
 
 type ShowToast = (title: string, description?: string, type?: 'success' | 'error' | 'info', duration?: number) => void;
@@ -81,6 +81,35 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
   const [familias, setFamilias] = useState<{ total: number; semCpf: string[]; quando: string; erro?: boolean } | null>(null);
   const [verSemCpf, setVerSemCpf] = useState(false);
   const [baixando, setBaixando] = useState(false);
+  const [importacao, setImportacao] = useState<{ arquivo: string; mudancas: MudancaPagamento[]; avisos: string[]; iguais: number } | null>(null);
+  const arquivoRef = React.useRef<HTMLInputElement>(null);
+
+  const lerPlanilhaDePagamentos = async (f: File) => {
+    try {
+      const lidas = await lerPagamentosDaPlanilha(f);
+      const r = compararPagamentos(pedidos, lidas);
+      setImportacao({ arquivo: f.name, ...r });
+    } catch (e: any) {
+      showToast('Não foi possível ler a planilha', String(e?.message || e), 'error', 10000);
+    } finally {
+      if (arquivoRef.current) arquivoRef.current.value = '';
+    }
+  };
+
+  const aplicarPagamentos = async () => {
+    if (!importacao) return;
+    setOcupado(true);
+    let ok = 0, falhas = 0;
+    for (const m of importacao.mudancas) {
+      try { await alterarEnvio(m.pedidoId, m.codigo, x => comParcelasPagas(x, m.depois)); ok++; }
+      catch { falhas++; }
+    }
+    setImportacao(null);
+    await carregar();
+    setOcupado(false);
+    showToast(falhas ? 'Pagamentos atualizados com falhas' : 'Pagamentos atualizados',
+      `${ok} ${ok === 1 ? 'pedido atualizado' : 'pedidos atualizados'}${falhas ? ` · ${falhas} não foram gravados, tente de novo` : ''}`, falhas ? 'error' : 'success', 8000);
+  };
 
   /**
    * Publica sozinho o resumo das famílias (CPF de qualquer responsável → nome, telefone, crianças e turma).
@@ -292,6 +321,13 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
               className={`${btnCls} ml-auto mb-1.5 bg-emerald-700 border-emerald-700 text-white hover:bg-emerald-800`}>
               {baixando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Baixar planilha (.xlsx)
             </button>
+            <input ref={arquivoRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) lerPlanilhaDePagamentos(f); }} />
+            <button onClick={() => arquivoRef.current?.click()} disabled={ocupado}
+              title="Lê a aba Pagamentos da planilha (SIM/NÃO) e mostra o que vai mudar antes de gravar"
+              className={`${btnCls} mb-1.5 border-emerald-700 text-emerald-800 hover:bg-emerald-50`}>
+              <Upload size={14} /> Atualizar pagamentos
+            </button>
           </div>
 
           {aba === 'pedidos' && <AbaPedidos linhas={linhas} catalogo={catalogo} campanha={campanha} onMudar={mudarEnvio} onNovo={() => setNovoAberto(true)} />}
@@ -302,6 +338,53 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
       {aba === 'catalogo' && <AbaCatalogo catalogo={catalogo} onSalvo={carregar} showToast={showToast} />}
       {!campanha && campanhas.length === 0 && catalogo.length > 0 && aba !== 'catalogo' && (
         <button onClick={() => setAba('catalogo')} className="text-xs font-bold text-brand-green-light underline">Ver catálogo e preços</button>
+      )}
+
+      {importacao && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto p-4" role="dialog" aria-modal="true" aria-label="Atualizar pagamentos">
+          <div className="bg-white rounded-2xl w-full max-w-2xl my-6 shadow-xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <div>
+                <h3 className="font-display font-bold text-lg text-brand-green-dark">Atualizar pagamentos</h3>
+                <p className="text-xs text-slate-500">{importacao.arquivo} · {importacao.iguais} {importacao.iguais === 1 ? 'pedido igual' : 'pedidos iguais'} ao sistema</p>
+              </div>
+              <button onClick={() => setImportacao(null)} aria-label="Fechar" className="p-1 rounded hover:bg-slate-100"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              {importacao.mudancas.length === 0 ? (
+                <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">Nada para mudar: a planilha está igual ao sistema.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="text-[11px] uppercase tracking-wide text-slate-500 text-left">
+                    <tr><th className="py-1.5">Pedido</th><th className="py-1.5">Responsável</th><th className="py-1.5 text-center">No sistema</th><th className="py-1.5 text-center">Na planilha</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {importacao.mudancas.map(m => (
+                      <tr key={m.codigo}>
+                        <td className="py-1.5 font-mono text-xs font-bold text-slate-600">{m.codigo}</td>
+                        <td className="py-1.5 text-slate-800">{m.responsavel}</td>
+                        <td className="py-1.5 text-center text-slate-500">{m.antes} de {m.n}</td>
+                        <td className={`py-1.5 text-center font-bold ${m.depois > m.antes ? 'text-emerald-700' : 'text-rose-700'}`}>{m.depois} de {m.n}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {importacao.avisos.length > 0 && (
+                <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+                  <div className="font-bold flex items-center gap-1"><AlertTriangle size={13} /> Atenção</div>
+                  {importacao.avisos.map((a, i) => <div key={i}>{a}</div>)}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+              <button onClick={() => setImportacao(null)} className={`${btnCls} border-slate-200 text-slate-600`}>Cancelar</button>
+              <button onClick={aplicarPagamentos} disabled={ocupado || importacao.mudancas.length === 0} className={`${btnCls} bg-brand-green-dark border-brand-green-dark text-white`}>
+                {ocupado ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Aplicar {importacao.mudancas.length} {importacao.mudancas.length === 1 ? 'mudança' : 'mudanças'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {novoAberto && campanha && (

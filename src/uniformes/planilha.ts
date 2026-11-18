@@ -3,17 +3,23 @@
  *  1. Pedidos     — uma linha por peça de cada pedido (com pagamento e situação)
  *  2. Fornecedora — quantidades por peça, cor e tamanho
  *  3. Recibos     — um recibo por família, pronto para imprimir (como a aba RECIBOS_IMPRESSÃO antiga)
+ *  4. Pagamentos  — uma linha por parcela com "Pago?" (SIM/NÃO); a equipe marca e o sistema lê de volta
+ *                   no botão "Atualizar pagamentos" (lerPagamentosDaPlanilha, mais abaixo).
  *
  * Montada à mão com PizZip (já usado nos contratos), sem biblioteca nova.
  */
 import {
-  listaFornecedor, situacaoDoEnvio, ROTULO_SITUACAO, parcelasDe, valorPago, formaPagamento, textoPagamento,
+  valoresParcelas, listaFornecedor, situacaoDoEnvio, ROTULO_SITUACAO, parcelasDe, valorPago, formaPagamento, textoPagamento,
   dataHoraBR, slug, type CampanhaUniforme, type PedidoUniformeDoc, type EnvioUniforme,
 } from './uniformes';
 
 type Cel = string | number | { f: string } | null;
 interface Linha { cels: Cel[]; estilo?: number[] | number; altura?: number }
-interface Aba { nome: string; linhas: Linha[]; larguras: number[]; merges?: string[]; congelar?: number; filtro?: string; retrato?: boolean }
+interface Aba {
+  nome: string; linhas: Linha[]; larguras: number[]; merges?: string[]; congelar?: number; filtro?: string; retrato?: boolean;
+  /** Lista suspensa SIM/NÃO numa faixa (ex.: "I3:I200"), pintada de verde quando SIM. */
+  simNao?: string;
+}
 
 const xml = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 const col = (i: number) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
@@ -44,7 +50,8 @@ const ESTILOS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSh
 <xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 <xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right"/></xf>
-</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+<dxfs count="2"><dxf><font><b/><color rgb="FF065F46"/></font><fill><patternFill><bgColor rgb="FFD1FAE5"/></patternFill></fill></dxf><dxf><font><color rgb="FF92400E"/></font><fill><patternFill><bgColor rgb="FFFEF3C7"/></patternFill></fill></dxf></dxfs></styleSheet>`;
 
 function folha(a: Aba): string {
   const rows = a.linhas.map((l, r) => {
@@ -64,8 +71,12 @@ function folha(a: Aba): string {
     ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${a.congelar}" topLeftCell="A${a.congelar + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
     : `<sheetViews><sheetView workbookViewId="0"/></sheetViews>`;
   const filtro = a.filtro ? `<autoFilter ref="${a.filtro}"/>` : '';
+  const cf = a.simNao
+    ? `<conditionalFormatting sqref="${a.simNao}"><cfRule type="cellIs" dxfId="0" priority="1" operator="equal"><formula>"SIM"</formula></cfRule><cfRule type="cellIs" dxfId="1" priority="2" operator="equal"><formula>"NÃO"</formula></cfRule></conditionalFormatting>`
+      + `<dataValidations count="1"><dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="Use SIM ou NÃO" error="Escolha SIM (pago) ou NÃO (pendente)." sqref="${a.simNao}"><formula1>"SIM,NÃO"</formula1></dataValidation></dataValidations>`
+    : '';
   const merges = a.merges?.length ? `<mergeCells count="${a.merges.length}">${a.merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : '';
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>${pane}${cols}<sheetData>${rows}</sheetData>${filtro}${merges}<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup orientation="${a.retrato ? 'portrait' : 'landscape'}" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>${pane}${cols}<sheetData>${rows}</sheetData>${filtro}${merges}${cf}<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup orientation="${a.retrato ? 'portrait' : 'landscape'}" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 
 async function baixarXlsx(abas: Aba[], nomeArquivo: string) {
@@ -197,5 +208,109 @@ export async function baixarPlanilhaUniformes({ campanha, pedidos, ordemPeca, so
   if (L3.length === 0) L3.push({ cels: ['Nenhum recibo para este lote.'] });
   const aba3: Aba = { nome: 'Recibos', linhas: L3, larguras: [30, 24, 30, 7, 6, 14], merges, retrato: true };
 
-  await baixarXlsx([aba1, aba2, aba3], `Uniformes_${slug(campanha.nome) || 'pedido'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  /* ---------- Aba 4: Pagamentos (uma linha por parcela) ---------- */
+  const cab4 = ['Pedido', 'Responsável', 'Telefone', 'Criança(s)', 'Pagamento', 'Parcela nº', 'De', 'Valor', 'Pago?', 'Data do pagamento', 'Observação'];
+  const L4: Linha[] = [
+    { cels: [`Pagamentos · ${campanha.nome} · marque SIM nas parcelas pagas e use "Atualizar pagamentos" no sistema`], estilo: 5 },
+    { cels: cab4, estilo: 1 },
+  ];
+  for (const { e } of todos) {
+    if (e.cancelado) continue;
+    const { n, pagas } = parcelasDe(e);
+    const criancas = [...new Set(e.itens.map(i => i.crianca))].join(', ');
+    valoresParcelas(e.total, n).forEach((v, k) => {
+      L4.push({
+        cels: [e.codigo, e.responsavel, e.telefone, criancas, formaPagamento(e), k + 1, n, v, k < pagas ? 'SIM' : 'NÃO', '', ''],
+        estilo: [9, 9, 9, 9, 9, 9, 9, 10, 9, 9, 9],
+      });
+    });
+  }
+  const fim4 = L4.length;
+  if (fim4 > 2) {
+    L4.push({ cels: ['', '', '', '', '', '', 'Recebido', { f: `SUMIF(I3:I${fim4},"SIM",H3:H${fim4})` }], estilo: [0, 0, 0, 0, 0, 0, 13, 4] });
+    L4.push({ cels: ['', '', '', '', '', '', 'A receber', { f: `SUMIF(I3:I${fim4},"<>SIM",H3:H${fim4})` }], estilo: [0, 0, 0, 0, 0, 0, 13, 4] });
+  }
+  const aba4: Aba = {
+    nome: 'Pagamentos', linhas: L4, larguras: [10, 30, 16, 34, 13, 10, 5, 12, 8, 16, 30], congelar: 2,
+    filtro: `A2:K${Math.max(fim4, 2)}`, simNao: `I3:I${Math.max(fim4, 3)}`,
+  };
+
+  await baixarXlsx([aba1, aba2, aba3, aba4], `Uniformes_${slug(campanha.nome) || 'pedido'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Leitura da aba "Pagamentos" (para o botão "Atualizar pagamentos")   */
+/* ------------------------------------------------------------------ */
+
+export interface LinhaPagamentoLida { codigo: string; parcela: number; de: number; pago: boolean; linha: number }
+
+const normTxt = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+const ehSim = (v: string) => ['sim', 's', 'x', 'pago', 'paga', 'ok', 'true', 'verdadeiro', '1', 'yes', 'y'].includes(normTxt(v)) || v.includes('✓') || v.includes('✔');
+
+/**
+ * Lê a aba "Pagamentos" de um .xlsx (salvo no Excel, no LibreOffice ou baixado do Google Planilhas).
+ * Acha as colunas pelo nome do cabeçalho (Pedido, Parcela nº, Pago?), então não importa se a ordem mudou.
+ */
+export async function lerPagamentosDaPlanilha(arquivo: File): Promise<LinhaPagamentoLida[]> {
+  const { default: PizZip } = await import('pizzip');
+  let zip: InstanceType<typeof PizZip>;
+  try { zip = new PizZip(await arquivo.arrayBuffer()); }
+  catch { throw new Error('O arquivo não é uma planilha .xlsx. No Google Planilhas use Arquivo → Fazer download → Microsoft Excel (.xlsx).'); }
+  const ler = (caminho: string) => zip.file(caminho)?.asText() || '';
+  const parse = (txt: string) => new DOMParser().parseFromString(txt, 'application/xml');
+  const porTag = (d: Document | Element, tag: string) => Array.from(d.getElementsByTagNameNS('*', tag));
+
+  // 1. Acha a aba "Pagamentos" (ou qualquer uma com "pagamento" no nome).
+  const wb = parse(ler('xl/workbook.xml'));
+  const abas = porTag(wb, 'sheet');
+  const aba = abas.find(s => normTxt(s.getAttribute('name') || '') === 'pagamentos') || abas.find(s => normTxt(s.getAttribute('name') || '').includes('pagamento'));
+  if (!aba) throw new Error('Não achei a aba "Pagamentos" nesta planilha. Use a planilha baixada pelo botão "Baixar planilha (.xlsx)".');
+  const rid = aba.getAttribute('r:id') || aba.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') || '';
+  const rels = parse(ler('xl/_rels/workbook.xml.rels'));
+  const alvo = porTag(rels, 'Relationship').find(r => r.getAttribute('Id') === rid)?.getAttribute('Target') || '';
+  const caminho = alvo.startsWith('/') ? alvo.slice(1) : `xl/${alvo.replace(/^\.\//, '')}`;
+  const folhaXml = ler(caminho);
+  if (!folhaXml) throw new Error('Não consegui abrir a aba "Pagamentos".');
+
+  // 2. Textos compartilhados (o Excel guarda os textos à parte quando salva).
+  const compartilhados = porTag(parse(ler('xl/sharedStrings.xml') || '<sst/>'), 'si').map(si => porTag(si, 't').map(t => t.textContent || '').join(''));
+
+  // 3. Lê as células linha a linha.
+  const colIdx = (ref: string) => { const l = (ref.match(/^[A-Z]+/) || ['A'])[0]; let n = 0; for (const ch of l) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+  const linhas: { r: number; vals: string[] }[] = [];
+  for (const row of porTag(parse(folhaXml), 'row')) {
+    const vals: string[] = [];
+    for (const c of porTag(row, 'c')) {
+      const t = c.getAttribute('t');
+      const v = porTag(c, 'v')[0]?.textContent ?? '';
+      let txt = v;
+      if (t === 's') txt = compartilhados[Number(v)] ?? '';
+      else if (t === 'inlineStr') txt = porTag(c, 't').map(x => x.textContent || '').join('');
+      else if (t === 'b') txt = v === '1' ? 'TRUE' : 'FALSE';
+      vals[colIdx(c.getAttribute('r') || 'A1')] = txt.trim();
+    }
+    linhas.push({ r: Number(row.getAttribute('r')) || linhas.length + 1, vals });
+  }
+
+  // 4. Cabeçalho e colunas.
+  const iCab = linhas.findIndex(l => l.vals.some(v => normTxt(v || '') === 'pedido') && l.vals.some(v => normTxt(v || '').startsWith('pago')));
+  if (iCab < 0) throw new Error('Não achei o cabeçalho (Pedido … Pago?) na aba "Pagamentos".');
+  const cab = linhas[iCab].vals.map(v => normTxt(v || ''));
+  const cPed = cab.indexOf('pedido');
+  const cPar = cab.findIndex(v => v.startsWith('parcela'));
+  const cDe = cab.indexOf('de');
+  const cPago = cab.findIndex(v => v.startsWith('pago'));
+  if (cPar < 0) throw new Error('Falta a coluna "Parcela nº" na aba "Pagamentos".');
+
+  const out: LinhaPagamentoLida[] = [];
+  for (const l of linhas.slice(iCab + 1)) {
+    const codigo = (l.vals[cPed] || '').toUpperCase().replace(/\s/g, '');
+    if (!/^U-[A-Z0-9]{4,}$/.test(codigo)) continue; // linhas de total e em branco
+    const parcela = Math.round(Number((l.vals[cPar] || '').replace(',', '.')));
+    if (!(parcela >= 1)) continue;
+    out.push({ codigo, parcela, de: Math.round(Number(l.vals[cDe] || 0)) || 0, pago: ehSim(l.vals[cPago] || ''), linha: l.r });
+  }
+  if (out.length === 0) throw new Error('A aba "Pagamentos" não tem nenhuma linha de pedido.');
+  return out;
 }

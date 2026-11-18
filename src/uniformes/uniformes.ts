@@ -311,3 +311,57 @@ export const telefoneZap = (t: string) => {
 
 export const dataHoraBR = (iso?: string) =>
   iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+/* ------------------------------------------------------------------ */
+/* Atualizar pagamentos a partir da planilha                           */
+/* ------------------------------------------------------------------ */
+
+export interface MudancaPagamento {
+  pedidoId: string;
+  codigo: string;
+  responsavel: string;
+  n: number;
+  antes: number;
+  depois: number;
+}
+
+/**
+ * Compara o que está marcado na aba "Pagamentos" com o sistema.
+ * O número de parcelas pagas passa a ser a quantidade de linhas com SIM daquele pedido.
+ * Pedidos que não aparecem na planilha não mudam.
+ */
+export function compararPagamentos(
+  pedidos: PedidoUniformeDoc[],
+  lidas: { codigo: string; parcela: number; pago: boolean; linha: number }[],
+): { mudancas: MudancaPagamento[]; avisos: string[]; iguais: number } {
+  const porCodigo = new Map<string, { pedido: PedidoUniformeDoc; envio: EnvioUniforme }>();
+  for (const p of pedidos) for (const e of p.envios) porCodigo.set(e.codigo.toUpperCase(), { pedido: p, envio: e });
+
+  const grupos = new Map<string, typeof lidas>();
+  for (const l of lidas) {
+    if (!grupos.has(l.codigo)) grupos.set(l.codigo, []);
+    grupos.get(l.codigo)!.push(l);
+  }
+
+  const mudancas: MudancaPagamento[] = [];
+  const avisos: string[] = [];
+  let iguais = 0;
+  for (const [codigo, linhas] of grupos) {
+    const achado = porCodigo.get(codigo);
+    if (!achado) { avisos.push(`${codigo} (linha ${linhas[0].linha}): pedido não encontrado no sistema; ignorado.`); continue; }
+    const { pedido, envio } = achado;
+    if (envio.cancelado) { avisos.push(`${codigo}: o pedido está cancelado no sistema; ignorado.`); continue; }
+    const { n, pagas } = parcelasDe(envio);
+    const foraDoLimite = linhas.filter(l => l.parcela > n);
+    if (foraDoLimite.length) avisos.push(`${codigo}: a planilha tem parcela ${foraDoLimite.map(l => l.parcela).join(', ')}, mas o pedido é em ${n}x; essas linhas foram ignoradas.`);
+    const marcadas = new Set(linhas.filter(l => l.pago && l.parcela <= n).map(l => l.parcela));
+    const depois = marcadas.size;
+    const emOrdem = [...marcadas].every(k => k <= depois);
+    if (!emOrdem) avisos.push(`${codigo}: parcelas marcadas fora de ordem (${[...marcadas].sort().join(', ')}); conta como ${depois} de ${n} pagas.`);
+    if (depois === pagas) { iguais++; continue; }
+    if (depois < pagas) avisos.push(`${codigo}: a planilha tem menos parcelas pagas (${depois}) do que o sistema (${pagas}). Confira antes de aplicar.`);
+    mudancas.push({ pedidoId: pedido.id, codigo: envio.codigo, responsavel: envio.responsavel, n, antes: pagas, depois });
+  }
+  mudancas.sort((a, b) => a.responsavel.localeCompare(b.responsavel, 'pt-BR'));
+  return { mudancas, avisos, iguais };
+}
