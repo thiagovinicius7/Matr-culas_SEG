@@ -265,6 +265,23 @@ service cloud.firestore {
       allow write: if isEquipe();
     }
 
+    // Propostas de atualização do catálogo, enviadas pelo formulário público. Quem recebe o link
+    // só consegue CRIAR uma proposta nova; ler, aplicar e descartar é só da equipe.
+    match /uniformeCatalogoPropostas/{propostaId} {
+      allow read, update, delete: if isEquipe();
+      allow create: if isEquipe() || (
+        isSignedIn()
+        && propostaId.matches('^prop-[a-z0-9-]{4,60}$')
+        && request.resource.data.keys().hasOnly(['id', 'criadaEm', 'nome', 'contato', 'obsGeral', 'pecas', 'status'])
+        && request.resource.data.id == propostaId
+        && request.resource.data.status == 'nova'
+        && request.resource.data.nome is string && request.resource.data.nome.size() > 0 && request.resource.data.nome.size() <= 120
+        && request.resource.data.contato is string && request.resource.data.contato.size() <= 60
+        && request.resource.data.obsGeral is string && request.resource.data.obsGeral.size() <= 2000
+        && request.resource.data.pecas is list && request.resource.data.pecas.size() > 0 && request.resource.data.pecas.size() <= 60
+      );
+    }
+
     match /uniformeCampanhas/{campanhaId} {
       allow read: if isSignedIn();
       allow write: if isEquipe();

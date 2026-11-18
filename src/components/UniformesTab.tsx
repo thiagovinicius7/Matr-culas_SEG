@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Shirt, Plus, Link2, MessageCircle, Lock, Unlock, Loader2, Search, Printer, Download, Trash2, X,
-  CheckCircle2, Truck, Ban, RotateCcw, AlertTriangle, PackageCheck, Save, Receipt, ListChecks, Settings2, FileSpreadsheet, Users, Upload,
+  CheckCircle2, Truck, Ban, RotateCcw, AlertTriangle, PackageCheck, Save, Receipt, ListChecks, Settings2, FileSpreadsheet, Users, Upload, Inbox,
 } from 'lucide-react';
-import { deleteDocument } from '../firebase';
+import { deleteDocument, getCollectionData } from '../firebase';
 import { moeda } from '../situacao/situacao';
 import type { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
 import type { ContratoContexto } from '../contratos/montarDados';
@@ -19,6 +19,10 @@ import {
 } from '../uniformes/uniformesDb';
 import { montarFamilias, type FamiliaUniforme } from '../uniformes/familias';
 import { baixarPlanilhaUniformes, lerPagamentosDaPlanilha } from '../uniformes/planilha';
+import {
+  COL_PROPOSTAS, diferencas, aplicarProposta, descartarProposta, linkFormularioCatalogo, mensagemFormularioCatalogo,
+  type PropostaCatalogo,
+} from '../uniformes/catalogoPropostas';
 import SeletorUniformes, { EscolhaPagamento, itensDaSelecao, selecaoIncompleta, type SelecaoUniformes, type CriancaUniforme } from './SeletorUniformes';
 
 type ShowToast = (title: string, description?: string, type?: 'success' | 'error' | 'info', duration?: number) => void;
@@ -74,6 +78,7 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
   const [catalogo, setCatalogo] = useState<PecaCatalogo[]>([]);
   const [campanhas, setCampanhas] = useState<CampanhaUniforme[]>([]);
   const [pedidos, setPedidos] = useState<PedidoUniformeDoc[]>([]);
+  const [propostas, setPropostas] = useState<PropostaCatalogo[]>([]);
   const [campanhaId, setCampanhaId] = useState('');
   const [aba, setAba] = useState<Aba>('pedidos');
   const [novoAberto, setNovoAberto] = useState(false);
@@ -134,6 +139,10 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
     try {
       const [cat, camp, ped] = await Promise.all([carregarCatalogo(), carregarCampanhas(), carregarPedidos()]);
       setCatalogo(cat); setCampanhas(camp); setPedidos(ped);
+      // Propostas do formulário de catálogo (se as regras ainda não foram publicadas, só não aparecem).
+      getCollectionData<PropostaCatalogo>(COL_PROPOSTAS)
+        .then(ps => setPropostas(ps.sort((a, b) => b.criadaEm.localeCompare(a.criadaEm))))
+        .catch(() => setPropostas([]));
       setCampanhaId(atual => (atual && camp.some(c => c.id === atual)) ? atual : (camp.find(c => c.aberta)?.id || camp[0]?.id || ''));
     } catch {
       showToast('Não foi possível carregar os uniformes', 'Confira se as regras do Firestore com o bloco UNIFORMES foram publicadas no Firebase Console.', 'error', 10000);
@@ -305,6 +314,9 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
               <button key={id} onClick={() => setAba(id)}
                 className={`px-4 py-2.5 text-xs font-bold flex items-center gap-1.5 border-b-2 -mb-px ${aba === id ? 'border-brand-orange text-brand-green-dark' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                 <Ic size={14} /> {rot}
+                {id === 'catalogo' && propostas.some(p => p.status === 'nova') && (
+                  <span className="ml-1 text-[10px] font-black bg-brand-orange text-white rounded-full px-1.5 py-0.5">{propostas.filter(p => p.status === 'nova').length}</span>
+                )}
               </button>
             ))}
             <button onClick={async () => {
@@ -335,7 +347,7 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
           {aba === 'recibos' && <AbaRecibos linhas={linhas} campanha={campanha} showToast={showToast} onMudar={mudarEnvio} />}
         </>
       )}
-      {aba === 'catalogo' && <AbaCatalogo catalogo={catalogo} onSalvo={carregar} showToast={showToast} />}
+      {aba === 'catalogo' && <AbaCatalogo catalogo={catalogo} propostas={propostas} onSalvo={carregar} showToast={showToast} />}
       {!campanha && campanhas.length === 0 && catalogo.length > 0 && aba !== 'catalogo' && (
         <button onClick={() => setAba('catalogo')} className="text-xs font-bold text-brand-green-light underline">Ver catálogo e preços</button>
       )}
@@ -771,7 +783,7 @@ const paraEdit = (p: PecaCatalogo): PecaEdit => ({
   preco: String(p.preco).replace('.', ','), ativo: p.ativo, ordem: p.ordem, obs: p.obs || '',
 });
 
-function AbaCatalogo({ catalogo, onSalvo, showToast }: { catalogo: PecaCatalogo[]; onSalvo: () => Promise<void>; showToast: ShowToast }) {
+function AbaCatalogo({ catalogo, propostas, onSalvo, showToast }: { catalogo: PecaCatalogo[]; propostas: PropostaCatalogo[]; onSalvo: () => Promise<void>; showToast: ShowToast }) {
   const [linhas, setLinhas] = useState<PecaEdit[]>(() => catalogo.map(paraEdit));
   const [salvando, setSalvando] = useState<string>('');
   useEffect(() => { setLinhas(catalogo.map(paraEdit)); }, [catalogo]);
@@ -808,7 +820,8 @@ function AbaCatalogo({ catalogo, onSalvo, showToast }: { catalogo: PecaCatalogo[
   }]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <PropostasCatalogo catalogo={catalogo} propostas={propostas} onSalvo={onSalvo} showToast={showToast} />
       <p className="text-xs text-slate-500">Cores e tamanhos separados por vírgula. Mudar o preço vale só para os pedidos novos; os já feitos ficam com o preço da época.</p>
       <div className="space-y-2">
         {linhas.map(l => (
@@ -830,6 +843,97 @@ function AbaCatalogo({ catalogo, onSalvo, showToast }: { catalogo: PecaCatalogo[
         ))}
       </div>
       <button onClick={nova} className={`${btnCls} border-slate-300 text-slate-700 hover:bg-slate-50`}><Plus size={14} /> Nova peça</button>
+    </div>
+  );
+}
+
+/** Formulário para mandar a quem cuida dos uniformes + propostas recebidas por ele. */
+function PropostasCatalogo({ catalogo, propostas, onSalvo, showToast }: {
+  catalogo: PecaCatalogo[]; propostas: PropostaCatalogo[]; onSalvo: () => Promise<void>; showToast: ShowToast;
+}) {
+  const [verResolvidas, setVerResolvidas] = useState(false);
+  const [ocupado, setOcupado] = useState('');
+  const novas = propostas.filter(p => p.status === 'nova');
+  const resolvidas = propostas.filter(p => p.status !== 'nova');
+  const visiveis = verResolvidas ? propostas : novas;
+
+  const aplicar = async (p: PropostaCatalogo) => {
+    if (!window.confirm(`Aplicar no catálogo as mudanças enviadas por ${p.nome}? Os pedidos já feitos não mudam.`)) return;
+    setOcupado(p.id);
+    try { const n = await aplicarProposta(catalogo, p); await onSalvo(); showToast('Catálogo atualizado', `${n} ${n === 1 ? 'peça alterada' : 'peças alteradas'}`, 'success'); }
+    catch { showToast('Não foi possível aplicar', undefined, 'error'); }
+    finally { setOcupado(''); }
+  };
+  const descartar = async (p: PropostaCatalogo) => {
+    if (!window.confirm(`Descartar a proposta de ${p.nome}? O catálogo não muda.`)) return;
+    setOcupado(p.id);
+    try { await descartarProposta(p); await onSalvo(); } catch { showToast('Não foi possível descartar', undefined, 'error'); }
+    finally { setOcupado(''); }
+  };
+
+  const ROT_TIPO = { nova: ['Peça nova', 'bg-emerald-100 text-emerald-800'], alterada: ['Alterada', 'bg-sky-100 text-sky-800'], retirada: ['Sai de venda', 'bg-rose-100 text-rose-800'], volta: ['Volta a vender', 'bg-emerald-100 text-emerald-800'] } as const;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5"><Inbox size={15} /> Formulário de atualização do catálogo</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Mande o link para quem cuida dos uniformes (ex.: a fornecedora). O que for enviado aparece aqui para conferir antes de entrar no catálogo.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => copiar(linkFormularioCatalogo(), showToast, 'Link do formulário copiado')} className={`${btnCls} border-slate-200 text-slate-700 hover:bg-slate-50`}><Link2 size={14} /> Copiar link</button>
+          <button onClick={() => copiar(mensagemFormularioCatalogo(linkFormularioCatalogo()), showToast, 'Mensagem copiada')} className={`${btnCls} border-slate-200 text-slate-700 hover:bg-slate-50`}><MessageCircle size={14} /> Mensagem para o WhatsApp</button>
+        </div>
+      </div>
+
+      {novas.length === 0 && !verResolvidas && <p className="text-xs text-slate-500">Nenhuma proposta nova.</p>}
+
+      {visiveis.map(p => {
+        const difs = diferencas(catalogo, p);
+        return (
+          <div key={p.id} className={`rounded-lg border p-3 space-y-2 ${p.status === 'nova' ? 'border-brand-orange/50 bg-orange-50/40' : 'border-slate-200 opacity-70'}`}>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="text-sm font-bold text-slate-800">{p.nome}{p.contato ? <span className="font-normal text-slate-500"> · {p.contato}</span> : null}</div>
+                <div className="text-[11px] text-slate-500">Enviada em {dataHoraBR(p.criadaEm)}{p.status !== 'nova' ? ` · ${p.status === 'aplicada' ? 'aplicada' : 'descartada'} em ${dataHoraBR(p.resolvidaEm)}` : ''}</div>
+              </div>
+              {p.status === 'nova' && (
+                <div className="flex gap-2">
+                  <button onClick={() => descartar(p)} disabled={!!ocupado} className={`${btnCls} border-slate-200 text-slate-600 hover:bg-slate-50`}><X size={14} /> Descartar</button>
+                  <button onClick={() => aplicar(p)} disabled={!!ocupado || difs.length === 0} className={`${btnCls} bg-brand-green-dark border-brand-green-dark text-white`}>
+                    {ocupado === p.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Aplicar no catálogo
+                  </button>
+                </div>
+              )}
+            </div>
+            {p.obsGeral && <p className="text-xs text-slate-700 bg-white border border-slate-200 rounded p-2 whitespace-pre-line"><strong>Observações:</strong> {p.obsGeral}</p>}
+            {difs.length === 0 ? (
+              <p className="text-xs text-slate-500">Nenhuma diferença em relação ao catálogo atual.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {difs.map(d => (
+                  <li key={d.pecaId} className="text-xs bg-white border border-slate-200 rounded p-2">
+                    <div className="flex items-center gap-2"><strong className="text-slate-800">{d.nome}</strong><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${ROT_TIPO[d.tipo][1]}`}>{ROT_TIPO[d.tipo][0]}</span></div>
+                    {d.itens.map((it, i) => (
+                      <div key={i} className="text-slate-600 mt-0.5">
+                        <span className="text-slate-500">{it.campo}:</span>{' '}
+                        {it.antes && <><span className="line-through text-slate-400">{it.antes}</span> → </>}
+                        <span className="font-semibold text-slate-800">{it.depois || '(vazio)'}</span>
+                      </div>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+
+      {resolvidas.length > 0 && (
+        <button onClick={() => setVerResolvidas(v => !v)} className="text-xs font-bold text-brand-green-light underline">
+          {verResolvidas ? 'Esconder propostas já resolvidas' : `Ver ${resolvidas.length} ${resolvidas.length === 1 ? 'proposta já resolvida' : 'propostas já resolvidas'}`}
+        </button>
+      )}
     </div>
   );
 }

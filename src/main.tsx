@@ -4,6 +4,7 @@ import App from './App.tsx';
 import VivenciaPublica from './components/VivenciaPublica';
 import SituacaoMatriculaPublica from './components/SituacaoMatriculaPublica';
 import UniformesPublica from './components/UniformesPublica';
+import CatalogoUniformesPublica from './components/CatalogoUniformesPublica';
 import './index.css';
 
 // Link público das Vivências (?vivencias=1 ou ?vivencia=<id>): abre uma página
@@ -16,9 +17,11 @@ const ehVivencia = !!vivenciaId || params.get('vivencias') === '1';
 const ehSituacao = params.get('situacao') === '1';
 // Link público do pedido de uniformes (?uniformes=1): a família pede pelo CPF do responsável financeiro.
 const ehUniformes = params.get('uniformes') === '1';
+// Formulário público para atualizar o catálogo de uniformes (?catalogoUniformes=1): vira uma proposta para a equipe aplicar.
+const ehCatalogoUniformes = params.get('catalogoUniformes') === '1';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {ehUniformes ? <UniformesPublica /> : ehSituacao ? <SituacaoMatriculaPublica /> : ehVivencia ? <VivenciaPublica vivenciaIdInicial={vivenciaId} /> : <App />}
+    {ehCatalogoUniformes ? <CatalogoUniformesPublica /> : ehUniformes ? <UniformesPublica /> : ehSituacao ? <SituacaoMatriculaPublica /> : ehVivencia ? <VivenciaPublica vivenciaIdInicial={vivenciaId} /> : <App />}
   </StrictMode>,
 );
