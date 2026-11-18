@@ -779,7 +779,7 @@ export function getAlunosDoAno(
   const classes = classPrices.length > 0 ? classPrices : REGULAR_CLASSES;
   return ativos.filter(s => {
     const e = doAno.find(x => x.alunoId === s.id);
-    if (!e || e.statusNegociacao === 'Cancelada' || e.quaseMatricula) return false; // "quase" fica fora das turmas e totais
+    if (!e || e.statusNegociacao === 'Cancelada') return false; // "quase" continua no total; sai só das turmas (Dashboard)
     const anterior = enrollments.find(x => x.alunoId === s.id && x.ano === ano - 1);
     if (anterior?.turmaRegularId && anterior.turmaRegularId !== 'sem_regular' && anterior.statusNegociacao !== 'Cancelada') {
       const turmaAnterior =
@@ -791,7 +791,7 @@ export function getAlunosDoAno(
   });
 }
 
-/** Alunos marcados como "Quase" no ano: não são perda, mas ficam fora das turmas e dos totais. */
+/** Alunos marcados como "Quase perdido" no ano: continuam no total, mas não ocupam vaga nas turmas. */
 export function getAlunosQuaseDoAno(students: Student[], enrollments: Enrollment[], ano: number): Student[] {
   return students.filter(s => s.status === 'ativo' && enrollments.some(
     e => e.alunoId === s.id && e.ano === ano && e.quaseMatricula && e.statusNegociacao !== 'Cancelada'

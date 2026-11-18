@@ -117,7 +117,7 @@ export default function Dashboard({
     const targetClassId = normalizeClassId(selectedClassForModal.id);
 
     return students
-      .filter(student => idsDoAno.has(student.id))
+      .filter(student => idsDoAno.has(student.id) && !ehQuaseNoAno(student.id))
       .filter(student => getStudentClassId(student) === targetClassId)
       .map(student => {
         const e = enrollments.find(e => e.alunoId === student.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === student.id) || {
@@ -148,8 +148,10 @@ export default function Dashboard({
   // Map of student counts per normalized class ID — só conta alunos ATIVOS;
   // quem foi cancelado ou trancado sai da contagem/lista de vagas ocupadas
   // e fica só no histórico como ex-aluno.
+  // "Quase perdidos" continuam no total geral, mas não ocupam vaga nas turmas.
+  const ehQuaseNoAno = (alunoId: string) => !!enrollments.find(e => e.alunoId === alunoId && e.ano === activeYear)?.quaseMatricula;
   const studentCountByClassId: Record<string, number> = {};
-  alunosDoAno.forEach(student => {
+  alunosDoAno.filter(s => !ehQuaseNoAno(s.id)).forEach(student => {
     const classId = getStudentClassId(student);
     studentCountByClassId[classId] = (studentCountByClassId[classId] || 0) + 1;
   });
@@ -178,7 +180,7 @@ export default function Dashboard({
   });
   const pendentesSoContraturno = pendentesAlunos.filter(isSoContraturno).length;
 
-  // "Quase": não é perda, mas fica fora das turmas e dos totais
+  // "Quase perdido": continua no total geral, mas não ocupa vaga nas turmas
   const alunosQuase = getAlunosQuaseDoAno(students, enrollments, activeYear);
   const alternarQuase = (alunoId: string) => {
     if (!onSaveEnrollment) return;
@@ -201,9 +203,9 @@ export default function Dashboard({
   const naoRenovam = students
     .filter(s => s.status === 'ativo' && !idsAtivosDoAno.has(s.id))
     .filter(s => getCartaIntencaoInfo(s.id, enrollments).estado === 'nao_renova');
-  // Os "quase" saíram dos totais, mas continuam no quadro das Cartas (subtópico de "Aguardando retorno")
+  // Os "quase perdidos" ficam num subtópico próprio de "Aguardando retorno" no quadro das Cartas
   const idsQuase = new Set(alunosQuase.map(s => s.id));
-  const cartaPorAluno = [...activeStudents, ...naoRenovam.filter(s => !idsQuase.has(s.id)), ...alunosQuase].map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
+  const cartaPorAluno = [...activeStudents, ...naoRenovam.filter(s => !idsQuase.has(s.id))].map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
   const idsCartaTodos = (estados: CartaEstado[]) => cartaPorAluno.filter(c => estados.includes(c.estado)).map(c => c.id);
   const idsCarta = (estados: CartaEstado[]) => idsCartaTodos(estados).filter(id => !idsQuase.has(id));
   const cartaIds = {
@@ -462,7 +464,7 @@ export default function Dashboard({
               <p
                 onClick={(ev) => { ev.stopPropagation(); setSelectedFaseForModal({ label: `Cartas ${anoCarta} — Quase perdidos`, emoji: '🤏', alunoIds: alunosQuase.map(s => s.id) }); }}
                 className="text-[10px] text-amber-700 mt-0.5 hover:underline"
-              >+ {alunosQuase.length} quase perdido{alunosQuase.length === 1 ? '' : 's'} (fora do total)</p>
+              >inclui {alunosQuase.length} quase perdido{alunosQuase.length === 1 ? '' : 's'} (fora das turmas)</p>
             )}
           </div>
         </motion.div>
@@ -543,6 +545,9 @@ export default function Dashboard({
             <p className="text-[10px] text-slate-500 mt-0.5">
               <strong className="text-slate-700">{pending - pendentesSoContraturno}</strong> matrícula regular + <strong className="text-slate-700">{pendentesSoContraturno}</strong> só contraturno
             </p>
+            {pendentesAlunos.filter(s => idsQuase.has(s.id)).length > 0 && (
+              <p className="text-[10px] text-amber-700 mt-0.5">inclui {pendentesAlunos.filter(s => idsQuase.has(s.id)).length} quase perdido(s)</p>
+            )}
             <p className="text-[10px] text-slate-400 mt-0.5">{confirmed} + {negotiating} + {pending} = {totalStudentsCount} alunos</p>
           </div>
         </motion.div>
@@ -783,7 +788,7 @@ export default function Dashboard({
                       <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
                     </button>
                   ))}
-                  {/* Aguardando retorno + subtópico "quase perdidos" (fora dos totais; dá para retomar) */}
+                  {/* Aguardando retorno + subtópico "quase perdidos" (fora das turmas; dá para retomar) */}
                   <div className="bg-white rounded border border-amber-200/60 shadow-2xs overflow-hidden flex flex-col">
                     <button
                       type="button"
@@ -798,7 +803,7 @@ export default function Dashboard({
                       type="button"
                       onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — Quase perdidos`, emoji: '🤏', alunoIds: cartaIds.quase })}
                       className="px-1.5 py-1 border-t border-amber-100 bg-amber-50/70 hover:bg-amber-100 cursor-pointer text-[9px] font-bold text-amber-800 leading-tight"
-                      title="Alunos marcados como quase perdidos — fora das turmas e dos totais. Clique para ver e retomar."
+                      title="Alunos marcados como quase perdidos — contam no total, mas não ocupam vaga nas turmas. Clique para ver e retomar."
                     >
                       🤏 Quase perdidos: <span className="font-mono">{cartaIds.quase.length}</span>
                     </button>
@@ -1144,7 +1149,7 @@ export default function Dashboard({
                                 alternarQuase(id);
                                 setSelectedFaseForModal(m => m ? { ...m, alunoIds: m.alunoIds.filter(x => x !== id) } : m);
                               }}
-                              title="A família resolveu voltar: o aluno volta para a turma e para os totais"
+                              title="A família resolveu voltar: o aluno volta a ocupar vaga na turma"
                               className="mr-2 shrink-0 text-[11px] font-bold px-2 py-1 rounded border bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 cursor-pointer"
                             >
                               ↩ Retomar
@@ -1154,7 +1159,7 @@ export default function Dashboard({
                         return (
                           <button
                             onClick={() => alternarQuase(id)}
-                            title={ehQuase ? 'Tirar do "Quase" e voltar a contar na turma e nos totais' : 'Marcar como "Quase": não é perda, mas sai da turma e dos totais'}
+                            title={ehQuase ? 'Tirar de quase perdido e voltar a ocupar vaga na turma' : 'Marcar como quase perdido: continua no total, mas sai da turma (libera a vaga)'}
                             className={`mr-2 shrink-0 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${ehQuase ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-700'}`}
                           >
                             {ehQuase ? '🤏 Quase perdido ✓' : '🤏 Quase perdido'}
