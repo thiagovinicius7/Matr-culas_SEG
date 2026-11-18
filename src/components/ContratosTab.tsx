@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice, ContratoDoc, ContratoModelo, StatusContrato } from '../types';
 import { ANO_CARTA_INTENCAO, TAXA_MATERIAL_2027, calculateAgeAtCutoff, getRegularClassForAgeDynamic } from '../data';
 import { getCollectionData, saveDocument, deleteDocument, proximoNumeroContrato } from '../firebase';
-import { montarSituacoes, mesmoConteudo, COLECAO_SITUACAO } from '../situacao/situacao';
+import { montarSituacoes, mesmoConteudo, COLECAO_SITUACAO, percentualDescontoJaneiro, camposDescontoJaneiro, dividirJaneiro, PERCENTUAL_DESCONTO_JANEIRO } from '../situacao/situacao';
 import type { SituacaoDoc } from '../situacao/situacao';
 import { imprimirListaNovembro, baixarExcelNovembro } from '../situacao/listaNovembro';
 import {
@@ -28,6 +28,7 @@ interface ContratosTabProps {
   contraturnos: ContraturnoSegment[];
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
+  onSaveEnrollment?: (e: Enrollment, logMovement?: boolean) => Promise<void> | void;
   showToast: ShowToast;
 }
 
@@ -60,7 +61,7 @@ const ddmm = (iso?: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` :
 const numTexto = (d?: ContratoDoc) => (d?.numero ? `${d.numero}/${ANO}` : '');
 const snapshot = (d: ContratoDoc) => ({ status: d.status as StatusContrato, versao: d.versao, geradoEm: d.geradoEm, enviadoEm: d.enviadoEm, assinadoEm: d.assinadoEm });
 
-export default function ContratosTab({ students, guardians, enrollments, contraturnos, classPrices, contraturnoPrices, showToast }: ContratosTabProps) {
+export default function ContratosTab({ students, guardians, enrollments, contraturnos, classPrices, contraturnoPrices, onSaveEnrollment, showToast }: ContratosTabProps) {
   const [docs, setDocs] = useState<ContratoDoc[]>([]);
   const docsRef = useRef<ContratoDoc[]>([]);
   const [modelos, setModelos] = useState<ContratoModelo[]>([]);
@@ -97,6 +98,18 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
   };
   const docDe = (alunoId: string, tipo: TipoContrato) => docs.find(d => d.id === idDoc(alunoId, tipo));
   const statusDe = (alunoId: string, tipo: TipoContrato): StatusContrato => docDe(alunoId, tipo)?.status || 'nao_gerado';
+
+  // ---------- desconto de janeiro (por criança) ----------
+  const salvarDescontoJaneiro = async (l: Linha, percentual: number) => {
+    if (!onSaveEnrollment) return;
+    const pct = Math.min(100, Math.max(0, Math.round(percentual * 100) / 100));
+    try {
+      await onSaveEnrollment({ ...l.carta.base, ...camposDescontoJaneiro(pct) }, false);
+      showToast('Desconto de janeiro salvo', `${l.aluno.nome.split(' ')[0]}: ${pct > 0 ? `${String(pct).replace('.', ',')}%` : 'sem desconto'}. Clique em "Página das famílias" para a família ver.`, 'success', 6000);
+    } catch (e: any) {
+      showToast('Não foi possível salvar o desconto', String(e?.message || e), 'error', 8000);
+    }
+  };
 
   // ---------- página pública "Situação da matrícula" ----------
   const [publicando, setPublicando] = useState(false);
@@ -443,7 +456,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
             <button onClick={async () => { try { await navigator.clipboard.writeText(LINK_SITUACAO); showToast('Link copiado', 'Cole no WhatsApp das famílias.', 'success'); } catch { showToast('Copie manualmente', LINK_SITUACAO, 'error', 9000); } }}
               className="px-3 py-1.5 rounded bg-brand-green-dark text-white font-bold flex items-center gap-1"><Copy size={12} /> Copiar</button>
           </div>
-          {relatorioPublicacao.semDesconto.length > 0 && <p><strong>Sem desconto de 50% (desmarcado na tela de matrícula):</strong> {relatorioPublicacao.semDesconto.join(', ')}. Para essas, a página mostra "falar com o financeiro".</p>}
+          {relatorioPublicacao.semDesconto.length > 0 && <p><strong>Sem desconto em janeiro:</strong> {relatorioPublicacao.semDesconto.join(', ')}. Para essas, a página mostra "falar com o financeiro".</p>}
           {relatorioPublicacao.semCpf.length > 0 && <p className="text-rose-700"><strong>Sem CPF válido do responsável financeiro (não conseguem consultar):</strong> {relatorioPublicacao.semCpf.join(', ')}.</p>}
         </div>
       )}
@@ -553,6 +566,9 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
                   <div className="w-64 min-w-0">
                     <button className="font-bold text-xs text-slate-800 text-left cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); setAbertoId(l.aluno.id); }}>{l.aluno.nome}</button><span className={`ml-1.5 align-middle text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${l.novo ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>{l.novo ? 'Aluno novo' : 'Rematrícula'}</span>
                     <span className="block text-[11px] text-slate-500 truncate">{r?.nome || 'sem responsável'}, {NOMES_PERFIL[l.perfil]}</span>
+                    {(() => { const p = percentualDescontoJaneiro(l.carta.base); return p === PERCENTUAL_DESCONTO_JANEIRO ? null : (
+                      <span className={`inline-block mt-0.5 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${p > 0 ? 'bg-sky-100 text-sky-800' : 'bg-rose-100 text-rose-800'}`}>{p > 0 ? `Desconto jan. ${String(p).replace('.', ',')}%` : 'Sem desconto jan.'}</span>
+                    ); })()}
                   </div>
                   <div className="flex flex-wrap gap-1.5 flex-1 min-w-[240px]">{l.tipos.map(t => chip(l, t))}</div>
                   <div className="w-44 text-[11px] font-semibold">
@@ -578,6 +594,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
               onFechar={() => setAbertoId(null)} onGerar={aoGerar} onBaixar={aoBaixarDeNovo}
               onMuda={muda} onMudaVarios={(l, tipos, st) => marcarVarios(tipos.map(t => ({ l, t })), st)} onDesfazer={desfazer} onCampo={salvaCampo}
               mensagem={mensagemFicha(linhaAberta)} link={linkFicha(linhaAberta.aluno.id)} showToast={showToast}
+              onDescontoJaneiro={onSaveEnrollment ? salvarDescontoJaneiro : undefined}
             />
           </aside>
         </>
@@ -601,9 +618,10 @@ interface GavetaProps {
   onDesfazer: (l: Linha, t: TipoContrato) => void;
   onCampo: (l: Linha, t: TipoContrato, campo: 'link' | 'nota', valor: string) => void;
   mensagem: string; link: string; showToast: ShowToast;
+  onDescontoJaneiro?: (l: Linha, percentual: number) => Promise<void>;
 }
 
-function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar, onMuda, onMudaVarios, onDesfazer, onCampo, mensagem, link, showToast }: GavetaProps) {
+function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar, onMuda, onMudaVarios, onDesfazer, onCampo, mensagem, link, showToast, onDescontoJaneiro }: GavetaProps) {
   const r = responsavelFinanceiro(guardians, l.aluno.id);
   const c = l.carta;
   const falta = (campo: string) => l.faltas.includes(campo);
@@ -690,6 +708,8 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
         </div>
       </details>
 
+      {onDescontoJaneiro && <DescontoJaneiroBox l={l} onSalvar={onDescontoJaneiro} />}
+
       {gerados.length >= 2 && (
         <button onClick={() => onMudaVarios(l, gerados, 'enviado')} disabled={ocupado !== null}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg bg-brand-orange text-white hover:bg-orange-700 disabled:opacity-50 cursor-pointer">
@@ -772,5 +792,54 @@ function GavetaAluno({ l, guardians, docDe, ocupado, onFechar, onGerar, onBaixar
 
       <p className="text-[11px] text-slate-400">O número é gerado pelo sistema na primeira vez e se mantém nas correções (muda só a versão). Cada tipo de documento tem a sua própria sequência.</p>
     </>
+  );
+}
+
+// ======================================================================
+// Desconto na mensalidade de janeiro (por criança)
+// ======================================================================
+function DescontoJaneiroBox({ l, onSalvar }: { l: Linha; onSalvar: (l: Linha, percentual: number) => Promise<void> }) {
+  const atual = percentualDescontoJaneiro(l.carta.base);
+  const [outro, setOutro] = useState(String(atual).replace('.', ','));
+  const [salvando, setSalvando] = useState(false);
+  useEffect(() => { setOutro(String(atual).replace('.', ',')); }, [atual, l.aluno.id]);
+  const v = dividirJaneiro(l.carta, atual);
+  const salvar = async (p: number) => {
+    if (!Number.isFinite(p) || p < 0 || p > 100 || p === atual) return;
+    setSalvando(true);
+    try { await onSalvar(l, p); } finally { setSalvando(false); }
+  };
+  const opcoes = [50, 25, 0];
+  const btn = (ativo: boolean) => `px-2.5 py-1.5 text-[11px] font-bold rounded-md border cursor-pointer disabled:opacity-50 ${ativo ? 'bg-brand-green-dark text-white border-brand-green-dark' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'}`;
+  return (
+    <section className="bg-white border border-slate-200 rounded-lg p-3 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs font-bold text-slate-700">Desconto na mensalidade de janeiro</h4>
+        {salvando && <Loader2 size={13} className="animate-spin text-slate-400" />}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {opcoes.map(p => (
+          <button key={p} type="button" disabled={salvando} onClick={() => salvar(p)} className={btn(atual === p)}>
+            {p === 0 ? 'Sem desconto' : `${p}%`}
+          </button>
+        ))}
+        <span className="flex items-center gap-1 text-[11px] text-slate-500 ml-1">
+          Outro:
+          <input value={outro} onChange={e => setOutro(e.target.value)} inputMode="decimal" aria-label="Outro percentual de desconto"
+            onKeyDown={e => { if (e.key === 'Enter') salvar(Number(outro.replace(',', '.'))); }}
+            className="w-14 text-xs px-2 py-1 rounded-md border border-slate-200 bg-slate-50 text-right" />%
+          <button type="button" disabled={salvando} onClick={() => salvar(Number(outro.replace(',', '.')))} className={btn(false)}>Salvar</button>
+        </span>
+      </div>
+      {atual > 0 ? (
+        <p className="text-[11px] text-slate-600">
+          Mensalidade de janeiro R$ {formatarMoeda(v.mensalidade)} − desconto de {String(atual).replace('.', ',')}% (R$ {formatarMoeda(v.desconto)}) =
+          parcela de novembro <strong>R$ {formatarMoeda(v.novembro)}</strong> + janeiro <strong>R$ {formatarMoeda(v.janeiro)}</strong>.
+        </p>
+      ) : (
+        <p className="text-[11px] text-rose-700">Sem desconto: a página das famílias mostra "o pagamento será combinado com o financeiro" e a criança sai da lista de novembro.</p>
+      )}
+      <p className="text-[10px] text-slate-400">Depois de mudar, clique em "Página das famílias" para atualizar o que a família vê.</p>
+    </section>
   );
 }

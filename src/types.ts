@@ -133,6 +133,7 @@ export interface Enrollment {
   diaVencimento2027?: '01' | '05' | '10' | '15' | '20';
   descontoPontualidadeAtivo2027?: boolean; // 3% fixo sobre a regular, só se a escola oferecer — família nunca escolhe
   descontoJaneiro2027?: boolean; // 50% na mensalidade de janeiro (aceite em outubro). Ausente = tem; false = não tem
+  descontoJaneiroPct2027?: number; // % do desconto de janeiro escolhido pela equipe (0–100). Ausente = 50%
   statusIntencao2027?: 'Pendente' | 'Confirmada' | 'Em Análise' | 'Não Renovará';
   cartaEnviadaEm2027?: string; // ISO — quando a equipe copiou/enviou o link da carta pra família (controle de "enviada / aguardando retorno")
   observacoesFamilia2027?: string;

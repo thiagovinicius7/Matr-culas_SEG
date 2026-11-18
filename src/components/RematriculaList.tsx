@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { percentualDescontoJaneiro, camposDescontoJaneiro } from '../situacao/situacao';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
 import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId, getCartaIntencaoInfo, getEnrollmentBaseDaCarta, ANO_CARTA_INTENCAO, getNextYearClass, calculateAgeAtCutoff, getFaseProcesso } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
@@ -238,7 +239,8 @@ export default function RematriculaList({
     if (!onSaveEnrollment) return;
     const base = getEnrollmentBaseDaCarta(alunoId, enrollments);
     if (!base) return;
-    onSaveEnrollment({ ...base, descontoJaneiro2027: base.descontoJaneiro2027 === false }, false);
+    const tem = percentualDescontoJaneiro(base) > 0;
+    onSaveEnrollment({ ...base, ...camposDescontoJaneiro(tem ? 0 : 50) }, false);
   };
 
   const abrirWhatsAppReuniao = (st: Student, g: Guardian | undefined) => {
@@ -834,12 +836,13 @@ export default function RematriculaList({
                         {(() => {
                           const baseD = getEnrollmentBaseDaCarta(student.id, enrollments);
                           if (!baseD) return null;
-                          const tem = baseD.descontoJaneiro2027 !== false;
+                          const pct = percentualDescontoJaneiro(baseD);
+                          const tem = pct > 0;
                           return (
                             <button type="button" onClick={() => alternarDescontoJaneiro(student.id)}
-                              title="Desconto de 50% na mensalidade de janeiro (quem aceitou a proposta em outubro). Clique para alternar."
+                              title="Desconto na mensalidade de janeiro. Clique para alternar entre 50% e sem desconto. Outro percentual: aba Contratos, na ficha do aluno."
                               className={`mt-1 px-2.5 py-1 text-[10px] font-bold rounded-md border cursor-pointer ${tem ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-rose-50 border-rose-300 text-rose-800'}`}>
-                              {tem ? '✓ Desconto 50% jan' : '✗ Sem desconto jan'}
+                              {tem ? `✓ Desconto ${String(pct).replace('.', ',')}% jan` : '✗ Sem desconto jan'}
                             </button>
                           );
                         })()}

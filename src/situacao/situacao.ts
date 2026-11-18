@@ -11,7 +11,7 @@
  *
  * Este módulo é PURO (não acessa o banco): monta os resumos, o hash, o Pix e a mensagem.
  */
-import type { ContratoDoc, Guardian, StatusContrato } from '../types';
+import type { ContratoDoc, Enrollment, Guardian, StatusContrato } from '../types';
 import {
   ContratoContexto, CartaResolvida, TipoContrato, NOMES_DOCS,
   elegivelParaContrato, resolverCarta, documentosDoAluno,
@@ -72,6 +72,8 @@ export interface CriancaSituacao {
   andamento: AndamentoContrato;
   /** Pagamento da 1ª parcela liberado (confirmou a Carta até a data limite). */
   liberado: boolean;
+  /** Percentual do desconto de janeiro desta criança (0 = sem desconto). */
+  percentual?: number;
   /** Valores em reais; só quando liberado. */
   mensalidade: number;
   desconto: number;
@@ -91,14 +93,14 @@ const reais = (c: number) => c / 100;
 
 /**
  * Mensalidade de janeiro = ensino regular + contraturno + lanche (se aderiu), pelos valores da Carta.
- * 50% de desconto; o restante (50%) é dividido ao meio: novembro e janeiro (25% e 25% do total).
+ * Desconto (padrão 50%, ajustável por criança); o restante é dividido ao meio: novembro e janeiro.
  */
-export function dividirJaneiro(carta: Pick<CartaResolvida, 'mensalidade' | 'contraturno' | 'lancheAdiciona' | 'lancheValor'>) {
+export function dividirJaneiro(carta: Pick<CartaResolvida, 'mensalidade' | 'contraturno' | 'lancheAdiciona' | 'lancheValor'>, percentual = PERCENTUAL_DESCONTO_JANEIRO) {
   const regular = centavos(carta.mensalidade);
   const contraturno = carta.contraturno ? centavos(carta.contraturno.valor) : 0;
   const lanche = carta.lancheAdiciona ? centavos(carta.lancheValor) : 0;
   const total = regular + contraturno + lanche;
-  const desconto = Math.round(total * PERCENTUAL_DESCONTO_JANEIRO / 100);
+  const desconto = Math.round(total * percentual / 100);
   const restante = total - desconto;
   const novembro = Math.floor(restante / 2);
   const janeiro = restante - novembro; // se sobrar 1 centavo, fica em janeiro
@@ -108,9 +110,27 @@ export function dividirJaneiro(carta: Pick<CartaResolvida, 'mensalidade' | 'cont
   };
 }
 
-/** Tem o desconto de janeiro? Vale para todos, a menos que a equipe desmarque na tela de matrícula. */
+/**
+ * Percentual do desconto na mensalidade de janeiro para uma matrícula.
+ * Padrão 50%. A equipe pode tirar (0%) ou escolher outro percentual por criança.
+ */
+export function percentualDescontoJaneiro(base?: Pick<Enrollment, 'descontoJaneiro2027' | 'descontoJaneiroPct2027'> | null): number {
+  if (!base) return PERCENTUAL_DESCONTO_JANEIRO;
+  if (base.descontoJaneiro2027 === false) return 0;
+  const p = Number(base.descontoJaneiroPct2027);
+  if (base.descontoJaneiroPct2027 === undefined || base.descontoJaneiroPct2027 === null || !Number.isFinite(p)) return PERCENTUAL_DESCONTO_JANEIRO;
+  return Math.min(100, Math.max(0, p));
+}
+
+/** Campos a gravar na matrícula para um novo percentual (mantém o campo antigo coerente). */
+export function camposDescontoJaneiro(percentual: number): Pick<Enrollment, 'descontoJaneiro2027' | 'descontoJaneiroPct2027'> {
+  const p = Math.min(100, Math.max(0, Math.round(percentual * 100) / 100));
+  return { descontoJaneiro2027: p > 0, descontoJaneiroPct2027: p };
+}
+
+/** Tem o desconto de janeiro? Vale para todos, a menos que a equipe tire ou zere o percentual. */
 export function direitoAoDescontoDeJaneiro(carta: CartaResolvida, _ctx?: ContratoContexto): boolean {
-  return carta.base.descontoJaneiro2027 !== false;
+  return percentualDescontoJaneiro(carta.base) > 0;
 }
 
 function andamento(tipos: TipoContrato[], statusDe: (t: TipoContrato) => StatusContrato) {
@@ -141,14 +161,15 @@ export function montarCriancas(ctxs: ContratoContexto[], docs: ContratoDoc[], an
     const tipos = documentosDoAluno(carta);
     const statusDe = (t: TipoContrato): StatusContrato => porId.get(`${ctx.student.id}_${ano}_${t}`)?.status || 'nao_gerado';
     const a = andamento(tipos, statusDe);
-    const liberado = direitoAoDescontoDeJaneiro(carta, ctx);
-    const v = dividirJaneiro(carta);
+    const percentual = percentualDescontoJaneiro(carta.base);
+    const liberado = percentual > 0;
+    const v = dividirJaneiro(carta, percentual);
     out.set(ctx.student.id, {
       entrada: { ctx, carta, tipos },
       crianca: {
         nome: ctx.student.nome,
         turma: carta.somenteContraturno ? 'Somente Contraturno' : carta.turma.nome,
-        contratos: a.contratos, andamento: a.resumo, liberado,
+        contratos: a.contratos, andamento: a.resumo, liberado, percentual,
         mensalidade: liberado ? v.mensalidade : 0, desconto: liberado ? v.desconto : 0,
         novembro: liberado ? v.novembro : 0, janeiro: liberado ? v.janeiro : 0,
         partes: liberado ? v.partes : { regular: 0, contraturno: 0, lanche: 0 },

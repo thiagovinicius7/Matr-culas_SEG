@@ -187,7 +187,7 @@ function CartaoCrianca({ c, inicialAberto }: { c: CriancaSituacao; inicialAberto
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Mensalidade de janeiro de 2027</h3>
             <dl className="text-sm space-y-1.5">
               <div className="flex justify-between gap-3"><dt className="text-slate-600">Valor da mensalidade</dt><dd className="font-bold text-slate-800">{moeda(c.mensalidade)}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-emerald-700">Desconto de {PERCENTUAL_DESCONTO_JANEIRO}% (aceite em outubro)</dt><dd className="font-bold text-emerald-700">− {moeda(c.desconto)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-emerald-700">Desconto de {String(c.percentual ?? PERCENTUAL_DESCONTO_JANEIRO).replace('.', ',')}%{(c.percentual ?? PERCENTUAL_DESCONTO_JANEIRO) === PERCENTUAL_DESCONTO_JANEIRO ? ' (aceite em outubro)' : ''}</dt><dd className="font-bold text-emerald-700">− {moeda(c.desconto)}</dd></div>
               <div className="flex justify-between gap-3 border-t border-slate-200 pt-1.5"><dt className="text-slate-600">Restante, dividido em duas parcelas iguais</dt><dd className="font-bold text-slate-800">{moeda(c.novembro + c.janeiro)}</dd></div>
             </dl>
             <div className="grid grid-cols-2 gap-2 pt-1">

@@ -2625,6 +2625,7 @@ export default function App() {
                   contraturnos={contraturnos}
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
+                  onSaveEnrollment={handleSaveEnrollment}
                   showToast={showToast}
                 />
               )}
