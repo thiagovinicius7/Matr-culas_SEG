@@ -201,13 +201,17 @@ export default function Dashboard({
   const naoRenovam = students
     .filter(s => s.status === 'ativo' && !idsAtivosDoAno.has(s.id))
     .filter(s => getCartaIntencaoInfo(s.id, enrollments).estado === 'nao_renova');
-  const cartaPorAluno = [...activeStudents, ...naoRenovam].map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
-  const idsCarta = (estados: CartaEstado[]) => cartaPorAluno.filter(c => estados.includes(c.estado)).map(c => c.id);
+  // Os "quase" saíram dos totais, mas continuam no quadro das Cartas (subtópico de "Aguardando retorno")
+  const idsQuase = new Set(alunosQuase.map(s => s.id));
+  const cartaPorAluno = [...activeStudents, ...naoRenovam.filter(s => !idsQuase.has(s.id)), ...alunosQuase].map(s => ({ id: s.id, ...getCartaIntencaoInfo(s.id, enrollments) }));
+  const idsCartaTodos = (estados: CartaEstado[]) => cartaPorAluno.filter(c => estados.includes(c.estado)).map(c => c.id);
+  const idsCarta = (estados: CartaEstado[]) => idsCartaTodos(estados).filter(id => !idsQuase.has(id));
   const cartaIds = {
     // Famílias com parceria ficam à parte: a Carta só vai depois da conversa pessoal.
     faltaEnviar: idsCarta(['nao_enviada']).filter(id => !activeStudents.find(s => s.id === id)?.parceria),
     emParceria: idsCarta(['nao_enviada']).filter(id => !!activeStudents.find(s => s.id === id)?.parceria),
-    enviadas: idsCarta(['aguardando', 'confirmada', 'em_analise', 'nao_renova']),
+    enviadas: idsCartaTodos(['aguardando', 'confirmada', 'em_analise', 'nao_renova']),
+    quase: alunosQuase.map(s => s.id),
     aguardando: idsCarta(['aguardando']),
     confirmam: idsCarta(['confirmada']),
     emAnalise: idsCarta(['em_analise']),
@@ -456,9 +460,9 @@ export default function Dashboard({
             </p>
             {alunosQuase.length > 0 && (
               <p
-                onClick={(ev) => { ev.stopPropagation(); setSelectedFaseForModal({ label: `Quase — fora do total (${activeYear})`, emoji: '🤏', alunoIds: alunosQuase.map(s => s.id) }); }}
+                onClick={(ev) => { ev.stopPropagation(); setSelectedFaseForModal({ label: `Cartas ${anoCarta} — Quase perdidos`, emoji: '🤏', alunoIds: alunosQuase.map(s => s.id) }); }}
                 className="text-[10px] text-amber-700 mt-0.5 hover:underline"
-              >+ {alunosQuase.length} quase (fora do total)</p>
+              >+ {alunosQuase.length} quase perdido{alunosQuase.length === 1 ? '' : 's'} (fora do total)</p>
             )}
           </div>
         </motion.div>
@@ -767,7 +771,6 @@ export default function Dashboard({
                   {([
                     { label: 'Falta enviar', emoji: '📤', ids: cartaIds.faltaEnviar, cor: 'text-slate-700' },
                     { label: 'Enviadas', emoji: '✉️', ids: cartaIds.enviadas, cor: 'text-sky-700' },
-                    { label: 'Aguardando retorno', emoji: '⏳', ids: cartaIds.aguardando, cor: 'text-amber-800' },
                   ] as const).map(box => (
                     <button
                       key={box.label}
@@ -780,6 +783,26 @@ export default function Dashboard({
                       <span className={`${box.cor} font-extrabold font-mono text-xs`}>{box.ids.length}</span>
                     </button>
                   ))}
+                  {/* Aguardando retorno + subtópico "quase perdidos" (fora dos totais; dá para retomar) */}
+                  <div className="bg-white rounded border border-amber-200/60 shadow-2xs overflow-hidden flex flex-col">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — Aguardando retorno`, emoji: '⏳', alunoIds: cartaIds.aguardando })}
+                      className="p-1.5 cursor-pointer hover:bg-amber-50/60 transition-colors flex-1"
+                      title="Ver os alunos — Aguardando retorno"
+                    >
+                      <span className="block text-[9px] text-slate-500 uppercase font-bold leading-tight">Aguardando retorno</span>
+                      <span className="text-amber-800 font-extrabold font-mono text-xs">{cartaIds.aguardando.length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFaseForModal({ label: `Cartas ${anoCarta} — Quase perdidos`, emoji: '🤏', alunoIds: cartaIds.quase })}
+                      className="px-1.5 py-1 border-t border-amber-100 bg-amber-50/70 hover:bg-amber-100 cursor-pointer text-[9px] font-bold text-amber-800 leading-tight"
+                      title="Alunos marcados como quase perdidos — fora das turmas e dos totais. Clique para ver e retomar."
+                    >
+                      🤏 Quase perdidos: <span className="font-mono">{cartaIds.quase.length}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Respostas da família */}
@@ -1114,13 +1137,27 @@ export default function Dashboard({
                       </button>
                       {onSaveEnrollment && enrollments.some(x => x.alunoId === id && x.ano === activeYear) && (() => {
                         const ehQuase = !!enrollments.find(x => x.alunoId === id && x.ano === activeYear)?.quaseMatricula;
+                        if (selectedFaseForModal.label.includes('Quase perdidos')) {
+                          return ehQuase ? (
+                            <button
+                              onClick={() => {
+                                alternarQuase(id);
+                                setSelectedFaseForModal(m => m ? { ...m, alunoIds: m.alunoIds.filter(x => x !== id) } : m);
+                              }}
+                              title="A família resolveu voltar: o aluno volta para a turma e para os totais"
+                              className="mr-2 shrink-0 text-[11px] font-bold px-2 py-1 rounded border bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 cursor-pointer"
+                            >
+                              ↩ Retomar
+                            </button>
+                          ) : null;
+                        }
                         return (
                           <button
                             onClick={() => alternarQuase(id)}
                             title={ehQuase ? 'Tirar do "Quase" e voltar a contar na turma e nos totais' : 'Marcar como "Quase": não é perda, mas sai da turma e dos totais'}
                             className={`mr-2 shrink-0 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${ehQuase ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-700'}`}
                           >
-                            {ehQuase ? '🤏 Quase ✓' : '🤏 Quase'}
+                            {ehQuase ? '🤏 Quase perdido ✓' : '🤏 Quase perdido'}
                           </button>
                         );
                       })()}
