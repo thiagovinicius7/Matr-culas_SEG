@@ -832,6 +832,16 @@ export default function RematriculaList({
                           })}
                         </div>
 
+                        {/* "Quase": não é perda, mas sai da turma e dos totais do ano */}
+                        {onSaveEnrollment && enrollment.statusNegociacao !== 'Cancelada' && (
+                          <button type="button"
+                            onClick={() => onSaveEnrollment({ ...enrollment, quaseMatricula: !enrollment.quaseMatricula }, false)}
+                            title={enrollment.quaseMatricula ? 'Tirar do "Quase" e voltar a contar na turma e nos totais' : 'Marcar como "Quase": não é perda, mas sai da turma e dos totais'}
+                            className={`px-2.5 py-1 text-[10px] font-bold rounded-md border cursor-pointer ${enrollment.quaseMatricula ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-700'}`}>
+                            {enrollment.quaseMatricula ? '🤏 Quase ✓ (fora do total)' : '🤏 Marcar quase'}
+                          </button>
+                        )}
+
                         {/* Desconto de 50% na mensalidade de janeiro (página das famílias) */}
                         {(() => {
                           const baseD = getEnrollmentBaseDaCarta(student.id, enrollments);

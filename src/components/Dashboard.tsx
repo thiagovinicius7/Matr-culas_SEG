@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { urlDoPackDocument } from '../packDocs';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, PackDocument, CoordenacaoSugestao } from '../types';
 import { mensagemLembreteCarta, mensagemReuniao } from '../mensagens';
-import { REGULAR_CLASSES, getEnrollmentBaseDaCarta, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO, getAlunosDoAno, getNovasMatriculasDoAno } from '../data';
+import { REGULAR_CLASSES, getEnrollmentBaseDaCarta, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId, PACK_DOCUMENT_DEFINITIONS, getFaseProcesso, getCartaIntencaoInfo, ANO_CARTA_INTENCAO, getAlunosDoAno, getNovasMatriculasDoAno, getAlunosQuaseDoAno } from '../data';
 import type { CartaEstado } from '../data';
 import { 
   Users, 
@@ -34,6 +34,7 @@ interface DashboardProps {
   packDocuments?: PackDocument[];
   coordenacaoSugestoes?: CoordenacaoSugestao[];
   onResolveSugestao?: (id: string) => void;
+  onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void | Promise<void>;
   onNavigate: (tab: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
   onSelectActiveYear?: (year: number) => void;
@@ -54,6 +55,7 @@ export default function Dashboard({
   packDocuments = [],
   coordenacaoSugestoes = [],
   onResolveSugestao,
+  onSaveEnrollment,
   onNavigate, 
   onNavigateWithStudent,
   onSelectActiveYear,
@@ -164,6 +166,28 @@ export default function Dashboard({
   const confirmed = validEnrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
   const negotiating = validEnrollments.filter(e => e.statusNegociacao === 'Em Negociação').length;
   const pending = activeStudentsCount - confirmed - negotiating;
+
+  // Divisão regular × somente contraturno (pela turma do aluno no ano ativo)
+  const isSoContraturno = (s: Student) => getStudentClassId(s) === 'sem_regular';
+  const totalSoContraturno = activeStudents.filter(isSoContraturno).length;
+  const totalRegular = activeStudentsCount - totalSoContraturno;
+  const statusDoAno = (alunoId: string) => validEnrollments.find(e => e.alunoId === alunoId)?.statusNegociacao;
+  const pendentesAlunos = activeStudents.filter(s => {
+    const st = statusDoAno(s.id);
+    return st !== 'Confirmada' && st !== 'Em Negociação';
+  });
+  const pendentesSoContraturno = pendentesAlunos.filter(isSoContraturno).length;
+
+  // "Quase": não é perda, mas fica fora das turmas e dos totais
+  const alunosQuase = getAlunosQuaseDoAno(students, enrollments, activeYear);
+  const alternarQuase = (alunoId: string) => {
+    if (!onSaveEnrollment) return;
+    const e = enrollments.find(x => x.alunoId === alunoId && x.ano === activeYear);
+    if (!e) return;
+    const atualizado: Enrollment = { ...e };
+    atualizado.quaseMatricula = !e.quaseMatricula;
+    onSaveEnrollment(atualizado, false);
+  };
 
   // 2027 Carta de Intenção Metrics (or next year intent)
   // Carta de Intenção: o ano-alvo é FIXO (ANO_CARTA_INTENCAO), não "ano ativo + 1" —
@@ -419,6 +443,23 @@ export default function Dashboard({
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total de Alunos</p>
             <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{activeStudentsCount}</h3>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              <span
+                onClick={(ev) => { ev.stopPropagation(); setSelectedFaseForModal({ label: `Matrícula regular (${activeYear})`, emoji: '🎒', alunoIds: activeStudents.filter(s => !isSoContraturno(s)).map(s => s.id) }); }}
+                className="hover:underline"
+              ><strong className="text-slate-700">{totalRegular}</strong> matrícula regular</span>
+              {' + '}
+              <span
+                onClick={(ev) => { ev.stopPropagation(); setSelectedFaseForModal({ label: `Somente contraturno (${activeYear})`, emoji: '🍯', alunoIds: activeStudents.filter(isSoContraturno).map(s => s.id) }); }}
+                className="hover:underline"
+              ><strong className="text-slate-700">{totalSoContraturno}</strong> só contraturno</span>
+            </p>
+            {alunosQuase.length > 0 && (
+              <p
+                onClick={(ev) => { ev.stopPropagation(); setSelectedFaseForModal({ label: `Quase — fora do total (${activeYear})`, emoji: '🤏', alunoIds: alunosQuase.map(s => s.id) }); }}
+                className="text-[10px] text-amber-700 mt-0.5 hover:underline"
+              >+ {alunosQuase.length} quase (fora do total)</p>
+            )}
           </div>
         </motion.div>
 
@@ -485,7 +526,7 @@ export default function Dashboard({
           transition={{ duration: 0.3, delay: 0.12 }}
           onClick={() => setSelectedFaseForModal({
             label: `Pendentes — sem resposta (${activeYear})`, emoji: '🕓',
-            alunoIds: validEnrollments.filter(e => e.statusNegociacao !== 'Confirmada' && e.statusNegociacao !== 'Em Negociação').map(e => e.alunoId)
+            alunoIds: pendentesAlunos.map(s => s.id)
           })}
           className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4 cursor-pointer hover:border-brand-green-light transition-colors"
         >
@@ -495,6 +536,9 @@ export default function Dashboard({
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Pendentes ({activeYear})</p>
             <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{pending}</h3>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              <strong className="text-slate-700">{pending - pendentesSoContraturno}</strong> matrícula regular + <strong className="text-slate-700">{pendentesSoContraturno}</strong> só contraturno
+            </p>
             <p className="text-[10px] text-slate-400 mt-0.5">{confirmed} + {negotiating} + {pending} = {totalStudentsCount} alunos</p>
           </div>
         </motion.div>
@@ -1068,6 +1112,18 @@ export default function Dashboard({
                         <span className="text-sm font-semibold text-slate-800">{st.nome}</span>
                         <span className="text-slate-300">›</span>
                       </button>
+                      {onSaveEnrollment && enrollments.some(x => x.alunoId === id && x.ano === activeYear) && (() => {
+                        const ehQuase = !!enrollments.find(x => x.alunoId === id && x.ano === activeYear)?.quaseMatricula;
+                        return (
+                          <button
+                            onClick={() => alternarQuase(id)}
+                            title={ehQuase ? 'Tirar do "Quase" e voltar a contar na turma e nos totais' : 'Marcar como "Quase": não é perda, mas sai da turma e dos totais'}
+                            className={`mr-2 shrink-0 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${ehQuase ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-700'}`}
+                          >
+                            {ehQuase ? '🤏 Quase ✓' : '🤏 Quase'}
+                          </button>
+                        );
+                      })()}
                       {(lembrete || emAnalise) && (
                         <button
                           onClick={abrirWhats}

@@ -132,6 +132,7 @@ export interface Enrollment {
   valorAlmoco2027?: number;
   diaVencimento2027?: '01' | '05' | '10' | '15' | '20';
   descontoPontualidadeAtivo2027?: boolean; // 3% fixo sobre a regular, só se a escola oferecer — família nunca escolhe
+  quaseMatricula?: boolean; // "Quase": família ainda não fechou, mas não é perda. Fica fora das turmas e dos totais do ano
   descontoJaneiro2027?: boolean; // 50% na mensalidade de janeiro (aceite em outubro). Ausente = tem; false = não tem
   descontoJaneiroPct2027?: number; // % do desconto de janeiro escolhido pela equipe (0–100). Ausente = 50%
   statusIntencao2027?: 'Pendente' | 'Confirmada' | 'Em Análise' | 'Não Renovará';

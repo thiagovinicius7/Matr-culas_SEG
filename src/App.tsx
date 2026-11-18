@@ -2550,6 +2550,7 @@ export default function App() {
                   packDocuments={packDocuments}
                   coordenacaoSugestoes={coordenacaoSugestoes}
                   onResolveSugestao={handleMarcarSugestaoResolvida}
+                  onSaveEnrollment={handleSaveEnrollment}
                   onNavigate={setActiveTab} 
                   onNavigateWithStudent={handleNavigateWithStudent}
                   onImportGeraniumData={handleImportGeraniumData}
