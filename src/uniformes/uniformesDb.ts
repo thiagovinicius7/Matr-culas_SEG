@@ -2,7 +2,9 @@
  * Acesso ao banco dos pedidos de uniformes. Ver uniformes.ts para o desenho das coleções.
  */
 import { doc, runTransaction } from 'firebase/firestore';
-import { db, getCollectionData, getDocumentById, saveDocument } from '../firebase';
+import { db, getCollectionData, getDocumentById, saveDocument, deleteDocument } from '../firebase';
+import { COL_FAMILIAS } from './uniformes';
+import { mesmaFamilia, type FamiliaUniforme } from './familias';
 import {
   COL_CATALOGO, COL_CAMPANHAS, COL_PEDIDOS, CATALOGO_PADRAO, idPedido,
   type PecaCatalogo, type CampanhaUniforme, type PedidoUniformeDoc, type EnvioUniforme,
@@ -34,10 +36,33 @@ export async function carregarPedidos(): Promise<PedidoUniformeDoc[]> {
   return getCollectionData<PedidoUniformeDoc>(COL_PEDIDOS);
 }
 
-/** Pedidos de uma família (pelo hash do CPF) em cada lote — leitura só pelo id exato. */
-export async function pedidosDaFamilia(cpfHash: string, campanhas: CampanhaUniforme[]): Promise<PedidoUniformeDoc[]> {
+/** Resumo da família pelo hash do CPF de um responsável (leitura só pelo id exato). */
+export const familiaPorCpfHash = (hash: string) => getDocumentById<FamiliaUniforme>(COL_FAMILIAS, hash);
+
+export const carregarFamilias = () => getCollectionData<FamiliaUniforme>(COL_FAMILIAS);
+
+/**
+ * Publica os resumos das famílias: grava só os que mudaram e apaga os que não valem mais
+ * (responsável sem criança matriculada, CPF trocado…).
+ */
+export async function publicarFamilias(novos: FamiliaUniforme[]): Promise<{ gravados: number; removidos: number }> {
+  const atuais = await carregarFamilias();
+  const porId = new Map(atuais.map(a => [a.id, a]));
+  let gravados = 0, removidos = 0;
+  for (const n of novos) {
+    const a = porId.get(n.id);
+    if (a && mesmaFamilia(a, n)) continue;
+    await saveDocument(COL_FAMILIAS, n); gravados++;
+  }
+  const ids = new Set(novos.map(n => n.id));
+  for (const a of atuais) if (!ids.has(a.id)) { await deleteDocument(COL_FAMILIAS, a.id); removidos++; }
+  return { gravados, removidos };
+}
+
+/** Pedidos de uma família (pelo grupo) em cada lote — leitura só pelo id exato. */
+export async function pedidosDaFamilia(grupo: string, campanhas: CampanhaUniforme[]): Promise<PedidoUniformeDoc[]> {
   const docs = await Promise.all(campanhas.map(c =>
-    getDocumentById<PedidoUniformeDoc>(COL_PEDIDOS, idPedido(c.id, cpfHash)).catch(() => null)));
+    getDocumentById<PedidoUniformeDoc>(COL_PEDIDOS, idPedido(c.id, grupo)).catch(() => null)));
   return docs.filter((d): d is PedidoUniformeDoc => !!d);
 }
 
@@ -46,17 +71,16 @@ export async function pedidosDaFamilia(cpfHash: string, campanhas: CampanhaUnifo
  * Roda numa transação: lê o que já existe e grava tudo de volta com o envio novo no fim —
  * as regras do Firestore só deixam a família acrescentar, nunca alterar o que já estava lá.
  */
-export async function acrescentarEnvio(campanhaId: string, cpfHash: string, envio: EnvioUniforme): Promise<void> {
-  const id = idPedido(campanhaId, cpfHash);
+export async function acrescentarEnvio(campanhaId: string, grupo: string, envio: EnvioUniforme): Promise<void> {
+  const id = idPedido(campanhaId, grupo);
   const ref = doc(db, COL_PEDIDOS, id);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const atual = snap.exists() ? (snap.data() as PedidoUniformeDoc) : null;
-    const novo: PedidoUniformeDoc = {
-      id, campanhaId, cpfHash,
-      envios: [...(atual?.envios || []), envio],
-      atualizadoEm: envio.criadoEm,
-    };
+    // Mantém os campos que já existiam; só acrescenta o envio no fim (é o que as regras permitem à família).
+    const novo: PedidoUniformeDoc = atual
+      ? { ...atual, envios: [...(atual.envios || []), envio], atualizadoEm: envio.criadoEm }
+      : { id, campanhaId, grupo, envios: [envio], atualizadoEm: envio.criadoEm };
     tx.set(ref, novo);
   });
 }
@@ -84,7 +108,7 @@ export async function alterarEnvio(pedidoId: string, codigo: string, mudar: (e: 
 export async function salvarPedidoAvulso(campanhaId: string, envio: EnvioUniforme): Promise<void> {
   const chave = `avulso-${envio.codigo.replace(/[^A-Z0-9]/gi, '')}`;
   await saveDocument<PedidoUniformeDoc>(COL_PEDIDOS, {
-    id: idPedido(campanhaId, chave), campanhaId, cpfHash: '', envios: [envio], atualizadoEm: envio.criadoEm,
+    id: idPedido(campanhaId, chave), campanhaId, grupo: '', envios: [envio], atualizadoEm: envio.criadoEm,
   });
 }
 

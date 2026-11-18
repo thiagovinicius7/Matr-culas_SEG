@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Minus, Plus, ChevronDown, Shirt } from 'lucide-react';
-import type { PecaCatalogo, ItemPedido } from '../uniformes/uniformes';
+import { MAX_PARCELAS, valoresParcelas, type PecaCatalogo, type ItemPedido } from '../uniformes/uniformes';
 import { moeda } from '../situacao/situacao';
 
 /**
@@ -147,6 +147,51 @@ export default function SeletorUniformes({
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Forma de pagamento: à vista ou dividido em 2, 3 ou 4 vezes no Pix.
+ * `parcelas` = 0 enquanto a pessoa não escolheu.
+ */
+export function EscolhaPagamento({ total, parcelas, onChange }: { total: number; parcelas: number; onChange: (n: number) => void }) {
+  const dividido = parcelas > 1;
+  const valores = (n: number) => valoresParcelas(total, n);
+  const opcao = (ativo: boolean) =>
+    `flex-1 text-left rounded-xl border-2 px-3 py-3 transition-colors ${ativo ? 'border-brand-green-dark bg-emerald-50' : 'border-slate-200 bg-white hover:border-slate-300'}`;
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2" role="radiogroup" aria-label="Forma de pagamento">
+        <button type="button" role="radio" aria-checked={parcelas === 1} onClick={() => onChange(1)} className={opcao(parcelas === 1)}>
+          <span className="block text-sm font-bold text-slate-800">À vista</span>
+          <span className="block text-xs text-slate-500">Pix de {moeda(total)}</span>
+        </button>
+        <button type="button" role="radio" aria-checked={dividido} onClick={() => onChange(dividido ? parcelas : 2)} className={opcao(dividido)}>
+          <span className="block text-sm font-bold text-slate-800">Dividido</span>
+          <span className="block text-xs text-slate-500">em até {MAX_PARCELAS}x no Pix</span>
+        </button>
+      </div>
+      {dividido && (
+        <div className="grid grid-cols-3 gap-2">
+          {Array.from({ length: MAX_PARCELAS - 1 }, (_, i) => i + 2).map(n => {
+            const v = valores(n);
+            return (
+              <button key={n} type="button" onClick={() => onChange(n)} aria-pressed={parcelas === n}
+                className={`rounded-lg border-2 px-2 py-2 text-center ${parcelas === n ? 'border-brand-orange bg-orange-50' : 'border-slate-200 bg-white'}`}>
+                <span className="block text-sm font-black text-slate-800">{n}x</span>
+                <span className="block text-[11px] text-slate-600">{moeda(v[0])}{v[n - 1] !== v[0] ? '*' : ''}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {dividido && (
+        <p className="text-[11px] text-slate-500">
+          Você paga a 1ª parcela agora e as outras depois, voltando a esta página com o mesmo CPF.
+          {valores(parcelas)[parcelas - 1] !== valores(parcelas)[0] ? ` *A última parcela fica em ${moeda(valores(parcelas)[parcelas - 1])} por causa do arredondamento.` : ''}
+        </p>
+      )}
     </div>
   );
 }

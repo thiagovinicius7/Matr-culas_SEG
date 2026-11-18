@@ -1,21 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Shirt, Plus, Link2, MessageCircle, Lock, Unlock, Loader2, Search, Printer, Download, Trash2, X,
-  CheckCircle2, Truck, Ban, RotateCcw, AlertTriangle, PackageCheck, Save, Receipt, ListChecks, Settings2,
+  CheckCircle2, Truck, Ban, RotateCcw, AlertTriangle, PackageCheck, Save, Receipt, ListChecks, Settings2, FileSpreadsheet, Users,
 } from 'lucide-react';
-import { getCollectionData, deleteDocument } from '../firebase';
-import { COLECAO_SITUACAO, moeda } from '../situacao/situacao';
-import type { SituacaoDoc } from '../situacao/situacao';
+import { deleteDocument } from '../firebase';
+import { moeda } from '../situacao/situacao';
+import type { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
+import type { ContratoContexto } from '../contratos/montarDados';
 import {
   COL_CATALOGO, ROTULO_SITUACAO, situacaoDoEnvio, listaFornecedor, juntarItens, totalItens, qtdPecas, novoCodigo,
   novoIdCampanha, linkPublicoUniformes, mensagemDivulgacao, telefoneZap, dataHoraBR, separarLista, slug, compararTamanho,
+  parcelasDe, valoresParcelas, valorPago, comParcelasPagas, textoPagamento,
   type PecaCatalogo, type CampanhaUniforme, type PedidoUniformeDoc, type EnvioUniforme, type SituacaoEnvio,
 } from '../uniformes/uniformes';
 import {
   carregarCatalogo, carregarCampanhas, carregarPedidos, semearCatalogo, alterarEnvio, acrescentarEnvio,
-  salvarPedidoAvulso, salvarCampanha, salvarPeca,
+  salvarPedidoAvulso, salvarCampanha, salvarPeca, carregarFamilias, publicarFamilias,
 } from '../uniformes/uniformesDb';
-import SeletorUniformes, { itensDaSelecao, selecaoIncompleta, type SelecaoUniformes, type CriancaUniforme } from './SeletorUniformes';
+import { montarFamilias, type FamiliaUniforme } from '../uniformes/familias';
+import { baixarPlanilhaUniformes } from '../uniformes/planilha';
+import SeletorUniformes, { EscolhaPagamento, itensDaSelecao, selecaoIncompleta, type SelecaoUniformes, type CriancaUniforme } from './SeletorUniformes';
 
 type ShowToast = (title: string, description?: string, type?: 'success' | 'error' | 'info', duration?: number) => void;
 type Aba = 'pedidos' | 'fornecedor' | 'recibos' | 'catalogo';
@@ -52,7 +56,20 @@ function baixarCsv(nome: string, cab: string[], linhas: unknown[][]) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
-export default function UniformesTab({ showToast }: { showToast: ShowToast }) {
+interface UniformesTabProps {
+  students: Student[];
+  guardians: Guardian[];
+  enrollments: Enrollment[];
+  contraturnos: ContraturnoSegment[];
+  classPrices: RegularClass[];
+  contraturnoPrices: ContraturnoPrice[];
+  showToast: ShowToast;
+}
+
+const pagou = (e: EnvioUniforme) => parcelasDe(e).pagas > 0;
+const ehAvulso = (p: PedidoUniformeDoc) => !p.grupo && !p.cpfHash;
+
+export default function UniformesTab({ students, guardians, enrollments, contraturnos, classPrices, contraturnoPrices, showToast }: UniformesTabProps) {
   const [carregando, setCarregando] = useState(true);
   const [catalogo, setCatalogo] = useState<PecaCatalogo[]>([]);
   const [campanhas, setCampanhas] = useState<CampanhaUniforme[]>([]);
@@ -61,6 +78,28 @@ export default function UniformesTab({ showToast }: { showToast: ShowToast }) {
   const [aba, setAba] = useState<Aba>('pedidos');
   const [novoAberto, setNovoAberto] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  const [familias, setFamilias] = useState<{ total: number; semCpf: string[]; quando: string; erro?: boolean } | null>(null);
+  const [verSemCpf, setVerSemCpf] = useState(false);
+  const [baixando, setBaixando] = useState(false);
+
+  /**
+   * Publica sozinho o resumo das famílias (CPF de qualquer responsável → nome, telefone, crianças e turma).
+   * Roda ao abrir a aba e grava só o que mudou. Sem alunos carregados não faz nada (para não apagar tudo).
+   */
+  const atualizarFamilias = async (avisar = false) => {
+    if (students.length === 0) return;
+    try {
+      const ctxs = students.map(aluno => ({ student: aluno, guardians, enrollments, classPrices, contraturnoPrices, contraturnos } as ContratoContexto));
+      const { docs, semCpf } = await montarFamilias(ctxs);
+      const r = await publicarFamilias(docs);
+      setFamilias({ total: docs.length, semCpf, quando: new Date().toISOString() });
+      if (avisar) showToast('Famílias atualizadas', `${docs.length} responsáveis · ${r.gravados} alterados · ${r.removidos} removidos`, 'success');
+    } catch {
+      setFamilias(f => ({ total: f?.total || 0, semCpf: f?.semCpf || [], quando: new Date().toISOString(), erro: true }));
+      if (avisar) showToast('Não foi possível atualizar as famílias', 'Confira se as regras do Firestore (bloco UNIFORMES) foram publicadas.', 'error', 9000);
+    }
+  };
+  useEffect(() => { atualizarFamilias(); }, [students, guardians, enrollments, classPrices]);
 
   const carregar = async () => {
     try {
@@ -88,7 +127,7 @@ export default function UniformesTab({ showToast }: { showToast: ShowToast }) {
       familias: new Set(validos.map(l => l.pedido.id)).size,
       pecas: validos.reduce((s, l) => s + qtdPecas(l.envio.itens), 0),
       total: validos.reduce((s, l) => s + l.envio.total, 0),
-      pago: validos.filter(l => l.envio.pago).reduce((s, l) => s + l.envio.total, 0),
+      pago: validos.reduce((s, l) => s + valorPago(l.envio), 0),
       entregues: validos.filter(l => l.envio.entregue).length,
     };
   }, [linhas]);
@@ -159,7 +198,24 @@ export default function UniformesTab({ showToast }: { showToast: ShowToast }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="font-display font-bold text-xl text-brand-green-dark flex items-center gap-2"><Shirt size={20} /> Uniformes</h2>
-            <p className="text-xs text-slate-500 mt-1">As famílias pedem pelo link com o CPF do responsável financeiro. As crianças vêm do resumo publicado no botão "Página das famílias" (aba Contratos).</p>
+            <p className="text-xs text-slate-500 mt-1">As famílias pedem pelo link com o CPF de qualquer responsável cadastrado; nome, telefone e crianças vêm do cadastro.</p>
+            {familias && (
+              <p className={`text-xs mt-1 flex flex-wrap items-center gap-x-2 ${familias.erro ? 'text-rose-700' : 'text-slate-600'}`}>
+                <Users size={13} className="inline" />
+                {familias.erro ? 'Não foi possível atualizar as famílias (confira as regras do Firestore).' : `${familias.total} responsáveis com CPF liberados para pedir · atualizado ${dataHoraBR(familias.quando)}`}
+                {familias.semCpf.length > 0 && (
+                  <button onClick={() => setVerSemCpf(v => !v)} className="text-amber-800 font-bold underline">
+                    {familias.semCpf.length} {familias.semCpf.length === 1 ? 'criança sem' : 'crianças sem'} CPF de responsável
+                  </button>
+                )}
+                <button onClick={() => atualizarFamilias(true)} className="text-brand-green-light font-bold underline">atualizar agora</button>
+              </p>
+            )}
+            {verSemCpf && familias && familias.semCpf.length > 0 && (
+              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2 max-w-2xl">
+                Estas famílias não conseguem pedir pelo link (nenhum responsável com CPF válido): {familias.semCpf.join(', ')}. Cadastre o CPF na ficha do aluno ou faça o pedido pela equipe.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => copiar(linkPublicoUniformes(), showToast, 'Link copiado')} className={`${btnCls} border-slate-200 text-slate-700 hover:bg-slate-50`}><Link2 size={14} /> Copiar link</button>
@@ -212,7 +268,7 @@ export default function UniformesTab({ showToast }: { showToast: ShowToast }) {
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-1 border-b border-slate-200">
+          <div className="flex flex-wrap items-end gap-1 border-b border-slate-200">
             {([
               ['pedidos', 'Pedidos', ListChecks], ['fornecedor', 'Lista para a fornecedora', Truck],
               ['recibos', 'Recibos de entrega', Receipt], ['catalogo', 'Catálogo e preços', Settings2],
@@ -222,6 +278,20 @@ export default function UniformesTab({ showToast }: { showToast: ShowToast }) {
                 <Ic size={14} /> {rot}
               </button>
             ))}
+            <button onClick={async () => {
+              setBaixando(true);
+              try {
+                await baixarPlanilhaUniformes({
+                  campanha, pedidos: pedidos.filter(p => p.campanhaId === campanha.id),
+                  ordemPeca: nome => catalogo.find(p => p.nome === nome)?.ordem ?? 999,
+                });
+              } catch { showToast('Não foi possível gerar a planilha', undefined, 'error'); }
+              finally { setBaixando(false); }
+            }} disabled={baixando || linhas.length === 0}
+              title="Uma planilha com três abas: Pedidos, Fornecedora e Recibos"
+              className={`${btnCls} ml-auto mb-1.5 bg-emerald-700 border-emerald-700 text-white hover:bg-emerald-800`}>
+              {baixando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Baixar planilha (.xlsx)
+            </button>
           </div>
 
           {aba === 'pedidos' && <AbaPedidos linhas={linhas} catalogo={catalogo} campanha={campanha} onMudar={mudarEnvio} onNovo={() => setNovoAberto(true)} />}
@@ -262,19 +332,6 @@ function AbaPedidos({ linhas, catalogo, campanha, onMudar, onNovo }: {
     return alvo.includes(norm(busca.trim()));
   });
 
-  const exportar = () => {
-    const cab = ['Pedido', 'Data', 'Lote', 'Responsável', 'Telefone', 'Criança', 'Turma 2027', 'Peça', 'Cor', 'Tamanho', 'Qtd', 'Valor unitário', 'Subtotal', 'Total do pedido', 'Situação', 'Origem', 'Observação'];
-    const rows: unknown[][] = [];
-    for (const l of [...linhas].reverse()) {
-      l.envio.itens.forEach((i, n) => rows.push([
-        l.envio.codigo, dataHoraBR(l.envio.criadoEm), campanha.nome, l.envio.responsavel, l.envio.telefone, i.crianca, i.turma,
-        i.peca, i.cor, i.tamanho, i.qtd, i.preco, i.preco * i.qtd, n === l.envio.itens.length - 1 ? l.envio.total : '',
-        ROTULO_SITUACAO[situacaoDoEnvio(l.envio)].rot, l.envio.origem === 'equipe' ? 'Equipe' : 'Link', l.envio.obs || '',
-      ]));
-    }
-    baixarCsv(`uniformes-pedidos-${slug(campanha.nome)}.csv`, cab, rows);
-  };
-
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -286,7 +343,6 @@ function AbaPedidos({ linhas, catalogo, campanha, onMudar, onNovo }: {
           <option value="">Todas as situações</option>
           {(Object.keys(ROTULO_SITUACAO) as SituacaoEnvio[]).map(s => <option key={s} value={s}>{ROTULO_SITUACAO[s].rot}</option>)}
         </select>
-        <button onClick={exportar} disabled={linhas.length === 0} className={`${btnCls} border-slate-200 text-slate-700 hover:bg-slate-50`}><Download size={14} /> Planilha (CSV)</button>
         <button onClick={onNovo} className={`${btnCls} bg-brand-green-dark border-brand-green-dark text-white`}><Plus size={14} /> Novo pedido pela equipe</button>
       </div>
 
@@ -310,7 +366,7 @@ function AbaPedidos({ linhas, catalogo, campanha, onMudar, onNovo }: {
                   <span className="font-mono text-xs font-bold text-slate-500">{e.codigo}</span>
                   <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${ROTULO_SITUACAO[s].chip}`}>{ROTULO_SITUACAO[s].rot}</span>
                   {e.origem === 'equipe' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800">feito pela equipe</span>}
-                  {!l.pedido.cpfHash && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">avulso</span>}
+                  {ehAvulso(l.pedido) && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">avulso</span>}
                 </div>
                 <div className="font-bold text-slate-800">{e.responsavel}</div>
                 <div className="text-xs text-slate-500">
@@ -319,7 +375,7 @@ function AbaPedidos({ linhas, catalogo, campanha, onMudar, onNovo }: {
               </div>
               <div className="text-right">
                 <div className="text-lg font-black text-brand-green-dark">{moeda(e.total)}</div>
-                <div className="text-[11px] text-slate-500">{qtdPecas(e.itens)} {qtdPecas(e.itens) === 1 ? "peça" : "peças"}</div>
+                <div className="text-[11px] text-slate-500">{qtdPecas(e.itens)} {qtdPecas(e.itens) === 1 ? "peça" : "peças"} · {textoPagamento(e)}</div>
               </div>
             </div>
 
@@ -348,10 +404,7 @@ function AbaPedidos({ linhas, catalogo, campanha, onMudar, onNovo }: {
 
             <div className="flex flex-wrap gap-2 pt-1">
               {!e.cancelado && <>
-                <button onClick={() => onMudar(l, x => ({ ...x, pago: !x.pago }), e.pago ? 'Pagamento desmarcado' : 'Marcado como pago')}
-                  className={`${btnCls} ${e.pago ? 'bg-sky-600 border-sky-600 text-white' : 'border-sky-200 text-sky-800 hover:bg-sky-50'}`}>
-                  <CheckCircle2 size={14} /> {e.pago ? 'Pago' : 'Marcar pago'}
-                </button>
+                <ControleParcelas e={e} onMarcar={(pagas, ok) => onMudar(l, x => comParcelasPagas(x, pagas), ok)} />
                 <button onClick={() => onMudar(l, x => ({ ...x, entregue: !x.entregue }), e.entregue ? 'Entrega desmarcada' : 'Marcado como entregue')}
                   className={`${btnCls} ${e.entregue ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-emerald-200 text-emerald-800 hover:bg-emerald-50'}`}>
                   <PackageCheck size={14} /> {e.entregue ? 'Entregue' : 'Marcar entregue'}
@@ -373,6 +426,35 @@ function AbaPedidos({ linhas, catalogo, campanha, onMudar, onNovo }: {
   );
 }
 
+/** Botões das parcelas: clicar numa parcela marca até ela como paga; clicar de novo na última paga desmarca. */
+function ControleParcelas({ e, onMarcar }: { e: EnvioUniforme; onMarcar: (pagas: number, ok: string) => void }) {
+  const { n, pagas } = parcelasDe(e);
+  const vals = valoresParcelas(e.total, n);
+  if (n === 1) {
+    return (
+      <button onClick={() => onMarcar(pagas ? 0 : 1, pagas ? 'Pagamento desmarcado' : 'Marcado como pago')}
+        className={`${btnCls} ${pagas ? 'bg-sky-600 border-sky-600 text-white' : 'border-sky-200 text-sky-800 hover:bg-sky-50'}`}>
+        <CheckCircle2 size={14} /> {pagas ? 'Pago à vista' : 'Marcar pago (à vista)'}
+      </button>
+    );
+  }
+  return (
+    <div className="inline-flex items-center gap-1 rounded-lg border border-sky-200 p-1" role="group" aria-label="Parcelas pagas">
+      <span className="text-[11px] font-bold text-sky-800 px-1.5">Parcelas pagas:</span>
+      {vals.map((v, i) => {
+        const paga = i < pagas;
+        const alvo = paga && i === pagas - 1 ? i : i + 1;
+        return (
+          <button key={i} onClick={() => onMarcar(alvo, `${alvo} de ${n} parcelas pagas`)} title={`${i + 1}ª parcela · ${moeda(v)}`}
+            className={`text-xs font-bold px-2.5 py-1.5 rounded-md border ${paga ? 'bg-sky-600 border-sky-600 text-white' : 'border-slate-200 text-slate-600 hover:bg-sky-50'}`}>
+            {paga ? '✓ ' : ''}{i + 1}ª
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ================================================================== */
 /* Lista para a fornecedora                                            */
 /* ================================================================== */
@@ -381,7 +463,7 @@ function AbaFornecedor({ linhas, catalogo, campanha, showToast }: {
   linhas: LinhaEnvio[]; catalogo: PecaCatalogo[]; campanha: CampanhaUniforme; showToast: ShowToast;
 }) {
   const [soPagos, setSoPagos] = useState(false);
-  const envios = linhas.map(l => l.envio).filter(e => !soPagos || e.pago);
+  const envios = linhas.map(l => l.envio).filter(e => !soPagos || pagou(e));
   const ordem = (nome: string) => catalogo.find(p => p.nome === nome)?.ordem ?? 999;
   const lista = listaFornecedor(envios, ordem);
   const total = lista.reduce((s, l) => s + l.qtd, 0);
@@ -430,7 +512,7 @@ function AbaFornecedor({ linhas, catalogo, campanha, showToast }: {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={soPagos} onChange={e => setSoPagos(e.target.checked)} /> Só pedidos pagos</label>
+        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={soPagos} onChange={e => setSoPagos(e.target.checked)} /> Só pedidos com pagamento (à vista ou 1ª parcela)</label>
         <span className="text-xs text-slate-500">Pedidos cancelados não entram.</span>
         <div className="ml-auto flex gap-2">
           <button onClick={exportar} disabled={lista.length === 0} className={`${btnCls} border-slate-200 text-slate-700 hover:bg-slate-50`}><Download size={14} /> CSV</button>
@@ -486,7 +568,7 @@ function AbaRecibos({ linhas, campanha, showToast, onMudar }: {
     const m = new Map<string, ReciboFamilia>();
     for (const l of [...linhas].reverse()) {
       const e = l.envio;
-      if (e.cancelado || (soPagos && !e.pago) || (ocultarEntregues && e.entregue)) continue;
+      if (e.cancelado || (soPagos && !pagou(e)) || (ocultarEntregues && e.entregue)) continue;
       if (!m.has(l.pedido.id)) m.set(l.pedido.id, { pedido: l.pedido, envios: [], linhas: [] });
       m.get(l.pedido.id)!.envios.push(e);
       m.get(l.pedido.id)!.linhas.push(l);
@@ -500,8 +582,6 @@ function AbaRecibos({ linhas, campanha, showToast, onMudar }: {
   const htmlRecibo = (r: ReciboFamilia) => {
     const itens = r.envios.flatMap(e => e.itens);
     const total = r.envios.reduce((s, e) => s + e.total, 0);
-    const pago = r.envios.every(e => e.pago);
-    const algumPago = r.envios.some(e => e.pago);
     const resp = r.envios[r.envios.length - 1];
     const criancas = [...new Set(itens.map(i => i.crianca))].join(', ');
     const corpo = itens.map(i => `<tr><td>${esc(i.crianca)}</td><td>${esc(i.peca)}</td><td>${esc(i.cor)}</td><td class="c">${esc(i.tamanho)}</td><td class="c">${i.qtd}</td><td class="r">${esc(moeda(i.preco * i.qtd))}</td></tr>`).join('');
@@ -511,7 +591,7 @@ function AbaRecibos({ linhas, campanha, showToast, onMudar }: {
       <div class="dados"><div><span>Responsável:</span> <b>${esc(resp.responsavel)}</b></div><div><span>Telefone:</span> ${esc(resp.telefone)}</div><div class="full"><span>Aluno(a):</span> <b>${esc(criancas)}</b></div></div>
       <table><thead><tr><th>Criança</th><th>Peça</th><th>Cor</th><th class="c">Tam.</th><th class="c">Qtd</th><th class="r">Valor</th></tr></thead><tbody>${corpo}</tbody>
       <tfoot><tr><td colspan="5" class="r"><b>TOTAL</b></td><td class="r"><b>${esc(moeda(total))}</b></td></tr></tfoot></table>
-      <div class="pag">Pagamento: Pix · ${pago ? 'PAGO' : algumPago ? 'PAGO EM PARTE' : 'PENDENTE'}</div>
+      <div class="pag">Pagamento: ${esc(r.envios.map(e => (r.envios.length > 1 ? e.codigo + ': ' : '') + textoPagamento(e)).join(' · '))}</div>
       <div class="ass"><div>Recebido em ____/____/________</div><div class="linha">Assinatura do responsável</div></div>
     </div>`;
   };
@@ -551,7 +631,7 @@ function AbaRecibos({ linhas, campanha, showToast, onMudar }: {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={soPagos} onChange={e => setSoPagos(e.target.checked)} /> Só pedidos pagos</label>
+        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={soPagos} onChange={e => setSoPagos(e.target.checked)} /> Só pedidos com pagamento</label>
         <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={ocultarEntregues} onChange={e => setOcultarEntregues(e.target.checked)} /> Esconder os já entregues</label>
         <div className="ml-auto flex gap-2">
           <button onClick={() => imprimir(escolhidos)} disabled={escolhidos.length === 0} className={`${btnCls} bg-brand-green-dark border-brand-green-dark text-white`}>
@@ -573,6 +653,7 @@ function AbaRecibos({ linhas, campanha, showToast, onMudar }: {
             const itens = r.envios.flatMap(e => e.itens);
             const total = r.envios.reduce((s, e) => s + e.total, 0);
             const pago = r.envios.every(e => e.pago);
+            const algum = r.envios.some(pagou);
             return (
               <div key={r.pedido.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <input type="checkbox" checked={marcados.has(r.pedido.id)} aria-label={`Incluir ${r.envios[0].responsavel}`}
@@ -581,7 +662,7 @@ function AbaRecibos({ linhas, campanha, showToast, onMudar }: {
                   <div className="font-semibold text-slate-800 text-sm">{r.envios[r.envios.length - 1].responsavel}</div>
                   <div className="text-xs text-slate-500">{[...new Set(itens.map(i => i.crianca))].join(', ')} · {qtdPecas(itens)} peças · {r.envios.map(e => e.codigo).join(', ')}</div>
                 </div>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${pago ? ROTULO_SITUACAO.pago.chip : ROTULO_SITUACAO.aguardando.chip}`}>{pago ? 'Pago' : 'Pagamento pendente'}</span>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${pago ? ROTULO_SITUACAO.pago.chip : algum ? ROTULO_SITUACAO.parcial.chip : ROTULO_SITUACAO.aguardando.chip}`}>{r.envios.map(textoPagamento).join(' · ')}</span>
                 <span className="font-black text-brand-green-dark text-sm w-24 text-right">{moeda(total)}</span>
                 <button onClick={() => imprimir([r])} className={`${btnCls} border-slate-200 text-slate-700 hover:bg-slate-50`}><Printer size={14} /> Recibo</button>
                 {r.envios.some(e => !e.entregue) && (
@@ -677,38 +758,38 @@ function AbaCatalogo({ catalogo, onSalvo, showToast }: { catalogo: PecaCatalogo[
 function NovoPedidoEquipe({ campanha, catalogo, showToast, onFechar, onSalvo }: {
   campanha: CampanhaUniforme; catalogo: PecaCatalogo[]; showToast: ShowToast; onFechar: () => void; onSalvo: () => Promise<void>;
 }) {
-  const [situacoes, setSituacoes] = useState<SituacaoDoc[] | null>(null);
+  const [lista, setLista] = useState<FamiliaUniforme[] | null>(null);
   const [busca, setBusca] = useState('');
-  const [familia, setFamilia] = useState<SituacaoDoc | null>(null);
+  const [familia, setFamilia] = useState<FamiliaUniforme | null>(null);
   const [avulso, setAvulso] = useState(false);
   const [avulsoNome, setAvulsoNome] = useState('');
   const [avulsoTurma, setAvulsoTurma] = useState('');
   const [responsavel, setResponsavel] = useState('');
   const [telefone, setTelefone] = useState('');
   const [obs, setObs] = useState('');
-  const [pago, setPago] = useState(false);
+  const [parcelas, setParcelas] = useState(1);
+  const [pagas, setPagas] = useState(0);
   const [selecao, setSelecao] = useState<SelecaoUniformes>({});
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    getCollectionData<SituacaoDoc>(COLECAO_SITUACAO).then(setSituacoes).catch(() => setSituacoes([]));
-  }, []);
+  useEffect(() => { carregarFamilias().then(setLista).catch(() => setLista([])); }, []);
 
   const criancas: CriancaUniforme[] = avulso
     ? (avulsoNome.trim() ? [{ nome: avulsoNome.trim(), turma: avulsoTurma.trim() || 'Não informada' }] : [])
-    : (familia?.criancas.map(c => ({ nome: c.nome, turma: c.turma })) || []);
+    : (familia?.criancas || []);
 
   const resultados = useMemo(() => {
-    if (!situacoes || busca.trim().length < 2) return [];
+    if (!lista || busca.trim().length < 2) return [];
     const q = norm(busca.trim());
-    // Um mesmo grupo de crianças pode estar em mais de um CPF; mostra cada grupo uma vez.
-    const vistos = new Set<string>();
-    return situacoes.filter(s => s.criancas.some(c => norm(c.nome).includes(q))).filter(s => {
-      const k = s.criancas.map(c => c.nome).join('|');
-      if (vistos.has(k)) return false;
-      vistos.add(k); return true;
-    }).slice(0, 8);
-  }, [situacoes, busca]);
+    return lista
+      .filter(f => norm(f.responsavel).includes(q) || f.criancas.some(c => norm(c.nome).includes(q)))
+      .sort((a, b) => a.responsavel.localeCompare(b.responsavel, 'pt-BR'))
+      .slice(0, 10);
+  }, [lista, busca]);
+
+  const escolher = (f: FamiliaUniforme) => {
+    setFamilia(f); setSelecao({}); setResponsavel(f.responsavel); setTelefone(f.telefone);
+  };
 
   const itens = itensDaSelecao(selecao, catalogo, criancas);
   const total = totalItens(itens);
@@ -718,14 +799,16 @@ function NovoPedidoEquipe({ campanha, catalogo, showToast, onFechar, onSalvo }: 
     if (itens.length === 0) { showToast('Escolha pelo menos uma peça', undefined, 'error'); return; }
     if (selecaoIncompleta(selecao)) { showToast('Falta tamanho ou cor em alguma peça', undefined, 'error'); return; }
     const juntos = juntarItens(itens);
-    const envio: EnvioUniforme = {
+    const base: EnvioUniforme = {
       codigo: novoCodigo(), criadoEm: new Date().toISOString(), responsavel: responsavel.trim(), telefone: telefone.trim(),
-      itens: juntos, total: totalItens(juntos), pago, entregue: false, cancelado: false, origem: 'equipe',
+      itens: juntos, total: totalItens(juntos), pago: false, entregue: false, cancelado: false, origem: 'equipe',
+      parcelas, parcelasPagas: 0,
       ...(obs.trim() ? { obs: obs.trim() } : {}),
     };
+    const envio = comParcelasPagas(base, pagas);
     setSalvando(true);
     try {
-      if (familia && !avulso) await acrescentarEnvio(campanha.id, familia.id, envio);
+      if (familia && !avulso) await acrescentarEnvio(campanha.id, familia.grupo, envio);
       else await salvarPedidoAvulso(campanha.id, envio);
       showToast('Pedido registrado', `${envio.codigo} · ${moeda(envio.total)}`, 'success');
       await onSalvo();
@@ -744,20 +827,21 @@ function NovoPedidoEquipe({ campanha, catalogo, showToast, onFechar, onSalvo }: 
           {!campanha.aberta && <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">Este lote está encerrado para as famílias, mas a equipe ainda pode lançar pedidos nele.</p>}
 
           <div className="flex gap-2">
-            <button onClick={() => { setAvulso(false); setSelecao({}); }} className={`${btnCls} ${!avulso ? 'bg-brand-green-dark border-brand-green-dark text-white' : 'border-slate-200 text-slate-600'}`}>Aluno matriculado</button>
-            <button onClick={() => { setAvulso(true); setFamilia(null); setSelecao({}); }} className={`${btnCls} ${avulso ? 'bg-brand-green-dark border-brand-green-dark text-white' : 'border-slate-200 text-slate-600'}`}>Outra pessoa (sem CPF no sistema)</button>
+            <button onClick={() => { setAvulso(false); setSelecao({}); }} className={`${btnCls} ${!avulso ? 'bg-brand-green-dark border-brand-green-dark text-white' : 'border-slate-200 text-slate-600'}`}>Família cadastrada</button>
+            <button onClick={() => { setAvulso(true); setFamilia(null); setSelecao({}); setResponsavel(''); setTelefone(''); }} className={`${btnCls} ${avulso ? 'bg-brand-green-dark border-brand-green-dark text-white' : 'border-slate-200 text-slate-600'}`}>Outra pessoa (sem CPF no sistema)</button>
           </div>
 
           {!avulso && !familia && (
             <div className="space-y-2">
-              <label className={labelCls}>Procure pelo nome da criança</label>
+              <label className={labelCls}>Procure pelo nome da criança ou do responsável</label>
               <input className={inputCls} value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite ao menos 2 letras" autoFocus />
-              {situacoes === null && <p className="text-xs text-slate-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Carregando famílias…</p>}
-              {situacoes && situacoes.length === 0 && <p className="text-xs text-amber-800">Nenhum resumo publicado. Clique em "Página das famílias" na aba Contratos, ou use "Outra pessoa".</p>}
+              {lista === null && <p className="text-xs text-slate-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Carregando famílias…</p>}
+              {lista && lista.length === 0 && <p className="text-xs text-amber-800">Nenhuma família publicada ainda. Clique em "atualizar agora" no topo da aba, ou use "Outra pessoa".</p>}
               <div className="space-y-1">
-                {resultados.map(s => (
-                  <button key={s.id} onClick={() => { setFamilia(s); setSelecao({}); }} className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:bg-brand-cream text-sm">
-                    {s.criancas.map(c => <span key={c.nome} className="block"><strong>{c.nome}</strong> <span className="text-slate-500">· {c.turma}</span></span>)}
+                {resultados.map(f => (
+                  <button key={f.id} onClick={() => escolher(f)} className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:bg-brand-cream text-sm">
+                    <span className="block font-bold text-slate-800">{f.responsavel} <span className="font-normal text-slate-500">· {f.parentesco}{f.telefone ? ` · ${f.telefone}` : ''}</span></span>
+                    <span className="block text-xs text-slate-600">{f.criancas.map(c => `${c.nome} (${c.turma})`).join(', ')}</span>
                   </button>
                 ))}
               </div>
@@ -773,7 +857,7 @@ function NovoPedidoEquipe({ campanha, catalogo, showToast, onFechar, onSalvo }: 
 
           {avulso && (
             <div className="grid sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><label className={labelCls}>Nome da criança (ou de quem vai usar)</label><input className={inputCls} value={avulsoNome} onChange={e => { setAvulsoNome(e.target.value); }} /></div>
+              <div className="space-y-1"><label className={labelCls}>Nome da criança (ou de quem vai usar)</label><input className={inputCls} value={avulsoNome} onChange={e => setAvulsoNome(e.target.value)} /></div>
               <div className="space-y-1"><label className={labelCls}>Turma</label><input className={inputCls} value={avulsoTurma} onChange={e => setAvulsoTurma(e.target.value)} placeholder="Ex.: Fundamental 2º ano, Funcionário" /></div>
             </div>
           )}
@@ -787,13 +871,24 @@ function NovoPedidoEquipe({ campanha, catalogo, showToast, onFechar, onSalvo }: 
               {criancas.length > 0
                 ? <SeletorUniformes catalogo={catalogo} criancas={criancas} selecao={selecao} onChange={setSelecao} />
                 : <p className="text-xs text-slate-500">Escreva o nome para escolher as peças.</p>}
+              {itens.length > 0 && (
+                <div className="space-y-2">
+                  <label className={labelCls}>Forma de pagamento</label>
+                  <EscolhaPagamento total={total} parcelas={parcelas} onChange={n => { setParcelas(n); setPagas(p => Math.min(p, n)); }} />
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    Já pagas:
+                    <select value={pagas} onChange={e => setPagas(Number(e.target.value))} className="text-sm px-2 py-1 rounded-lg border border-slate-200">
+                      {Array.from({ length: parcelas + 1 }, (_, i) => <option key={i} value={i}>{i === 0 ? 'nenhuma' : parcelas === 1 ? 'pago' : `${i} de ${parcelas}`}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
               <div className="space-y-1"><label className={labelCls}>Observação</label><input className={inputCls} value={obs} onChange={e => setObs(e.target.value)} /></div>
-              <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={pago} onChange={e => setPago(e.target.checked)} /> Já está pago</label>
             </>
           )}
         </div>
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
-          <div><div className="text-[10px] font-bold uppercase text-slate-500">{qtdPecas(itens)} peças</div><div className="text-lg font-black text-brand-green-dark">{moeda(total)}</div></div>
+          <div><div className="text-[10px] font-bold uppercase text-slate-500">{qtdPecas(itens)} peças{parcelas > 1 ? ` · ${parcelas}x` : ''}</div><div className="text-lg font-black text-brand-green-dark">{moeda(total)}</div></div>
           <div className="flex gap-2">
             <button onClick={onFechar} className={`${btnCls} border-slate-200 text-slate-600`}>Cancelar</button>
             <button onClick={salvar} disabled={salvando || itens.length === 0} className={`${btnCls} bg-brand-orange border-brand-orange text-white`}>

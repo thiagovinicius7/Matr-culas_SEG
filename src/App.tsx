@@ -2632,7 +2632,15 @@ export default function App() {
                 <VivenciasTab showToast={showToast} />
               )}
               {activeTab === 'uniformes' && (
-                <UniformesTab showToast={showToast} />
+                <UniformesTab
+                  students={students}
+                  guardians={guardians}
+                  enrollments={enrollments}
+                  contraturnos={contraturnos}
+                  classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
+                  showToast={showToast}
+                />
               )}
               {activeTab === 'importar' && (
                 <ImportarTab

@@ -4,12 +4,13 @@
  * Coleções no Firestore:
  *  - uniformeCatalogo/{id}   → peças à venda (nome, cores, tamanhos, preço). Só a equipe grava.
  *  - uniformeCampanhas/{id}  → cada "pedido" (lote) que a escola abre e encerra à mão.
- *  - uniformePedidos/{campanhaId}_{hashDoCpf} → tudo o que uma família pediu naquele lote.
+ *  - uniformeFamilias/{hashDoCpf} → resumo por CPF de responsável (publicado pela aba da equipe).
+ *  - uniformePedidos/{campanhaId}_{grupo} → tudo o que uma família pediu naquele lote.
  *    Cada envio do formulário vira um item de `envios`. A família só lê pelo id exato
  *    (precisa saber o CPF) e só consegue ACRESCENTAR envios; a equipe lê e altera tudo.
  *
- * A família é reconhecida pelo mesmo resumo da "Situação da matrícula" (coleção situacaoMatricula):
- * o CPF do responsável financeiro leva às crianças e às turmas de 2027.
+ * A família é reconhecida pelo resumo da coleção uniformeFamilias (ver familias.ts): o CPF de qualquer
+ * responsável cadastrado leva ao nome, ao telefone, às crianças e às turmas de 2027.
  *
  * Este módulo é PURO: tipos, catálogo padrão, contas e textos. O acesso ao banco fica em uniformesDb.ts.
  */
@@ -18,6 +19,7 @@ import { ZAP_FINANCEIRO, moeda } from '../situacao/situacao';
 export const COL_CATALOGO = 'uniformeCatalogo';
 export const COL_CAMPANHAS = 'uniformeCampanhas';
 export const COL_PEDIDOS = 'uniformePedidos';
+export const COL_FAMILIAS = 'uniformeFamilias';
 
 /* ------------------------------------------------------------------ */
 /* Tipos                                                               */
@@ -67,13 +69,20 @@ export interface EnvioUniforme {
   cancelado: boolean;
   origem: 'link' | 'equipe';
   obs?: string;
+  /** Em quantas parcelas a família escolheu pagar (1 = à vista; até 4). Pedidos antigos: ausente = 1. */
+  parcelas?: number;
+  /** Quantas parcelas a equipe já confirmou. Ausente = 0 (ou todas, se `pago`). */
+  parcelasPagas?: number;
 }
 
 export interface PedidoUniformeDoc {
   id: string;
   campanhaId: string;
-  /** Hash do CPF do responsável financeiro (o mesmo id da Situação). Vazio em pedidos avulsos da equipe. */
-  cpfHash: string;
+  /** Grupo da família (ver familias.ts): todos os responsáveis das mesmas crianças caem no mesmo pedido.
+   *  Vazio em pedidos avulsos da equipe. */
+  grupo?: string;
+  /** Formato antigo (primeira versão): hash do CPF do responsável financeiro. */
+  cpfHash?: string;
   envios: EnvioUniforme[];
   atualizadoEm: string;
 }
@@ -121,17 +130,62 @@ export function juntarItens(itens: ItemPedido[]): ItemPedido[] {
   return [...mapa.values()];
 }
 
-export type SituacaoEnvio = 'cancelado' | 'entregue' | 'pago' | 'aguardando';
+/* ---------------- Pagamento em parcelas ---------------- */
+
+export const MAX_PARCELAS = 4;
+
+/** Parcelas do envio, já normalizadas (pedidos antigos não tinham esses campos). */
+export function parcelasDe(e: Pick<EnvioUniforme, 'parcelas' | 'parcelasPagas' | 'pago'>): { n: number; pagas: number } {
+  const n = Math.min(MAX_PARCELAS, Math.max(1, Math.round(Number(e.parcelas) || 1)));
+  const pagas = e.parcelasPagas === undefined ? (e.pago ? n : 0) : Math.min(n, Math.max(0, Math.round(Number(e.parcelasPagas) || 0)));
+  return { n, pagas };
+}
+
+/** Valores de cada parcela; o centavo que sobrar vai para a última. */
+export function valoresParcelas(total: number, n: number): number[] {
+  const c = centavos(total);
+  const base = Math.floor(c / n);
+  return Array.from({ length: n }, (_, i) => (i === n - 1 ? c - base * (n - 1) : base) / 100);
+}
+
+export const valorPago = (e: EnvioUniforme) => {
+  const { n, pagas } = parcelasDe(e);
+  return valoresParcelas(e.total, n).slice(0, pagas).reduce((s, v) => s + v, 0);
+};
+
+export const formaPagamento = (e: EnvioUniforme) => {
+  const { n } = parcelasDe(e);
+  return n === 1 ? 'Pix à vista' : `Pix em ${n}x`;
+};
+
+/** Grava quantas parcelas foram pagas, mantendo `pago` coerente. */
+export function comParcelasPagas(e: EnvioUniforme, pagas: number): EnvioUniforme {
+  const { n } = parcelasDe(e);
+  const p = Math.min(n, Math.max(0, pagas));
+  return { ...e, parcelas: n, parcelasPagas: p, pago: p >= n };
+}
+
+export type SituacaoEnvio = 'cancelado' | 'entregue' | 'pago' | 'parcial' | 'aguardando';
 
 export function situacaoDoEnvio(e: EnvioUniforme): SituacaoEnvio {
   if (e.cancelado) return 'cancelado';
   if (e.entregue) return 'entregue';
-  if (e.pago) return 'pago';
+  const { n, pagas } = parcelasDe(e);
+  if (pagas >= n) return 'pago';
+  if (pagas > 0) return 'parcial';
   return 'aguardando';
+}
+
+/** Texto curto do pagamento: "À vista · pago", "4x · 2 de 4 pagas"… */
+export function textoPagamento(e: EnvioUniforme): string {
+  const { n, pagas } = parcelasDe(e);
+  if (n === 1) return pagas ? 'À vista · pago' : 'À vista · pendente';
+  return `${n}x · ${pagas} de ${n} ${pagas === 1 ? 'paga' : 'pagas'}`;
 }
 
 export const ROTULO_SITUACAO: Record<SituacaoEnvio, { rot: string; familia: string; chip: string }> = {
   aguardando: { rot: 'Aguardando pagamento', familia: 'Aguardando o pagamento', chip: 'bg-amber-100 text-amber-900 border-amber-200' },
+  parcial: { rot: 'Pago em parte', familia: 'Parcelas em andamento', chip: 'bg-orange-100 text-orange-900 border-orange-200' },
   pago: { rot: 'Pago', familia: 'Pagamento confirmado · aguardando a entrega', chip: 'bg-sky-100 text-sky-800 border-sky-200' },
   entregue: { rot: 'Entregue', familia: 'Entregue', chip: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
   cancelado: { rot: 'Cancelado', familia: 'Cancelado', chip: 'bg-slate-100 text-slate-500 border-slate-200' },
@@ -183,7 +237,7 @@ export function novoCodigo(): string {
   return 'U-' + Array.from(bytes, b => ALFABETO[b % ALFABETO.length]).join('');
 }
 
-export const idPedido = (campanhaId: string, cpfHash: string) => `${campanhaId}_${cpfHash}`;
+export const idPedido = (campanhaId: string, grupo: string) => `${campanhaId}_${grupo}`;
 
 export function novoIdCampanha(): string {
   return `uni-${Date.now().toString(36)}`;
@@ -198,20 +252,36 @@ export const separarLista = (s: string) => s.split(',').map(x => x.trim()).filte
 /* Mensagens                                                           */
 /* ------------------------------------------------------------------ */
 
-export function mensagemComprovanteUniforme(e: Pick<EnvioUniforme, 'codigo' | 'responsavel' | 'total' | 'itens'>): string {
+/** O que está sendo pago agora: a próxima parcela ou o restante de uma vez. */
+export interface PagamentoAgora { valor: number; descricao: string }
+
+export function pagamentoAgora(e: EnvioUniforme, restante = false): PagamentoAgora | null {
+  const { n, pagas } = parcelasDe(e);
+  if (pagas >= n) return null;
+  const vals = valoresParcelas(e.total, n);
+  if (n === 1) return { valor: vals[0], descricao: 'Pagamento à vista' };
+  if (restante && n - pagas > 1) {
+    const valor = vals.slice(pagas).reduce((s, v) => s + v, 0);
+    return { valor: Math.round(valor * 100) / 100, descricao: `Parcelas ${pagas + 1} a ${n} de ${n} (restante)` };
+  }
+  return { valor: vals[pagas], descricao: `Parcela ${pagas + 1} de ${n}` };
+}
+
+export function mensagemComprovanteUniforme(e: Pick<EnvioUniforme, 'codigo' | 'responsavel' | 'itens'>, p: PagamentoAgora): string {
   const criancas = [...new Set(e.itens.map(i => i.crianca))].join(', ');
   return (
     `Olá! Segue o comprovante do Pix do pedido de uniformes.\n\n` +
     `Pedido: ${e.codigo}\n` +
     `Responsável: ${e.responsavel}\n` +
     `Criança(s): ${criancas}\n` +
-    `Valor pago: ${moeda(e.total)}\n\n` +
+    `${p.descricao}\n` +
+    `Valor pago: ${moeda(p.valor)}\n\n` +
     `(comprovante em anexo)`
   );
 }
 
-export const linkZapComprovanteUniforme = (e: Pick<EnvioUniforme, 'codigo' | 'responsavel' | 'total' | 'itens'>) =>
-  `https://wa.me/${ZAP_FINANCEIRO}?text=${encodeURIComponent(mensagemComprovanteUniforme(e))}`;
+export const linkZapComprovanteUniforme = (e: Pick<EnvioUniforme, 'codigo' | 'responsavel' | 'itens'>, p: PagamentoAgora) =>
+  `https://wa.me/${ZAP_FINANCEIRO}?text=${encodeURIComponent(mensagemComprovanteUniforme(e, p))}`;
 
 export const linkZapDuvidaUniforme = (texto?: string) =>
   `https://wa.me/${ZAP_FINANCEIRO}?text=${encodeURIComponent(texto || 'Olá! Tenho uma dúvida sobre o pedido de uniformes.')}`;
@@ -226,8 +296,8 @@ export function mensagemDivulgacao(link: string): string {
   return (
     `Olá, famílias! 🌱\n\n` +
     `Está aberto o pedido de uniformes do Sítio-Escola Geranium.\n\n` +
-    `É só abrir o link, digitar o CPF do responsável financeiro e escolher as peças de cada criança. ` +
-    `O pagamento é por Pix e o comprovante vai direto para o financeiro.\n\n` +
+    `É só abrir o link, digitar o CPF de um dos responsáveis cadastrados na escola e escolher as peças de cada criança. ` +
+    `O pagamento é por Pix, à vista ou em até 4 vezes, e o comprovante vai direto para o financeiro.\n\n` +
     `👉 ${link}\n\n` +
     `Qualquer dúvida, estamos por aqui.`
   );

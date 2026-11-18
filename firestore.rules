@@ -270,7 +270,14 @@ service cloud.firestore {
       allow write: if isEquipe();
     }
 
-    // Pedidos: um documento por família e lote, id = <lote>_<hash do CPF>.
+    // Resumo das famílias para o pedido (um por CPF de responsável; id = hash do CPF).
+    // Publicado pela equipe; a família só lê pelo id exato.
+    match /uniformeFamilias/{familiaId} {
+      allow get: if isSignedIn();
+      allow list, write: if isEquipe();
+    }
+
+    // Pedidos: um documento por família e lote, id = <lote>_<grupo da família>.
     // A família (link público, login anônimo) só lê pelo id exato e só ACRESCENTA
     // um envio novo, com o lote aberto; não altera nem apaga o que já existe.
     function uniformeLoteAberto(campanhaId) {
@@ -278,7 +285,7 @@ service cloud.firestore {
     }
 
     function uniformeEnvioFamiliaOk(e) {
-      return e.keys().hasOnly(['codigo', 'criadoEm', 'responsavel', 'telefone', 'itens', 'total', 'pago', 'entregue', 'cancelado', 'origem', 'obs'])
+      return e.keys().hasOnly(['codigo', 'criadoEm', 'responsavel', 'telefone', 'itens', 'total', 'pago', 'entregue', 'cancelado', 'origem', 'obs', 'parcelas', 'parcelasPagas'])
         && e.codigo is string && e.codigo.size() <= 20
         && e.criadoEm is string
         && e.responsavel is string && e.responsavel.size() > 0 && e.responsavel.size() <= 200
@@ -287,14 +294,16 @@ service cloud.firestore {
         && (e.total is int || e.total is float)
         && e.pago == false && e.entregue == false && e.cancelado == false
         && e.origem == 'link'
+        && e.parcelas is int && e.parcelas >= 1 && e.parcelas <= 4
+        && e.parcelasPagas == 0
         && (!e.keys().hasAny(['obs']) || (e.obs is string && e.obs.size() <= 1000));
     }
 
     function uniformeCriacaoFamiliaOk(pedidoId) {
-      return request.resource.data.keys().hasOnly(['id', 'campanhaId', 'cpfHash', 'envios', 'atualizadoEm'])
+      return request.resource.data.keys().hasOnly(['id', 'campanhaId', 'grupo', 'envios', 'atualizadoEm'])
         && request.resource.data.id == pedidoId
-        && request.resource.data.cpfHash is string && request.resource.data.cpfHash.size() == 64
-        && pedidoId == request.resource.data.campanhaId + '_' + request.resource.data.cpfHash
+        && request.resource.data.grupo is string && request.resource.data.grupo.size() == 64
+        && pedidoId == request.resource.data.campanhaId + '_' + request.resource.data.grupo
         && uniformeLoteAberto(request.resource.data.campanhaId)
         && request.resource.data.envios is list && request.resource.data.envios.size() == 1
         && uniformeEnvioFamiliaOk(request.resource.data.envios[0]);
