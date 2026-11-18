@@ -257,5 +257,64 @@ service cloud.firestore {
       allow list: if isEquipe();
       allow write: if isEquipe();
     }
+
+    // ===================== UNIFORMES =====================
+    // Catálogo e lotes ("pedidos" que a escola abre e encerra): todos leem, só a equipe grava.
+    match /uniformeCatalogo/{pecaId} {
+      allow read: if isSignedIn();
+      allow write: if isEquipe();
+    }
+
+    match /uniformeCampanhas/{campanhaId} {
+      allow read: if isSignedIn();
+      allow write: if isEquipe();
+    }
+
+    // Pedidos: um documento por família e lote, id = <lote>_<hash do CPF>.
+    // A família (link público, login anônimo) só lê pelo id exato e só ACRESCENTA
+    // um envio novo, com o lote aberto; não altera nem apaga o que já existe.
+    function uniformeLoteAberto(campanhaId) {
+      return get(/databases/$(database)/documents/uniformeCampanhas/$(campanhaId)).data.aberta == true;
+    }
+
+    function uniformeEnvioFamiliaOk(e) {
+      return e.keys().hasOnly(['codigo', 'criadoEm', 'responsavel', 'telefone', 'itens', 'total', 'pago', 'entregue', 'cancelado', 'origem', 'obs'])
+        && e.codigo is string && e.codigo.size() <= 20
+        && e.criadoEm is string
+        && e.responsavel is string && e.responsavel.size() > 0 && e.responsavel.size() <= 200
+        && e.telefone is string && e.telefone.size() <= 40
+        && e.itens is list && e.itens.size() > 0 && e.itens.size() <= 60
+        && (e.total is int || e.total is float)
+        && e.pago == false && e.entregue == false && e.cancelado == false
+        && e.origem == 'link'
+        && (!e.keys().hasAny(['obs']) || (e.obs is string && e.obs.size() <= 1000));
+    }
+
+    function uniformeCriacaoFamiliaOk(pedidoId) {
+      return request.resource.data.keys().hasOnly(['id', 'campanhaId', 'cpfHash', 'envios', 'atualizadoEm'])
+        && request.resource.data.id == pedidoId
+        && request.resource.data.cpfHash is string && request.resource.data.cpfHash.size() == 64
+        && pedidoId == request.resource.data.campanhaId + '_' + request.resource.data.cpfHash
+        && uniformeLoteAberto(request.resource.data.campanhaId)
+        && request.resource.data.envios is list && request.resource.data.envios.size() == 1
+        && uniformeEnvioFamiliaOk(request.resource.data.envios[0]);
+    }
+
+    function uniformeAcrescimoFamiliaOk() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['envios', 'atualizadoEm'])
+        && uniformeLoteAberto(resource.data.campanhaId)
+        && request.resource.data.envios is list
+        && request.resource.data.envios.size() == resource.data.envios.size() + 1
+        && request.resource.data.envios.size() <= 30
+        && request.resource.data.envios[0:resource.data.envios.size()] == resource.data.envios
+        && uniformeEnvioFamiliaOk(request.resource.data.envios[resource.data.envios.size()]);
+    }
+
+    match /uniformePedidos/{pedidoId} {
+      allow get: if isSignedIn();
+      allow list, delete: if isEquipe();
+      allow create: if isEquipe() || (isSignedIn() && uniformeCriacaoFamiliaOk(pedidoId));
+      allow update: if isEquipe() || (isSignedIn() && uniformeAcrescimoFamiliaOk());
+    }
   }
 }

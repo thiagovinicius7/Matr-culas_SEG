@@ -49,12 +49,13 @@ import LoginScreen from './components/LoginScreen';
 import ContratosTab from './components/ContratosTab';
 import ImportarTab from './components/ImportarTab';
 import VivenciasTab from './components/VivenciasTab';
+import UniformesTab from './components/UniformesTab';
 import ParentCartaPortal from './components/ParentCartaPortal';
 import FichaDadosGeraisForm from './components/FichaDadosGeraisForm';
 import FichaSaudeForm from './components/FichaSaudeForm';
 import FichaAnamneseForm from './components/FichaAnamneseForm';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2, FileText, Leaf } from 'lucide-react';
+import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck, Loader2, FileText, Leaf, Shirt } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Data/hora em que esta versão foi publicada (vem do vite.config.ts). O typeof evita
@@ -2298,6 +2299,7 @@ export default function App() {
             { id: 'students', label: 'Fichas de Alunos', icon: Users },
             { id: 'contratos', label: 'Contratos', icon: FileText },
             { id: 'vivencias', label: 'Vivências', icon: Leaf },
+            { id: 'uniformes', label: 'Uniformes', icon: Shirt },
             { id: 'escala', label: 'Contraturno', icon: CalendarDays },
             { id: 'importar', label: 'Importar', icon: Upload },
             { id: 'pricing', label: 'Configurações', icon: Settings },
@@ -2393,6 +2395,7 @@ export default function App() {
                 { id: 'students', label: 'Fichas de Alunos', icon: Users },
                 { id: 'contratos', label: 'Contratos', icon: FileText },
                 { id: 'vivencias', label: 'Vivências', icon: Leaf },
+            { id: 'uniformes', label: 'Uniformes', icon: Shirt },
                 { id: 'escala', label: 'Contraturno', icon: CalendarDays },
                 { id: 'importar', label: 'Importar', icon: Upload },
                 { id: 'pricing', label: 'Configurações', icon: Settings },
@@ -2627,6 +2630,9 @@ export default function App() {
               )}
               {activeTab === 'vivencias' && (
                 <VivenciasTab showToast={showToast} />
+              )}
+              {activeTab === 'uniformes' && (
+                <UniformesTab showToast={showToast} />
               )}
               {activeTab === 'importar' && (
                 <ImportarTab
