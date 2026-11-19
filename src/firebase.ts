@@ -8,7 +8,10 @@ import {
   doc, 
   deleteDoc, 
   writeBatch,
-  runTransaction
+  runTransaction,
+  serverTimestamp,
+  query,
+  limit
 } from 'firebase/firestore';
 import {
   getAuth,
@@ -181,9 +184,16 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
  */
 export async function seedDatabaseIfEmpty() {
   const studentsRef = collection(db, 'students');
-  let studentsSnap;
+  // Checagem barata (2 leituras): antes lia TODOS os alunos a cada abertura do sistema.
+  let vazio = false;
+  let temExemplo = false;
   try {
-    studentsSnap = await getDocs(studentsRef);
+    const [umAluno, exemplo] = await Promise.all([
+      getDocs(query(studentsRef, limit(1))),
+      getDoc(doc(db, 'students', 'student_1')),
+    ]);
+    vazio = umAluno.empty;
+    temExemplo = exemplo.exists();
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'students');
   }
@@ -196,7 +206,7 @@ export async function seedDatabaseIfEmpty() {
   // alunos cadastrados: qualquer atualização de página apagava os dados
   // reais e recolocava o conjunto de exemplo (importedStudents.ts) por
   // cima. Essa contagem mínima foi removida.
-  const needsSeeding = studentsSnap.empty || studentsSnap.docs.some(d => d.id === 'student_1');
+  const needsSeeding = vazio || temExemplo;
   
   if (!needsSeeding) {
     console.log('Database already populated with official Sítio Geranium data. Skipping seed.');
@@ -269,11 +279,30 @@ export async function clearAllDatabaseCollections(): Promise<void> {
 /**
  * Fetch all documents from a Firestore collection
  */
+/** Campo com a hora do servidor de cada gravação (ver syncCache.ts). Nunca chega às telas. */
+export const CAMPO_SYNC = '_sync';
+
+/** Coleções lidas com cópia local no navegador + busca só do que mudou (syncCache.ts). */
+export const COLECOES_SINCRONIZADAS = new Set([
+  'students', 'guardians', 'enrollments', 'contraturnos', 'movements', 'classPrices',
+  'contraturnoPrices', 'settings', 'negotiationHistory', 'contraturnoDailyExceptions',
+  'packDocuments', 'coordenacaoSugestoes', 'fichasSaude', 'fichasAnamnese',
+  'contratos', 'contratoModelos', 'situacaoMatricula', 'uniformeFamilias',
+]);
+
+const semSync = <T,>(dados: any): T => {
+  if (dados && typeof dados === 'object' && CAMPO_SYNC in dados) {
+    const { [CAMPO_SYNC]: _descartado, ...resto } = dados;
+    return resto as T;
+  }
+  return dados as T;
+};
+
 export async function getCollectionData<T>(collectionName: string): Promise<T[]> {
   try {
     const colRef = collection(db, collectionName);
     const snap = await getDocs(colRef);
-    return snap.docs.map(d => d.data() as T);
+    return snap.docs.map(d => semSync<T>(d.data()));
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, collectionName);
   }
@@ -282,7 +311,7 @@ export async function getCollectionData<T>(collectionName: string): Promise<T[]>
 /** Lê UM documento pelo identificador exato (devolve null se não existir). */
 export async function getDocumentById<T>(collectionName: string, id: string): Promise<T | null> {
   const snap = await getDoc(doc(db, collectionName, id));
-  return snap.exists() ? (snap.data() as T) : null;
+  return snap.exists() ? semSync<T>(snap.data()) : null;
 }
 
 /**
@@ -291,7 +320,8 @@ export async function getDocumentById<T>(collectionName: string, id: string): Pr
 export async function saveDocument<T extends { id: string }>(collectionName: string, data: T): Promise<void> {
   try {
     const docRef = doc(db, collectionName, data.id);
-    await setDoc(docRef, data);
+    const { [CAMPO_SYNC]: _antigo, ...limpo } = data as any;
+    await setDoc(docRef, COLECOES_SINCRONIZADAS.has(collectionName) ? { ...limpo, [CAMPO_SYNC]: serverTimestamp() } : limpo);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${data.id}`);
   }

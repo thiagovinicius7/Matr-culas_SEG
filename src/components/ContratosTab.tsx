@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice, ContratoDoc, ContratoModelo, StatusContrato } from '../types';
 import { ANO_CARTA_INTENCAO, TAXA_MATERIAL_2027, calculateAgeAtCutoff, getRegularClassForAgeDynamic } from '../data';
+import { carregarColecao } from '../syncCache';
 import { getCollectionData, saveDocument, deleteDocument, proximoNumeroContrato } from '../firebase';
 import { montarSituacoes, mesmoConteudo, COLECAO_SITUACAO, percentualDescontoJaneiro, camposDescontoJaneiro, dividirJaneiro, PERCENTUAL_DESCONTO_JANEIRO } from '../situacao/situacao';
 import type { SituacaoDoc } from '../situacao/situacao';
@@ -82,7 +83,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
   const carregar = async () => {
     setCarga('carregando'); setErroCarga('');
     try {
-      const [d, m] = await Promise.all([getCollectionData<ContratoDoc>('contratos'), getCollectionData<ContratoModelo>('contratoModelos')]);
+      const [d, m] = await Promise.all([carregarColecao<ContratoDoc>('contratos'), carregarColecao<ContratoModelo>('contratoModelos')]);
       docsRef.current = d; setDocs(d); setModelos(m); setCarga('ok');
       if (m.length === 0) setPainelModelos(true);
     } catch (e: any) {
@@ -120,7 +121,7 @@ export default function ContratosTab({ students, guardians, enrollments, contrat
     try {
       const ctxs = students.map(aluno => ({ student: aluno, guardians, enrollments, classPrices, contraturnoPrices, contraturnos } as ContratoContexto));
       const { docs: novos, semCpf, semDesconto } = await montarSituacoes(ctxs, docsRef.current);
-      const atuais = await getCollectionData<SituacaoDoc>(COLECAO_SITUACAO);
+      const atuais = await carregarColecao<SituacaoDoc>(COLECAO_SITUACAO);
       const porId = new Map(atuais.map(a => [a.id, a]));
       let gravados = 0;
       for (const n of novos) {

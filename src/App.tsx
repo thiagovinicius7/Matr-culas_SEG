@@ -21,6 +21,7 @@ import {
 } from './data';
 import {
   seedDatabaseIfEmpty,
+  getDocumentById,
   getCollectionData,
   saveDocument,
   deleteDocument,
@@ -31,6 +32,7 @@ import {
   createTeamMemberAccount,
   signInAsPublicVisitor
 } from './firebase';
+import { carregarColecao, carregarDoAluno, limparCacheLocal } from './syncCache';
 import type { User as AuthUser } from 'firebase/auth';
 import {
   IMPORTED_STUDENTS,
@@ -194,30 +196,62 @@ export default function App() {
     async function initFirebase() {
       try {
         setLoading(true);
-        // Seed if first time
-        await seedDatabaseIfEmpty();
-        
-        // Fetch all data from Firestore collections. Cada coleção é buscada de
-        // forma independente (Promise.allSettled) — se uma falhar (por
-        // exemplo, uma coleção nova sem regra de segurança liberada ainda),
-        // as demais continuam carregando normalmente em vez de travar o
-        // sistema inteiro.
-        const results = await Promise.allSettled([
-          getCollectionData<Student>('students'),
-          getCollectionData<Guardian>('guardians'),
-          getCollectionData<Enrollment>('enrollments'),
-          getCollectionData<ContraturnoSegment>('contraturnos'),
-          getCollectionData<FinancialMovement>('movements'),
-          getCollectionData<RegularClass>('classPrices'),
-          getCollectionData<ContraturnoPrice>('contraturnoPrices'),
-          getCollectionData<{ id: string; value: string }>('settings'),
-          getCollectionData<NegotiationHistoryEntry>('negotiationHistory'),
-          getCollectionData<ContraturnoDailyException>('contraturnoDailyExceptions'),
-          getCollectionData<PackDocument>('packDocuments'),
-          getCollectionData<CoordenacaoSugestao>('coordenacaoSugestoes'),
-          getCollectionData<FichaSaude>('fichasSaude'),
-          getCollectionData<FichaAnamnese>('fichasAnamnese')
-        ]);
+        // Links das famílias: só os dados daquela criança (antes cada abertura relia o banco
+        // inteiro, ~1.000 leituras). Equipe e Coordenação: cópia local + só o que mudou.
+        const alunoDoLink = publicStudentId || fichaSaudeStudentId || dadosGeraisStudentId || anamneseStudentId;
+        const vazio = async <T,>(): Promise<T[]> => [];
+        let results: PromiseSettledResult<any[]>[];
+        if (alunoDoLink) {
+          const aluno = await getDocumentById<Student>('students', alunoDoLink).catch(() => null);
+          results = await Promise.allSettled([
+            Promise.resolve(aluno ? [aluno] : []),
+            carregarDoAluno<Guardian>('guardians', alunoDoLink),
+            carregarDoAluno<Enrollment>('enrollments', alunoDoLink),
+            carregarDoAluno<ContraturnoSegment>('contraturnos', alunoDoLink),
+            vazio<FinancialMovement>(),
+            getCollectionData<RegularClass>('classPrices'),
+            getCollectionData<ContraturnoPrice>('contraturnoPrices'),
+            getCollectionData<{ id: string; value: string }>('settings'),
+            vazio<NegotiationHistoryEntry>(),
+            vazio<ContraturnoDailyException>(),
+            vazio<PackDocument>(),
+            vazio<CoordenacaoSugestao>(),
+            carregarDoAluno<FichaSaude>('fichasSaude', alunoDoLink),
+            carregarDoAluno<FichaAnamnese>('fichasAnamnese', alunoDoLink),
+          ]);
+        } else if (isPublicFichaForm) {
+          // Ficha de família nova: só precisa das turmas e preços
+          results = await Promise.allSettled([
+            vazio<Student>(), vazio<Guardian>(), vazio<Enrollment>(), vazio<ContraturnoSegment>(), vazio<FinancialMovement>(),
+            getCollectionData<RegularClass>('classPrices'),
+            getCollectionData<ContraturnoPrice>('contraturnoPrices'),
+            getCollectionData<{ id: string; value: string }>('settings'),
+            vazio<NegotiationHistoryEntry>(), vazio<ContraturnoDailyException>(), vazio<PackDocument>(),
+            vazio<CoordenacaoSugestao>(), vazio<FichaSaude>(), vazio<FichaAnamnese>(),
+          ]);
+        } else {
+          // Seed if first time (checagem barata, 2 leituras)
+          await seedDatabaseIfEmpty();
+
+          // Cada coleção é buscada de forma independente (Promise.allSettled) — se uma
+          // falhar, as demais continuam carregando normalmente.
+          results = await Promise.allSettled([
+            carregarColecao<Student>('students'),
+            carregarColecao<Guardian>('guardians'),
+            carregarColecao<Enrollment>('enrollments'),
+            carregarColecao<ContraturnoSegment>('contraturnos'),
+            carregarColecao<FinancialMovement>('movements'),
+            carregarColecao<RegularClass>('classPrices'),
+            carregarColecao<ContraturnoPrice>('contraturnoPrices'),
+            carregarColecao<{ id: string; value: string }>('settings'),
+            carregarColecao<NegotiationHistoryEntry>('negotiationHistory'),
+            carregarColecao<ContraturnoDailyException>('contraturnoDailyExceptions'),
+            carregarColecao<PackDocument>('packDocuments'),
+            carregarColecao<CoordenacaoSugestao>('coordenacaoSugestoes'),
+            carregarColecao<FichaSaude>('fichasSaude'),
+            carregarColecao<FichaAnamnese>('fichasAnamnese'),
+          ]);
+        }
 
         const collectionNames = [
           'students', 'guardians', 'enrollments', 'contraturnos', 'movements',
@@ -424,6 +458,7 @@ export default function App() {
     try {
       setLoading(true);
       await clearAllDatabaseCollections();
+      await limparCacheLocal();
       setStudents([]);
       setGuardians([]);
       setEnrollments([]);
@@ -1890,6 +1925,7 @@ export default function App() {
       }
       // cópia de segurança do estado atual, antes de gravar qualquer coisa
       handleExportBackup('backup_antes_de_restaurar');
+      await limparCacheLocal(); // na próxima abertura relê tudo do banco
 
       setLoading(true);
 

@@ -4,6 +4,7 @@
 import { doc, runTransaction } from 'firebase/firestore';
 import { db, getCollectionData, getDocumentById, saveDocument, deleteDocument } from '../firebase';
 import { COL_FAMILIAS } from './uniformes';
+import { carregarColecao } from '../syncCache';
 import { mesmaFamilia, type FamiliaUniforme } from './familias';
 import {
   COL_CATALOGO, COL_CAMPANHAS, COL_PEDIDOS, CATALOGO_PADRAO, idPedido,
@@ -39,7 +40,7 @@ export async function carregarPedidos(): Promise<PedidoUniformeDoc[]> {
 /** Resumo da família pelo hash do CPF de um responsável (leitura só pelo id exato). */
 export const familiaPorCpfHash = (hash: string) => getDocumentById<FamiliaUniforme>(COL_FAMILIAS, hash);
 
-export const carregarFamilias = () => getCollectionData<FamiliaUniforme>(COL_FAMILIAS);
+export const carregarFamilias = () => carregarColecao<FamiliaUniforme>(COL_FAMILIAS);
 
 /**
  * Publica os resumos das famílias: grava só os que mudaram e apaga os que não valem mais
