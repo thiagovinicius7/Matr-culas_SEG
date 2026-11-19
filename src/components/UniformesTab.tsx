@@ -3,7 +3,7 @@ import {
   Shirt, Plus, Link2, MessageCircle, Lock, Unlock, Loader2, Search, Printer, Download, Trash2, X,
   CheckCircle2, Truck, Ban, RotateCcw, AlertTriangle, PackageCheck, Save, Receipt, ListChecks, Settings2, FileSpreadsheet, Users, Upload, Inbox,
 } from 'lucide-react';
-import { deleteDocument, getCollectionData } from '../firebase';
+import { deleteDocument, getCollectionData, getDocumentById } from '../firebase';
 import { moeda } from '../situacao/situacao';
 import type { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
 import type { ContratoContexto } from '../contratos/montarDados';
@@ -11,7 +11,7 @@ import {
   COL_CATALOGO, ROTULO_SITUACAO, situacaoDoEnvio, listaFornecedor, juntarItens, totalItens, qtdPecas, novoCodigo,
   novoIdCampanha, linkPublicoUniformes, mensagemDivulgacao, telefoneZap, dataHoraBR, separarLista, slug, compararTamanho,
   parcelasDe, valoresParcelas, valorPago, comParcelasPagas, textoPagamento, compararPagamentos, type MudancaPagamento,
-  type PecaCatalogo, type CampanhaUniforme, type PedidoUniformeDoc, type EnvioUniforme, type SituacaoEnvio,
+  COL_PEDIDOS, type PecaCatalogo, type CampanhaUniforme, type PedidoUniformeDoc, type EnvioUniforme, type SituacaoEnvio,
 } from '../uniformes/uniformes';
 import {
   carregarCatalogo, carregarCampanhas, carregarPedidos, semearCatalogo, alterarEnvio, acrescentarEnvio,
@@ -109,8 +109,9 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
       try { await alterarEnvio(m.pedidoId, m.codigo, x => comParcelasPagas(x, m.depois)); ok++; }
       catch { falhas++; }
     }
+    const alterados = importacao.mudancas.map(m => m.pedidoId);
     setImportacao(null);
-    await carregar();
+    await recarregarPedidos(alterados);
     setOcupado(false);
     showToast(falhas ? 'Pagamentos atualizados com falhas' : 'Pagamentos atualizados',
       `${ok} ${ok === 1 ? 'pedido atualizado' : 'pedidos atualizados'}${falhas ? ` · ${falhas} não foram gravados, tente de novo` : ''}`, falhas ? 'error' : 'success', 8000);
@@ -219,10 +220,26 @@ export default function UniformesTab({ students, guardians, enrollments, contrat
   };
 
   /* ---------- envios ---------- */
+  // Relê só os pedidos que mudaram (antes cada clique relia todos os pedidos, o catálogo e os lotes).
+  const recarregarPedidos = async (ids: string[]) => {
+    const unicos = [...new Set(ids)];
+    const lidos = await Promise.all(unicos.map(id => getDocumentById<PedidoUniformeDoc>(COL_PEDIDOS, id).catch(() => undefined)));
+    setPedidos(prev => {
+      let lista = [...prev];
+      unicos.forEach((id, i) => {
+        const novo = lidos[i];
+        if (novo === undefined) return; // falhou a leitura: mantém o que estava
+        lista = lista.filter(p => p.id !== id);
+        if (novo) lista.push(novo);
+      });
+      return lista;
+    });
+  };
+
   const mudarEnvio = async (l: LinhaEnvio, mudar: (e: EnvioUniforme) => EnvioUniforme | null, ok?: string) => {
     try {
       await alterarEnvio(l.pedido.id, l.envio.codigo, mudar);
-      await carregar();
+      await recarregarPedidos([l.pedido.id]);
       if (ok) showToast(ok, undefined, 'success');
     } catch { showToast('Não foi possível salvar', undefined, 'error'); }
   };
