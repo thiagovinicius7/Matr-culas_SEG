@@ -148,6 +148,7 @@ export default function App() {
   const [coordenacaoSugestoes, setCoordenacaoSugestoes] = useState<CoordenacaoSugestao[]>([]);
   const [fichasSaude, setFichasSaude] = useState<FichaSaude[]>([]);
   const [fichasAnamnese, setFichasAnamnese] = useState<FichaAnamnese[]>([]);
+  const [erroCargaNucleo, setErroCargaNucleo] = useState(false);
   const [coordenacaoDesbloqueada, setCoordenacaoDesbloqueada] = useState(false);
   const [coordenacaoSenhaInput, setCoordenacaoSenhaInput] = useState('');
   const [coordenacaoErro, setCoordenacaoErro] = useState('');
@@ -313,30 +314,21 @@ export default function App() {
         }));
         const sortedStudents = [...sanitizedStudents].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
-        // Ensure every student has an enrollment record in memory if somehow missing
-        const existingEnrollmentMap = new Map(loadedEnrollments.map(e => [e.alunoId, e]));
+        // IMPORTANTE (19/11/2026): aqui existia um trecho que, para todo aluno sem matrícula
+        // carregada, GRAVAVA uma matrícula 2026 vazia. Quando a leitura das matrículas falhou
+        // (cota do Firestore estourada), ele gravou matrículas falsas para os 101 alunos.
+        // Removido: o carregamento nunca grava nada no banco.
         const finalEnrollments: Enrollment[] = [...loadedEnrollments];
 
-        for (const st of sortedStudents) {
-          if (!existingEnrollmentMap.has(st.id)) {
-            const age = calculateAgeAtCutoff(st.nascimento, 2026);
-            const regClass = getRegularClassForAge(age);
-            const newE: Enrollment = {
-              id: `enroll_${st.id}`,
-              alunoId: st.id,
-              ano: 2026,
-              turmaRegularId: regClass.id,
-              valorRegularOriginal: regClass.valorMensal,
-              descontoMensal: 0,
-              valorFinalRegular: regClass.valorMensal,
-              statusNegociacao: 'Pendente',
-              faseProcesso: 'preparo_terra',
-              anotacoes: 'Matrícula Sítio Geranium'
-            };
-            finalEnrollments.push(newE);
-            await saveDocument('enrollments', newE);
-          }
+        // Se alunos, responsáveis ou matrículas não carregaram, não mostra o sistema:
+        // trabalhar com a lista incompleta poderia gravar dados errados por cima dos certos.
+        const nucleoFalhou = [loadedStudentsResult, loadedGuardiansResult, loadedEnrollmentsResult]
+          .some(r => r.status === 'rejected');
+        if (nucleoFalhou) {
+          setErroCargaNucleo(true);
+          return;
         }
+        setErroCargaNucleo(false);
 
         setStudents(sortedStudents);
         setGuardians(loadedGuardians);
@@ -2140,6 +2132,25 @@ export default function App() {
             </div>
           </div>
         </main>
+      </div>
+    );
+  }
+
+  if (erroCargaNucleo) {
+    return (
+      <div className="min-h-screen bg-brand-cream flex items-center justify-center p-6 font-sans">
+        <div className="max-w-sm text-center space-y-3 bg-white border border-rose-200 rounded-xl p-6 shadow-sm">
+          <p className="text-3xl">⚠️</p>
+          <h2 className="font-display font-bold text-brand-green-dark">Não foi possível carregar os dados</h2>
+          <p className="text-sm text-slate-600">
+            O banco não respondeu agora. Para não gravar nada por cima de dados certos, o sistema não abre com a lista incompleta.
+            Tente de novo em alguns minutos.
+          </p>
+          <button onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white text-sm font-bold rounded-lg cursor-pointer">
+            Tentar de novo
+          </button>
+        </div>
       </div>
     );
   }
